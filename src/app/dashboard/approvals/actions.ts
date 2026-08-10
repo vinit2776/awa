@@ -5,8 +5,8 @@ import { and, eq } from "drizzle-orm";
 import { getCurrentUserAndTenant } from "@/db/session";
 import { withTenant } from "@/db/withTenant";
 import { logAction } from "@/db/audit";
-import { isCurrentGroup, checkFullyApproved } from "@/db/approvals";
-import { purchaseRequisitions, requisitionApprovalRequirements, approvalDecisionLog } from "@/db/schema";
+import { isCurrentGroup, checkFullyApproved, rejectRequisition } from "@/db/approvals";
+import { requisitionApprovalRequirements, approvalDecisionLog } from "@/db/schema";
 
 export async function approveRequirement(formData: FormData) {
   const requirementId = String(formData.get("requirementId") ?? "");
@@ -56,60 +56,23 @@ export async function approveRequirement(formData: FormData) {
   revalidatePath("/dashboard/approvals");
 }
 
-export async function rejectRequirement(formData: FormData) {
+async function reject(formData: FormData, closure: "revisable" | "closed") {
   const requirementId = String(formData.get("requirementId") ?? "");
   const comment = String(formData.get("comment") ?? "").trim();
   if (!requirementId || !comment) return;
 
   const { user, tenant } = await getCurrentUserAndTenant();
-
-  await withTenant(tenant.id, async (tx) => {
-    const [requirement] = await tx
-      .select()
-      .from(requisitionApprovalRequirements)
-      .where(
-        and(
-          eq(requisitionApprovalRequirements.id, requirementId),
-          eq(requisitionApprovalRequirements.assignedUserId, user.id),
-          eq(requisitionApprovalRequirements.status, "pending"),
-        ),
-      );
-    if (!requirement) return;
-    if (!(await isCurrentGroup(tx, requirement.requisitionId, requirement.groupNo))) return;
-
-    await tx
-      .update(requisitionApprovalRequirements)
-      .set({ status: "rejected", decidedAt: new Date(), decisionComment: comment })
-      .where(eq(requisitionApprovalRequirements.id, requirement.id));
-
-    await tx.insert(approvalDecisionLog).values({
-      tenantId: tenant.id,
-      requisitionApprovalRequirementId: requirement.id,
-      actorUserId: user.id,
-      action: "rejected",
-      comment,
-    });
-
-    // Rejected-with-defects: the requisition can be revised and resubmitted
-    // (that flow is Sprint 6). Other approvers' pending rows are left as-is
-    // rather than cancelled — they just stop being actionable, since the
-    // inbox only surfaces rows for requisitions still pending_approval.
-    await tx
-      .update(purchaseRequisitions)
-      .set({ status: "rejected_revisable" })
-      .where(eq(purchaseRequisitions.id, requirement.requisitionId));
-
-    await logAction(tx, {
-      tenantId: tenant.id,
-      actorUserId: user.id,
-      action: "requisition_approval.rejected",
-      entityType: "requisition_approval_requirement",
-      entityId: requirement.id,
-      metadata: { requisitionId: requirement.requisitionId, comment },
-    });
-  });
+  await withTenant(tenant.id, (tx) => rejectRequisition(tx, tenant.id, user.id, requirementId, closure, comment));
 
   revalidatePath("/dashboard/approvals");
+}
+
+export async function requestRevision(formData: FormData) {
+  await reject(formData, "revisable");
+}
+
+export async function rejectAndClose(formData: FormData) {
+  await reject(formData, "closed");
 }
 
 export async function addAdHocApprover(formData: FormData) {

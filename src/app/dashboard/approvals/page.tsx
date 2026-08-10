@@ -10,7 +10,12 @@ import {
 } from "@/db/schema";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { approveRequirement, rejectRequirement, addAdHocApprover } from "./actions";
+import { approveRequirement, requestRevision, rejectAndClose, addAdHocApprover } from "./actions";
+
+function pendingDays(submittedAt: Date | null): number | null {
+  if (!submittedAt) return null;
+  return Math.floor((Date.now() - submittedAt.getTime()) / 86_400_000);
+}
 
 export default async function ApprovalsInboxPage() {
   const { user, tenant } = await getCurrentUserAndTenant();
@@ -66,6 +71,9 @@ export default async function ApprovalsInboxPage() {
                   <p className="text-xs text-muted-foreground">
                     {departmentName(requisition.departmentId)} · {costCenterName(requisition.costCenterId)}
                     {req.source === "ad_hoc" && " · ad-hoc addition"}
+                    {pendingDays(requisition.submittedAt) !== null && (
+                      <> · pending {pendingDays(requisition.submittedAt)} day{pendingDays(requisition.submittedAt) === 1 ? "" : "s"}</>
+                    )}
                   </p>
                   {requisition.justification && (
                     <p className="mt-1 text-xs text-muted-foreground">&quot;{requisition.justification}&quot;</p>
@@ -83,15 +91,25 @@ export default async function ApprovalsInboxPage() {
                   />
                   <button type="submit" className={cn(buttonVariants())}>Approve</button>
                 </form>
-                <form action={rejectRequirement} className="flex items-end gap-2">
+                <form action={requestRevision} className="flex items-end gap-2">
                   <input type="hidden" name="requirementId" value={req.id} />
                   <input
                     name="comment"
                     required
-                    placeholder="Reason for rejection"
+                    placeholder="What needs fixing?"
                     className="h-8 w-48 rounded-md border px-2 text-sm"
                   />
-                  <button type="submit" className={cn(buttonVariants({ variant: "outline" }))}>Reject</button>
+                  <button type="submit" className={cn(buttonVariants({ variant: "outline" }))}>Request revision</button>
+                </form>
+                <form action={rejectAndClose} className="flex items-end gap-2">
+                  <input type="hidden" name="requirementId" value={req.id} />
+                  <input
+                    name="comment"
+                    required
+                    placeholder="Reason for closing"
+                    className="h-8 w-48 rounded-md border px-2 text-sm"
+                  />
+                  <button type="submit" className={cn(buttonVariants({ variant: "outline" }))}>Reject &amp; close</button>
                 </form>
               </div>
 

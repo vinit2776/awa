@@ -2,7 +2,7 @@
 
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { createRequisition, type LineInput } from "./actions";
+import { createRequisition, reviseAndResubmitRequisition, type LineInput } from "./actions";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -24,24 +24,40 @@ const emptyLine = (): Line => ({
   estimatedUnitPrice: "0",
 });
 
+type Revision = {
+  requisitionId: string;
+  initial: {
+    departmentId: string | null;
+    costCenterId: string | null;
+    justification: string;
+    lines: LineInput[];
+  };
+};
+
 export function RequisitionForm({
   departments,
   costCenters,
   categories,
   catalogItems,
   committedByCostCenter,
+  revision,
 }: {
   departments: Department[];
   costCenters: CostCenter[];
   categories: Category[];
   catalogItems: CatalogItem[];
   committedByCostCenter: Record<string, number>;
+  revision?: Revision;
 }) {
   const router = useRouter();
-  const [departmentId, setDepartmentId] = useState("");
-  const [costCenterId, setCostCenterId] = useState("");
-  const [justification, setJustification] = useState("");
-  const [lines, setLines] = useState<Line[]>([emptyLine()]);
+  const [departmentId, setDepartmentId] = useState(revision?.initial.departmentId ?? "");
+  const [costCenterId, setCostCenterId] = useState(revision?.initial.costCenterId ?? "");
+  const [justification, setJustification] = useState(revision?.initial.justification ?? "");
+  const [lines, setLines] = useState<Line[]>(
+    revision?.initial.lines.length
+      ? revision.initial.lines.map((l) => ({ ...l, key: crypto.randomUUID() }))
+      : [emptyLine()],
+  );
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
@@ -62,21 +78,32 @@ export function RequisitionForm({
   const submit = (shouldSubmit: boolean) => {
     setError(null);
     startTransition(async () => {
-      const result = await createRequisition({
-        departmentId: departmentId || null,
-        costCenterId: costCenterId || null,
-        justification,
-        lines: lines.map((l) => ({
-          catalogItemId: l.catalogItemId,
-          freeTextDescription: l.freeTextDescription,
-          categoryId: l.categoryId,
-          fulfillmentType: l.fulfillmentType,
-          quantity: l.quantity,
-          uom: l.uom,
-          estimatedUnitPrice: l.estimatedUnitPrice,
-        })),
-        submit: shouldSubmit,
-      });
+      const cleanLines: LineInput[] = lines.map((l) => ({
+        catalogItemId: l.catalogItemId,
+        freeTextDescription: l.freeTextDescription,
+        categoryId: l.categoryId,
+        fulfillmentType: l.fulfillmentType,
+        quantity: l.quantity,
+        uom: l.uom,
+        estimatedUnitPrice: l.estimatedUnitPrice,
+      }));
+
+      const result = revision
+        ? await reviseAndResubmitRequisition({
+            requisitionId: revision.requisitionId,
+            departmentId: departmentId || null,
+            costCenterId: costCenterId || null,
+            justification,
+            lines: cleanLines,
+          })
+        : await createRequisition({
+            departmentId: departmentId || null,
+            costCenterId: costCenterId || null,
+            justification,
+            lines: cleanLines,
+            submit: shouldSubmit,
+          });
+
       if (result.error) {
         setError(result.error);
         return;
@@ -274,16 +301,18 @@ export function RequisitionForm({
       {error && <p className="text-sm text-destructive">{error}</p>}
 
       <div className="flex gap-2">
-        <button
-          type="button"
-          disabled={isPending}
-          onClick={() => submit(false)}
-          className={cn(buttonVariants({ variant: "outline" }))}
-        >
-          Save as draft
-        </button>
+        {!revision && (
+          <button
+            type="button"
+            disabled={isPending}
+            onClick={() => submit(false)}
+            className={cn(buttonVariants({ variant: "outline" }))}
+          >
+            Save as draft
+          </button>
+        )}
         <button type="button" disabled={isPending} onClick={() => submit(true)} className={cn(buttonVariants())}>
-          Submit
+          {revision ? "Resubmit" : "Submit"}
         </button>
       </div>
     </div>

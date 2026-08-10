@@ -1,12 +1,14 @@
 import { and, eq, inArray, isNull, or, sql } from "drizzle-orm";
 import type { db } from "./client";
 import { logAction } from "./audit";
+import { notifyUser } from "./notifications";
 import {
   purchaseRequisitions,
   purchaseRequisitionLines,
   approvalRules,
   approvalRuleRequirements,
   requisitionApprovalRequirements,
+  approvalDecisionLog,
   userRoles,
 } from "./schema";
 
@@ -145,10 +147,16 @@ export async function resolveApprovals(tx: typeof db, tenantId: string, requisit
     entityId: requisition.id,
     metadata: { approverCount: requirementRows.length, ruleIds: matchingRules.map((r) => r.id) },
   });
+
+  await notifyCurrentGroup(tx, requisition.id);
 }
 
 async function autoApprove(tx: typeof db, tenantId: string, requisitionId: string, reason: string) {
-  await tx.update(purchaseRequisitions).set({ status: "approved" }).where(eq(purchaseRequisitions.id, requisitionId));
+  const [requisition] = await tx
+    .update(purchaseRequisitions)
+    .set({ status: "approved" })
+    .where(eq(purchaseRequisitions.id, requisitionId))
+    .returning();
   await logAction(tx, {
     tenantId,
     action: "requisition.auto_approved",
@@ -156,6 +164,13 @@ async function autoApprove(tx: typeof db, tenantId: string, requisitionId: strin
     entityId: requisitionId,
     metadata: { reason },
   });
+  await notifyUser(
+    tx,
+    requisition.requestorId,
+    "requisition_approved",
+    "Your requisition was approved",
+    `No approval was required (${reason}).`,
+  );
 }
 
 /**
@@ -178,6 +193,28 @@ export async function isCurrentGroup(tx: typeof db, requisitionId: string, group
   return row?.minGroup === groupNo;
 }
 
+// Notifies whoever is in the current group. Called once when a
+// requisition first enters pending_approval, and again after every
+// approve — cheap to over-call (a still-open group's other member gets a
+// redundant nudge rather than silence) and simpler than tracking "have we
+// already notified this person for this group" separately.
+async function notifyCurrentGroup(tx: typeof db, requisitionId: string) {
+  const pending = await tx
+    .select({ assignedUserId: requisitionApprovalRequirements.assignedUserId, groupNo: requisitionApprovalRequirements.groupNo })
+    .from(requisitionApprovalRequirements)
+    .where(
+      and(
+        eq(requisitionApprovalRequirements.requisitionId, requisitionId),
+        eq(requisitionApprovalRequirements.status, "pending"),
+      ),
+    );
+  if (pending.length === 0) return;
+  const currentGroup = Math.min(...pending.map((p) => p.groupNo));
+  for (const p of pending.filter((p) => p.groupNo === currentGroup)) {
+    await notifyUser(tx, p.assignedUserId, "approval_needed", "A requisition needs your approval", "Open your approvals inbox to review it.");
+  }
+}
+
 export async function checkFullyApproved(tx: typeof db, tenantId: string, requisitionId: string) {
   const [row] = await tx
     .select({ pendingCount: sql<number>`count(*) filter (where ${requisitionApprovalRequirements.status} = 'pending')` })
@@ -185,7 +222,11 @@ export async function checkFullyApproved(tx: typeof db, tenantId: string, requis
     .where(eq(requisitionApprovalRequirements.requisitionId, requisitionId));
 
   if (Number(row?.pendingCount ?? 0) === 0) {
-    await tx.update(purchaseRequisitions).set({ status: "approved" }).where(eq(purchaseRequisitions.id, requisitionId));
+    const [requisition] = await tx
+      .update(purchaseRequisitions)
+      .set({ status: "approved" })
+      .where(eq(purchaseRequisitions.id, requisitionId))
+      .returning();
     await logAction(tx, {
       tenantId,
       action: "requisition.approved",
@@ -193,5 +234,91 @@ export async function checkFullyApproved(tx: typeof db, tenantId: string, requis
       entityId: requisitionId,
       metadata: {},
     });
+    await notifyUser(tx, requisition.requestorId, "requisition_approved", "Your requisition was approved", "All required approvals are in.");
+  } else {
+    await notifyCurrentGroup(tx, requisitionId);
   }
+}
+
+/**
+ * Handles both reject outcomes (§04): "rejected with defects" returns to
+ * the requestor to revise and resubmit; "rejected and closed" ends the
+ * PR permanently. Either way, every other still-pending row for this
+ * round is closed out too — they'll never be actioned now, and leaving
+ * them pending would corrupt the current-group calculation if the
+ * requestor later resubmits and a fresh round of rows gets created for
+ * the same requisitionId. Already-decided (approved) rows are left
+ * alone as the historical record.
+ */
+export async function rejectRequisition(
+  tx: typeof db,
+  tenantId: string,
+  actorUserId: string,
+  requirementId: string,
+  closure: "revisable" | "closed",
+  comment: string,
+): Promise<{ error?: string }> {
+  const [requirement] = await tx
+    .select()
+    .from(requisitionApprovalRequirements)
+    .where(
+      and(
+        eq(requisitionApprovalRequirements.id, requirementId),
+        eq(requisitionApprovalRequirements.assignedUserId, actorUserId),
+        eq(requisitionApprovalRequirements.status, "pending"),
+      ),
+    );
+  if (!requirement) return { error: "Not found, or already decided." };
+  if (!(await isCurrentGroup(tx, requirement.requisitionId, requirement.groupNo))) {
+    return { error: "It isn't your turn to decide on this requisition yet." };
+  }
+
+  await tx
+    .update(requisitionApprovalRequirements)
+    .set({ status: "rejected", decidedAt: new Date(), decisionComment: comment })
+    .where(eq(requisitionApprovalRequirements.id, requirement.id));
+
+  await tx.insert(approvalDecisionLog).values({
+    tenantId,
+    requisitionApprovalRequirementId: requirement.id,
+    actorUserId,
+    action: "rejected",
+    comment,
+  });
+
+  await tx
+    .update(requisitionApprovalRequirements)
+    .set({ status: "rejected", decidedAt: new Date(), decisionComment: "Superseded — requisition rejected." })
+    .where(
+      and(
+        eq(requisitionApprovalRequirements.requisitionId, requirement.requisitionId),
+        eq(requisitionApprovalRequirements.status, "pending"),
+      ),
+    );
+
+  const newStatus = closure === "closed" ? "rejected_closed" : "rejected_revisable";
+  const [updatedRequisition] = await tx
+    .update(purchaseRequisitions)
+    .set({ status: newStatus })
+    .where(eq(purchaseRequisitions.id, requirement.requisitionId))
+    .returning();
+
+  await logAction(tx, {
+    tenantId,
+    actorUserId,
+    action: closure === "closed" ? "requisition.rejected_closed" : "requisition.rejected_revisable",
+    entityType: "purchase_requisition",
+    entityId: requirement.requisitionId,
+    metadata: { comment },
+  });
+
+  await notifyUser(
+    tx,
+    updatedRequisition.requestorId,
+    "requisition_rejected",
+    closure === "closed" ? "Your requisition was rejected and closed" : "Your requisition needs revisions",
+    `Reason: ${comment}`,
+  );
+
+  return {};
 }
