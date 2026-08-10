@@ -5,6 +5,7 @@ import { and, eq } from "drizzle-orm";
 import { getCurrentUserAndTenant } from "@/db/session";
 import { withTenant } from "@/db/withTenant";
 import { logAction } from "@/db/audit";
+import { resolveApprovals } from "@/db/approvals";
 import { purchaseRequisitions, purchaseRequisitionLines } from "@/db/schema";
 
 export type LineInput = {
@@ -76,6 +77,10 @@ export async function createRequisition(input: {
       metadata: { total, lineCount: linesWithTotals.length },
     });
 
+    if (input.submit) {
+      await resolveApprovals(tx, tenant.id, requisition.id);
+    }
+
     return requisition.id;
   });
 
@@ -111,6 +116,8 @@ export async function submitRequisition(formData: FormData) {
       entityId: updated.id,
       metadata: {},
     });
+
+    await resolveApprovals(tx, tenant.id, updated.id);
   });
 
   revalidatePath("/dashboard/requisitions");

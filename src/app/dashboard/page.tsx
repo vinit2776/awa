@@ -32,6 +32,9 @@ export default async function DashboardPage() {
           <Link href="/dashboard/requisitions" className={cn(buttonVariants({ variant: "outline" }))}>
             My requests
           </Link>
+          <Link href="/dashboard/approvals" className={cn(buttonVariants({ variant: "outline" }))}>
+            Approvals
+          </Link>
           <Link href="/dashboard/admin/departments" className={cn(buttonVariants({ variant: "outline" }))}>
             Admin
           </Link>

@@ -30,6 +30,11 @@ export default async function AdminLayout({ children }: { children: React.ReactN
             </Link>
           </li>
           <li>
+            <Link href="/dashboard/admin/approval-rules" className="block rounded px-2 py-1.5 hover:bg-muted">
+              Approval rules
+            </Link>
+          </li>
+          <li>
             <Link href="/dashboard/admin/roles" className="block rounded px-2 py-1.5 hover:bg-muted">
               Roles
             </Link>
