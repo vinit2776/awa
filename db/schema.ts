@@ -67,6 +67,9 @@ export const tenants = pgTable("tenants", {
   name: text("name").notNull(),
   slug: text("slug").notNull().unique(),
   status: tenantStatus("status").notNull().default("active"),
+  // Set deliberately by a platform admin onboarding a customer — never
+  // auto-created from a sign-in attempt. See §14 Sprint 1 / 0002 migration.
+  workosOrganizationId: text("workos_organization_id").unique(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
@@ -85,6 +88,9 @@ export const users = pgTable("users", {
   email: text("email").notNull(),
   fullName: text("full_name").notNull(),
   status: userStatus("status").notNull().default("invited"),
+  // Set on first successful WorkOS sign-in (JIT linking, app-side) once a
+  // row already exists for this email within a matching tenant.
+  workosUserId: text("workos_user_id").unique(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [unique().on(t.tenantId, t.email)]);

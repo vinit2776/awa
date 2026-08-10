@@ -12,4 +12,4 @@ Next.js (App Router) + TypeScript, Postgres (Neon/Supabase) with RLS, Drizzle, W
 
 ## Status
 
-Pre-build. Repo, hosting accounts, and CI/CD are being set up per [SETUP.md](SETUP.md) before Sprint 0 (app scaffold) begins.
+Sprint 1 (tenancy &amp; auth) complete. Next.js app scaffolded, phase 0–1 schema live on Supabase with RLS actually enforced (verified, not assumed — see `SETUP.md`), WorkOS AuthKit wired end to end: sign in → tenant/user resolved → RLS-scoped query, all on a dedicated `app_runtime` role rather than the table owner. Sprint 2 (roles &amp; platform console) is next per the scope doc's §14 sprint plan.

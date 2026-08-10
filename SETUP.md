@@ -27,4 +27,24 @@ All 7 environment variables (`DATABASE_URL`, `WORKOS_API_KEY`, `WORKOS_CLIENT_ID
 
 ## CI/CD
 
-`.github/workflows/ci.yml` runs lint/typecheck/build on every PR — currently a no-op guard until Sprint 0 adds `package.json`, at which point it activates automatically. Deployment itself is handled by Vercel's GitHub integration (step 1 above), not by this workflow.
+`.github/workflows/ci.yml` runs lint/typecheck/build on every PR and is live now that Sprint 0 added `package.json`. Deployment itself is handled by Vercel's GitHub integration (step 1 above), not by this workflow.
+
+## Database roles (added in Sprint 1)
+
+Two Postgres roles, two connection strings — this distinction matters, don't collapse it:
+
+- **`app_runtime`** (`DATABASE_URL`) — the role the app actually queries as. RLS applies to it in full. This is what `db/client.ts` uses, and it's what every feature sprint from here on should use, via `db/withTenant.ts`.
+- **postgres, the table owner** (`DATABASE_URL_MIGRATIONS`) — RLS does **not** apply to table owners in Postgres, by design. Used only for running migrations (`supabase db push`, `drizzle.config.ts`) and the one legitimate bootstrap case where RLS scope genuinely can't apply yet: resolving which tenant a signing-in user belongs to, in `db/tenant.ts` and `db/session.ts` (via `db/adminClient.ts`). Nothing else should import `adminClient.ts`.
+
+This split exists because the first version of `DATABASE_URL` pointed at the owner role — meaning RLS was silently bypassed on every query, including the phase-0 smoke tests. Verified fixed with a live test proving an unscoped `app_runtime` query returns nothing even when matching rows exist, and `withTenant` returns exactly the right rows for the right tenant and nothing for the wrong one.
+
+`app_runtime`'s password, like the Supabase database password, was generated locally and never shown in chat — see `.app-runtime-password.local` (gitignored) if you need direct `psql` access as that role.
+
+## Auth flow (Sprint 1)
+
+WorkOS AuthKit is wired (`src/proxy.ts`, `src/app/callback/route.ts`). There's no self-serve signup yet — onboarding a customer is two deliberate steps, not something that happens automatically from a sign-in attempt:
+
+1. A platform admin links a `tenants` row to a WorkOS Organization (`tenants.workos_organization_id`).
+2. A platform admin (or tenant admin, once that UI exists) pre-provisions a `users` row for each person, status `invited`, matched by email within that tenant.
+
+The first time that person signs in via WorkOS, `db/tenant.ts`'s `linkUserOnSignIn` matches their WorkOS organization to the tenant, matches their email to the pending `users` row, records their `workos_user_id`, and flips status to `active`. Signing in with an email that has no matching pre-provisioned row fails loudly (a real error, not a silent bounce) — that's intentional; it means an admin step is missing, not a bug to paper over.
