@@ -1,0 +1,44 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Skip if app not scaffolded yet
+        id: gate
+        run: |
+          if [ -f package.json ]; then
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "No package.json yet — Sprint 0 hasn't landed. Nothing to check."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/setup-node@v4
+        if: steps.gate.outputs.skip == 'false'
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install
+        if: steps.gate.outputs.skip == 'false'
+        run: npm ci
+
+      - name: Lint
+        if: steps.gate.outputs.skip == 'false'
+        run: npm run lint
+
+      - name: Typecheck
+        if: steps.gate.outputs.skip == 'false'
+        run: npm run typecheck
+
+      - name: Build
+        if: steps.gate.outputs.skip == 'false'
+        run: npm run build

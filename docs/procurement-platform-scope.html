@@ -1,0 +1,1272 @@
+<title>Procurement &amp; asset platform — scope &amp; phased build plan</title>
+<style>
+  :root{
+    --paper:#F1F2ED; --ink:#1B211F; --ink-soft:#545B57; --ink-faint:#7C837E;
+    --rule:#CBD0C7; --rule-strong:#B3B9AE; --panel:#E8E9E3;
+    --verified:#0B6E56; --verified-soft:#E3EFE9;
+    --seal:#A63A2D; --seal-soft:#F5E6E2;
+    --amber:#9C6B1F; --amber-soft:#F1E7D3;
+    --serif:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,ui-serif,serif;
+    --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",ui-sans-serif,Helvetica,Arial,sans-serif;
+    --mono:ui-monospace,"SF Mono","Cascadia Code",Menlo,Consolas,monospace;
+  }
+  @media (prefers-color-scheme:dark){
+    :root{
+      --paper:#151815; --ink:#E7E9E3; --ink-soft:#A2A89E; --ink-faint:#7C837E;
+      --rule:#33372F; --rule-strong:#3F443A; --panel:#1D211C;
+      --verified:#3FBE9A; --verified-soft:#1B2C26;
+      --seal:#E2695A; --seal-soft:#2E1E1B;
+      --amber:#D9A94D; --amber-soft:#2B2417;
+    }
+  }
+  :root[data-theme="dark"]{
+    --paper:#151815; --ink:#E7E9E3; --ink-soft:#A2A89E; --ink-faint:#7C837E;
+    --rule:#33372F; --rule-strong:#3F443A; --panel:#1D211C;
+    --verified:#3FBE9A; --verified-soft:#1B2C26;
+    --seal:#E2695A; --seal-soft:#2E1E1B;
+    --amber:#D9A94D; --amber-soft:#2B2417;
+  }
+  :root[data-theme="light"]{
+    --paper:#F1F2ED; --ink:#1B211F; --ink-soft:#545B57; --ink-faint:#7C837E;
+    --rule:#CBD0C7; --rule-strong:#B3B9AE; --panel:#E8E9E3;
+    --verified:#0B6E56; --verified-soft:#E3EFE9;
+    --seal:#A63A2D; --seal-soft:#F5E6E2;
+    --amber:#9C6B1F; --amber-soft:#F1E7D3;
+  }
+  *{box-sizing:border-box;}
+  body{background:var(--paper);color:var(--ink);font-family:var(--sans);line-height:1.65;margin:0;padding:0;-webkit-font-smoothing:antialiased;}
+  ::selection{background:var(--verified-soft);color:var(--verified);}
+  a{color:var(--verified);text-decoration:none;border-bottom:1px solid var(--verified-soft);}
+  a:hover{border-bottom-color:var(--verified);}
+  a:focus-visible,button:focus-visible,summary:focus-visible{outline:2px solid var(--verified);outline-offset:2px;}
+
+  .page{display:grid;grid-template-columns:252px minmax(0,1fr);gap:0;max-width:1180px;margin:0 auto;}
+  @media (max-width:860px){.page{grid-template-columns:1fr;}}
+
+  .toc{position:sticky;top:0;align-self:start;height:100vh;overflow-y:auto;padding:2.5rem 1.25rem 2rem 2rem;border-right:1px solid var(--rule);}
+  @media (max-width:860px){.toc{position:static;height:auto;border-right:none;border-bottom:1px solid var(--rule);padding:1.5rem 1.5rem 1rem;}}
+  .toc-brand{font-family:var(--mono);font-size:11px;letter-spacing:.08em;color:var(--ink-faint);text-transform:uppercase;margin:0 0 1.25rem;}
+  .toc ol{list-style:none;margin:0;padding:0;counter-reset:toc;}
+  .toc li{counter-increment:toc;margin-bottom:2px;}
+  .toc a{display:flex;gap:10px;border:none;color:var(--ink-soft);font-size:13.5px;padding:6px 8px;border-radius:4px;}
+  .toc a::before{content:counter(toc,decimal-leading-zero);font-family:var(--mono);color:var(--ink-faint);font-size:11px;padding-top:1px;}
+  .toc a:hover{background:var(--panel);color:var(--ink);}
+
+  main{padding:3rem clamp(1.25rem,4vw,4rem) 6rem;min-width:0;}
+  .masthead{max-width:640px;margin-bottom:3.5rem;padding-bottom:2rem;border-bottom:1px solid var(--rule);}
+  .eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--verified);margin:0 0 .9rem;}
+  h1{font-family:var(--serif);font-weight:400;font-size:clamp(28px,4vw,38px);line-height:1.15;margin:0 0 .75rem;text-wrap:balance;letter-spacing:-.01em;}
+  .lede{font-size:16px;color:var(--ink-soft);margin:0;max-width:56ch;}
+
+  section{max-width:760px;margin:0 0 3.25rem;}
+  section.wide{max-width:none;}
+  h2{font-family:var(--serif);font-weight:400;font-size:23px;margin:0 0 .35rem;letter-spacing:-.005em;}
+  .sec-num{font-family:var(--mono);font-size:12px;color:var(--ink-faint);display:block;margin-bottom:.4rem;}
+  h3{font-family:var(--sans);font-weight:600;font-size:14.5px;margin:1.6rem 0 .6rem;color:var(--ink);}
+  p{margin:0 0 .9rem;max-width:66ch;}
+  ul,ol.plain{margin:0 0 .9rem;padding-left:1.15rem;}
+  li{margin-bottom:.4rem;max-width:64ch;}
+  strong{font-weight:600;}
+  code{font-family:var(--mono);font-size:.86em;background:var(--panel);padding:.1em .4em;border-radius:3px;}
+
+  .callout{border-left:2px solid var(--amber);background:var(--amber-soft);padding:.85rem 1.1rem;border-radius:0 6px 6px 0;font-size:14px;margin:1rem 0;}
+  .callout strong{color:var(--amber);}
+  .callout.risk{border-left-color:var(--seal);background:var(--seal-soft);}
+  .callout.risk strong{color:var(--seal);}
+
+  table{border-collapse:collapse;width:100%;font-size:13.5px;}
+  th,td{text-align:left;padding:8px 12px;border-bottom:1px solid var(--rule);vertical-align:top;}
+  th{font-family:var(--mono);font-size:11px;letter-spacing:.04em;text-transform:uppercase;color:var(--ink-faint);font-weight:500;border-bottom:1px solid var(--rule-strong);}
+  td code{background:none;padding:0;}
+  .schema-wrap{overflow-x:auto;border:1px solid var(--rule);border-radius:8px;margin:1rem 0 1.6rem;}
+  .schema-wrap table{min-width:560px;}
+  .schema-wrap td:first-child,.schema-wrap th:first-child{padding-left:16px;}
+  .field{font-family:var(--mono);font-size:12.5px;}
+  .type{font-family:var(--mono);font-size:12px;color:var(--ink-soft);}
+  .tbl-title{display:flex;align-items:center;justify-content:space-between;background:var(--panel);padding:9px 16px;font-family:var(--mono);font-size:12.5px;border-bottom:1px solid var(--rule);}
+  .tbl-title span.dim{color:var(--ink-faint);}
+
+  .badge{display:inline-block;font-family:var(--mono);font-size:10.5px;letter-spacing:.03em;padding:2px 8px;border-radius:20px;text-transform:uppercase;}
+  .badge.trust{background:var(--verified-soft);color:var(--verified);}
+  .badge.risk{background:var(--seal-soft);color:var(--seal);}
+  .badge.later{background:var(--amber-soft);color:var(--amber);}
+
+  .roadmap{margin-top:1rem;}
+  .phase{border:1px solid var(--rule);border-radius:10px;margin-bottom:1.1rem;overflow:hidden;}
+  .phase-head{display:flex;align-items:baseline;gap:14px;padding:16px 20px;background:var(--panel);border-bottom:1px solid var(--rule);}
+  .phase-num{font-family:var(--serif);font-size:26px;color:var(--verified);line-height:1;}
+  .phase-name{font-weight:600;font-size:15.5px;}
+  .phase-goal{color:var(--ink-soft);font-size:13.5px;margin-left:auto;text-align:right;max-width:40ch;}
+  .phase-body{display:grid;grid-template-columns:1fr 1fr;gap:0;}
+  @media (max-width:640px){.phase-body{grid-template-columns:1fr;}}
+  .phase-col{padding:16px 20px;font-size:13.5px;}
+  .phase-col:first-child{border-right:1px solid var(--rule);}
+  @media (max-width:640px){.phase-col:first-child{border-right:none;border-bottom:1px solid var(--rule);}}
+  .phase-col h4{font-family:var(--mono);font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-faint);margin:0 0 .6rem;font-weight:500;}
+  .phase-col ul{margin:0;padding-left:1.05rem;}
+  .phase-col li{margin-bottom:.35rem;}
+  .deferred li{color:var(--ink-soft);}
+
+  .qgrid{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+  @media (max-width:640px){.qgrid{grid-template-columns:1fr;}}
+  .qcard{border:1px solid var(--rule);border-radius:8px;padding:14px 16px;font-size:13.5px;}
+  .qcard h4{margin:0 0 .5rem;font-size:14px;}
+
+  footer{border-top:1px solid var(--rule);padding:2rem clamp(1.25rem,4vw,4rem) 3rem;font-family:var(--mono);font-size:11.5px;color:var(--ink-faint);}
+
+  .mock-label{font-family:var(--mono);font-size:11px;color:var(--ink-faint);margin:0 0 .5rem;letter-spacing:.02em;}
+  .mock-frame{border:1px solid var(--rule);border-radius:10px;overflow:hidden;margin:0 0 1.6rem;background:var(--paper);}
+  .mock-titlebar{display:flex;align-items:center;gap:6px;padding:8px 12px;border-bottom:1px solid var(--rule);background:var(--panel);}
+  .mock-dot{width:7px;height:7px;border-radius:50%;background:var(--rule-strong);}
+  .mock-url{margin-left:8px;font-family:var(--mono);font-size:10.5px;color:var(--ink-faint);background:var(--paper);border:1px solid var(--rule);border-radius:4px;padding:2px 10px;flex:1;}
+  .mock-body{display:grid;grid-template-columns:132px 1fr;min-height:220px;}
+  .mock-body.mobile{display:block;max-width:300px;margin:0 auto;}
+  .mock-nav{border-right:1px solid var(--rule);padding:12px 8px;font-size:11.5px;background:var(--panel);}
+  .mock-nav-item{padding:6px 9px;border-radius:6px;color:var(--ink-soft);margin-bottom:2px;}
+  .mock-nav-item.active{background:var(--verified-soft);color:var(--verified);font-weight:600;}
+  .mock-main{padding:14px 18px;font-size:12px;}
+  .mock-h{font-weight:600;font-size:13px;margin:0 0 10px;display:flex;align-items:center;justify-content:space-between;}
+  .mock-table{width:100%;font-size:11px;border-collapse:collapse;}
+  .mock-table th{text-align:left;color:var(--ink-faint);font-weight:500;padding:4px 7px;border-bottom:1px solid var(--rule-strong);font-family:var(--mono);font-size:9.5px;text-transform:uppercase;letter-spacing:.03em;}
+  .mock-table td{padding:6px 7px;border-bottom:1px solid var(--rule);}
+  .mock-pill{display:inline-block;font-size:9.5px;padding:2px 7px;border-radius:20px;font-family:var(--mono);white-space:nowrap;}
+  .mock-pill.ok{background:var(--verified-soft);color:var(--verified);}
+  .mock-pill.warn{background:var(--amber-soft);color:var(--amber);}
+  .mock-pill.risk{background:var(--seal-soft);color:var(--seal);}
+  .mock-pill.info{background:var(--panel);color:var(--ink-soft);}
+  .mock-btn{display:inline-block;font-size:10.5px;padding:5px 11px;border-radius:6px;border:1px solid var(--rule-strong);background:var(--paper);color:var(--ink);}
+  .mock-btn.primary{background:var(--verified);border-color:var(--verified);color:#fff;}
+  .mock-btn.ghost{background:none;}
+  .mock-field label{display:block;font-family:var(--mono);font-size:9.5px;color:var(--ink-faint);text-transform:uppercase;letter-spacing:.03em;margin-bottom:3px;}
+  .mock-field input{width:100%;font-size:11.5px;padding:6px 8px;border:1px solid var(--rule-strong);border-radius:5px;background:var(--paper);color:var(--ink);}
+  .mock-field{margin-bottom:10px;}
+  .mock-bar{height:6px;border-radius:3px;background:var(--rule);overflow:hidden;margin-top:4px;}
+  .mock-bar-fill{height:100%;background:var(--verified);}
+  .mock-steps{display:flex;align-items:center;gap:0;margin:6px 0 14px;}
+  .mock-step{flex:1;text-align:center;font-size:9.5px;padding-bottom:8px;border-bottom:3px solid var(--rule-strong);color:var(--ink-faint);position:relative;}
+  .mock-step.done{border-color:var(--verified);color:var(--verified);}
+  .mock-step.current{border-color:var(--amber);color:var(--amber);font-weight:600;}
+  .mock-detail{border-left:1px solid var(--rule);padding-left:16px;}
+  .mock-kv{display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--rule);font-size:11px;}
+  .mock-kv span:first-child{color:var(--ink-faint);}
+
+  .hifi-frame{border:1px solid var(--rule);border-radius:12px;overflow:hidden;margin:0 0 1rem;background:var(--paper);box-shadow:0 1px 3px rgba(0,0,0,.05);}
+  .hifi-top{display:flex;align-items:center;gap:16px;padding:10px 20px;border-bottom:1px solid var(--rule);}
+  .hifi-logo{width:26px;height:26px;border-radius:7px;background:var(--verified);color:#fff;display:flex;align-items:center;justify-content:center;font-family:var(--serif);font-size:14px;flex-shrink:0;}
+  .hifi-brand{font-weight:600;font-size:13.5px;}
+  .hifi-tenant{font-size:11px;color:var(--ink-faint);padding-left:12px;border-left:1px solid var(--rule);margin-left:2px;}
+  .hifi-search{flex:1;max-width:320px;margin:0 auto;font-size:12px;color:var(--ink-faint);background:var(--panel);border:1px solid var(--rule);border-radius:7px;padding:6px 12px;}
+  .hifi-topright{display:flex;align-items:center;gap:14px;margin-left:auto;}
+  .hifi-bell{position:relative;color:var(--ink-soft);font-size:15px;}
+  .hifi-bell::after{content:"";position:absolute;top:-2px;right:-2px;width:6px;height:6px;border-radius:50%;background:var(--seal);}
+  .hifi-user{display:flex;align-items:center;gap:8px;}
+  .hifi-avatar{width:26px;height:26px;border-radius:50%;background:var(--verified-soft);color:var(--verified);display:flex;align-items:center;justify-content:center;font-size:10.5px;font-weight:600;flex-shrink:0;}
+  .hifi-avatar.alt{background:var(--amber-soft);color:var(--amber);}
+  .hifi-username{font-size:12px;font-weight:500;line-height:1.2;}
+  .hifi-userrole{font-size:10px;color:var(--ink-faint);line-height:1.2;}
+  .hifi-body{display:grid;grid-template-columns:168px 280px 1fr;min-height:540px;}
+  @media (max-width:820px){.hifi-body{grid-template-columns:1fr;}}
+  .hifi-nav{border-right:1px solid var(--rule);padding:16px 10px;background:var(--panel);}
+  .hifi-nav-item{display:flex;align-items:center;gap:9px;padding:8px 11px;border-radius:7px;font-size:12.5px;color:var(--ink-soft);margin-bottom:2px;}
+  .hifi-nav-item.active{background:var(--verified);color:#fff;font-weight:600;}
+  .hifi-nav-dot{width:5px;height:5px;border-radius:50%;background:currentColor;opacity:.5;flex-shrink:0;}
+  .hifi-list{border-right:1px solid var(--rule);padding:14px 0;}
+  .hifi-list-head{padding:0 16px 10px;display:flex;align-items:center;justify-content:space-between;}
+  .hifi-list-title{font-weight:600;font-size:13px;}
+  .hifi-sort{font-size:10.5px;color:var(--ink-faint);}
+  .hifi-chips{display:flex;gap:6px;padding:0 16px 12px;}
+  .hifi-chip{font-size:10.5px;padding:3px 9px;border-radius:20px;border:1px solid var(--rule-strong);color:var(--ink-soft);}
+  .hifi-chip.active{background:var(--ink);color:var(--paper);border-color:var(--ink);}
+  .hifi-row{padding:11px 16px;border-left:3px solid transparent;border-bottom:1px solid var(--rule);}
+  .hifi-row.selected{border-left-color:var(--verified);background:var(--verified-soft);}
+  .hifi-row-top{display:flex;align-items:center;gap:8px;margin-bottom:4px;}
+  .hifi-row-title{font-size:12.5px;font-weight:600;flex:1;}
+  .hifi-row-meta{font-size:11px;color:var(--ink-faint);display:flex;justify-content:space-between;}
+  .hifi-detail{padding:22px 26px;}
+  .hifi-dhead{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:4px;gap:12px;}
+  .hifi-dtitle{font-family:var(--serif);font-size:20px;}
+  .hifi-damount{font-size:22px;font-weight:600;font-variant-numeric:tabular-nums;white-space:nowrap;}
+  .hifi-dsub{font-size:12px;color:var(--ink-soft);margin-bottom:18px;}
+  .hifi-chainlabel{font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:.04em;color:var(--ink-faint);margin:0 0 8px;}
+  .hifi-chain{display:flex;gap:8px;margin-bottom:20px;flex-wrap:wrap;align-items:center;}
+  .hifi-chainchip{border:1px solid var(--rule-strong);border-radius:8px;padding:7px 12px;font-size:11.5px;display:flex;align-items:center;gap:7px;}
+  .hifi-chainchip.self{border-color:var(--verified);background:var(--verified-soft);}
+  .cardgrid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:18px;}
+  @media (max-width:600px){.cardgrid{grid-template-columns:1fr;}}
+  .hifi-card{border:1px solid var(--rule);border-radius:9px;padding:12px 14px;}
+  .hifi-card h5{font-family:var(--mono);font-size:9.5px;text-transform:uppercase;letter-spacing:.04em;color:var(--ink-faint);margin:0 0 7px;font-weight:500;}
+  .hifi-card .big{font-size:15px;font-weight:600;font-variant-numeric:tabular-nums;}
+  .hifi-card .sub{font-size:11px;color:var(--ink-soft);margin-top:2px;}
+  .hifi-justif{border-left:2px solid var(--rule-strong);padding:4px 0 4px 14px;font-size:12px;color:var(--ink-soft);font-style:italic;margin-bottom:20px;}
+  .hifi-actions{display:flex;align-items:center;gap:10px;padding-top:16px;border-top:1px solid var(--rule);flex-wrap:wrap;}
+  .hifi-comment{flex:1;min-width:140px;font-size:12px;padding:8px 12px;border:1px solid var(--rule-strong);border-radius:7px;color:var(--ink-faint);}
+  .hifi-btn{font-size:12px;font-weight:600;padding:8px 16px;border-radius:7px;border:1px solid var(--rule-strong);background:var(--paper);color:var(--ink);white-space:nowrap;}
+  .hifi-btn.primary{background:var(--verified);border-color:var(--verified);color:#fff;}
+  .hifi-btn.danger{border-color:var(--seal);color:var(--seal);background:none;}
+  .hifi-btn.ghost{border:none;color:var(--ink-soft);}
+
+  .hifi-form{padding:24px 28px;max-width:540px;}
+  .hifi-field{margin-bottom:16px;}
+  .hifi-field label{display:block;font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:.04em;color:var(--ink-faint);margin-bottom:5px;}
+  .hifi-input{width:100%;font-size:13px;padding:9px 11px;border:1px solid var(--rule-strong);border-radius:7px;background:var(--paper);color:var(--ink);}
+  .hifi-formrow{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+  .hifi-toggle{display:inline-flex;border:1px solid var(--rule-strong);border-radius:7px;overflow:hidden;}
+  .hifi-toggle-opt{padding:7px 16px;font-size:12px;color:var(--ink-soft);}
+  .hifi-toggle-opt.active{background:var(--verified);color:#fff;font-weight:600;}
+  .hifi-match{font-size:11px;color:var(--verified);margin-top:5px;}
+  .hifi-hint{font-size:11px;color:var(--ink-faint);margin-top:5px;}
+  .hifi-textarea{width:100%;font-size:12.5px;padding:9px 11px;border:1px solid var(--rule-strong);border-radius:7px;color:var(--ink-soft);font-style:italic;min-height:52px;}
+  .hifi-attach{display:inline-flex;align-items:center;gap:6px;font-size:11px;color:var(--ink-soft);background:var(--panel);border:1px solid var(--rule);border-radius:6px;padding:4px 10px;margin-top:8px;}
+
+  .hifi-top.platform .hifi-logo{background:var(--amber);}
+  .hifi-nav-item.active.platform{background:var(--amber);color:#fff;}
+  .hifi-stats{display:flex;gap:22px;margin-bottom:18px;flex-wrap:wrap;}
+  .hifi-stat .n{font-size:20px;font-weight:600;font-variant-numeric:tabular-nums;}
+  .hifi-stat .l{font-family:var(--mono);font-size:9.5px;text-transform:uppercase;color:var(--ink-faint);letter-spacing:.03em;margin-top:2px;}
+  .hifi-switch{display:inline-block;width:30px;height:16px;border-radius:10px;background:var(--verified);position:relative;vertical-align:middle;flex-shrink:0;}
+  .hifi-switch::after{content:"";position:absolute;top:2px;right:2px;width:12px;height:12px;border-radius:50%;background:#fff;}
+  .hifi-switch.off{background:var(--rule-strong);}
+  .hifi-switch.off::after{right:auto;left:2px;}
+  .hifi-radio-opt{display:flex;align-items:center;gap:8px;font-size:12px;margin-bottom:8px;color:var(--ink-soft);}
+  .hifi-radio-dot{width:13px;height:13px;border-radius:50%;border:1.5px solid var(--rule-strong);position:relative;flex-shrink:0;}
+  .hifi-radio-dot.on{border-color:var(--verified);}
+  .hifi-radio-dot.on::after{content:"";position:absolute;inset:2.5px;border-radius:50%;background:var(--verified);}
+  .hifi-phone{max-width:300px;margin:0 auto;border:1px solid var(--rule);border-radius:26px;background:var(--paper);box-shadow:0 1px 4px rgba(0,0,0,.07);padding:7px;}
+  .hifi-phone-screen{border-radius:19px;overflow:hidden;border:1px solid var(--rule);background:var(--paper);}
+  .hifi-statusbar{display:flex;justify-content:space-between;padding:7px 16px 0;font-size:10px;font-weight:600;color:var(--ink);}
+  .hifi-phone-body{padding:6px 16px 16px;}
+
+  @media print{
+    .toc{display:none;}
+    .page{display:block;max-width:100%;}
+    main{padding:0 8px;}
+    section{max-width:none;page-break-inside:avoid;break-inside:avoid;}
+    .phase,.hifi-frame,.mock-frame,.schema-wrap,.hifi-card,.qcard{page-break-inside:avoid;break-inside:avoid;}
+    body{background:#fff;}
+    a{color:var(--ink);border-bottom:none;}
+    h2{page-break-before:auto;}
+  }
+</style>
+
+<div class="page">
+  <nav class="toc" aria-label="Table of contents">
+    <p class="toc-brand">Scope document · v0.3</p>
+    <ol>
+      <li><a href="#overview">Overview &amp; scope</a></li>
+      <li><a href="#roles">Roles &amp; permission layers</a></li>
+      <li><a href="#workflow">Procurement workflow</a></li>
+      <li><a href="#approvals">Approval engine</a></li>
+      <li><a href="#trust">Vendor trust &amp; PO authenticity</a></li>
+      <li><a href="#fraud">Duplicate &amp; fraud detection</a></li>
+      <li><a href="#catalog">Self-regulating catalog</a></li>
+      <li><a href="#assets">Asset lifecycle &amp; QR</a></li>
+      <li><a href="#pwa">PWA &amp; delivery</a></li>
+      <li><a href="#nfr">Platform &amp; isolation</a></li>
+      <li><a href="#roadmap">Phased build plan</a></li>
+      <li><a href="#open">Open decisions</a></li>
+      <li><a href="#stack">Tech stack</a></li>
+      <li><a href="#sprints">Sprint plan</a></li>
+      <li><a href="#customer1">Customer #1 scope &amp; pricing</a></li>
+      <li><a href="#mocks">UI mockups</a></li>
+    </ol>
+  </nav>
+
+  <main>
+    <header class="masthead">
+      <p class="eyebrow">Concept &amp; scope document — updated</p>
+      <h1>Procurement &amp; asset platform</h1>
+      <p class="lede">A multi-tenant requisition-to-payment system with a configurable approval engine, vendor-trust verification, and asset lifecycle tracking — scoped and sequenced for build planning.</p>
+    </header>
+
+    <section id="for-review" class="wide" style="max-width:none;">
+      <span class="sec-num">00 — For review</span>
+      <h2>Known gaps &amp; open questions</h2>
+      <p style="max-width:66ch;">Start here. Everything below is a real open item, not a settled decision — the rest of the document has already absorbed the calls that got made along the way. Section references point back to where each item comes from.</p>
+
+      <h3>Architecture — still open</h3>
+      <div class="qgrid">
+        <div class="qcard"><h4>RFQ / quotation-comparison step</h4>Not present in customer #1's confirmed v1 scope (§15) — PO appears to issue directly. Intentional cut for a single-vendor relationship, or a gap that should be in the base flow?</div>
+        <div class="qcard"><h4>What "customer-provided storage" actually means</h4><code>storage_mode = customer_provided</code> (§10/§15) — is this a real per-tenant storage abstraction (customer's own bucket + credentials, a genuine build item) or just separate billing while we still operate the storage? Meaningfully different implementation cost.</div>
+        <div class="qcard"><h4>Isolation tier default</h4>§12 leans RLS on a shared database. Does a data-control-conscious first customer change that calculus, or is RLS still right for phase 0?</div>
+        <div class="qcard"><h4>Default approval-group behavior</h4>Same-group approvers default to parallel or sequential? Flagged in §12, never explicitly locked as a platform-wide default.</div>
+      </div>
+
+      <h3>Business rules — need real numbers from the customer, not engineering guesses</h3>
+      <div class="qgrid">
+        <div class="qcard"><h4>Rule thresholds in the mockups (§16)</h4>₹5,00,000 MD override, ₹20,000 furniture threshold, IT Head + Director combo — these are illustrative examples carried through the schema and mockups, not Oil Extraction Co's actual approved thresholds. Need real numbers before go-live.</div>
+        <div class="qcard"><h4>Asset auto-creation threshold (§08)</h4>Which categories/values trigger QR/AMC tracking hasn't been set for this customer specifically — matters a lot for an equipment-heavy operation.</div>
+      </div>
+
+      <h3>Pricing — bucket agreed, number not set</h3>
+      <div class="qgrid">
+        <div class="qcard"><h4>Asset/AMC add-on (§15)</h4>Confirmed as a one-time fee, no ongoing cost driver. No price attached yet.</div>
+        <div class="qcard"><h4>Fraud-detection / catalog-dedup add-on (§15)</h4>Confirmed as a recurring subscription given real ongoing API cost. No price attached yet.</div>
+      </div>
+
+      <h3>Flagged, deliberately deferred</h3>
+      <div class="qgrid">
+        <div class="qcard"><h4>Cross-tenant fraud-signal sharing (§06/§12)</h4>Gets meaningfully stronger across tenants, which cuts against strict per-tenant isolation. Needs an explicit opt-in design before phase 3, not a default.</div>
+        <div class="qcard"><h4>"Closed domain" access (§12)</h4>Leaning network-restriction + domain-verified signup over a branded subdomain, but not fully locked.</div>
+      </div>
+    </section>
+
+    <section id="overview">
+      <span class="sec-num">01 — Overview</span>
+      <h2>What this is</h2>
+      <p>Replaces a paper- and WhatsApp-fragmented approval process with one digital flow: requisition → sourcing → purchase order → receipt (goods or service) → invoice match → payment, with role-based approval at every gate and a full audit trail. Delivered as a service to multiple customer organizations from one codebase, with strict data isolation between them.</p>
+      <p>Three ideas run through every section below and should stay consistent as the build progresses:</p>
+      <ul>
+        <li><strong>Configurable, not hardcoded.</strong> Approval chains, roles, and catalog categories are tenant-authored data, not application logic.</li>
+        <li><strong>Trust is layered, never a single control.</strong> PO authenticity, fraud detection, and asset custody all rely on several independent, mutually reinforcing checks rather than one gate.</li>
+        <li><strong>Nothing terminal without a record.</strong> Rejections, ad-hoc approver additions, and catalog merges all preserve history — the system self-corrects without deleting evidence of how it got there.</li>
+      </ul>
+    </section>
+
+    <section id="roles">
+      <span class="sec-num">02 — Roles</span>
+      <h2>Roles &amp; permission layers</h2>
+      <p>Roles are tenant-configurable permission sets built from a shared template, not fixed code paths. Every user can raise a requisition by default; everything past that is scoped.</p>
+      <h3>Platform layer</h3>
+      <ul>
+        <li><strong>Platform super admin</strong> — tenant lifecycle, billing, feature flags, resource usage, API keys</li>
+        <li><strong>Platform support</strong> — time-boxed, logged impersonation only</li>
+      </ul>
+      <h3>Tenant &amp; procurement layer</h3>
+      <ul>
+        <li><strong>Tenant admin</strong> — configures approval rules, roles, branding, integrations</li>
+        <li><strong>Requestor</strong> — every user, by default</li>
+        <li><strong>Department head / budget owner</strong>, <strong>procurement officer</strong>, <strong>goods/service receiver</strong>, <strong>finance approver</strong>, <strong>CFO / controller</strong>, <strong>approval delegate</strong></li>
+      </ul>
+      <h3>Asset &amp; external layer</h3>
+      <ul>
+        <li><strong>Asset custodian</strong>, <strong>facilities/maintenance manager</strong>, <strong>internal technician</strong></li>
+        <li><strong>Vendor admin</strong>, <strong>vendor user</strong>, <strong>external technician</strong> (ticket-scoped magic link, not a standing login)</li>
+        <li><strong>Internal auditor</strong> — read-only across everything, no transact rights</li>
+      </ul>
+      <div class="callout"><strong>Segregation of duties</strong> — enforced by default, tenant-toggleable: a requestor can't approve their own PR; an approver can't be the goods/service receiver on that PO; the receiver can't be the finance approver who matches the invoice.</div>
+    </section>
+
+    <section id="workflow" class="wide" style="max-width:760px;">
+      <span class="sec-num">03 — Core flow</span>
+      <h2>Procurement workflow &amp; goods/services branching</h2>
+      <p>One PR can carry both goods and service lines. Each line branches independently after the PO is issued — goods need a physical receipt, services need an acceptance sign-off — then both re-converge at invoice matching.</p>
+      <ul>
+        <li><strong>Goods line:</strong> PO line → delivery → <code>goods_receipt_note</code> (partial/split supported) → quality check → accept or reject-and-return</li>
+        <li><strong>Service line:</strong> PO line → milestone or full-completion acceptance → sign-off by whoever actually received the service</li>
+        <li><strong>Hybrid:</strong> goods delivery followed by an installation/setup service line on the same PO</li>
+      </ul>
+
+      <h3>Schema</h3>
+      <div class="schema-wrap">
+        <div class="tbl-title">purchase_order_line <span class="dim">one row per PO line — carries the fork</span></div>
+        <table>
+          <tr><th>Field</th><th>Type</th><th>Notes</th></tr>
+          <tr><td class="field">fulfillment_type</td><td class="type">enum</td><td>goods · service — decides which table picks it up next</td></tr>
+          <tr><td class="field">item_id / service_description</td><td class="type">fk / text</td><td>catalog reference, or freeform for services</td></tr>
+          <tr><td class="field">quantity, uom, unit_price</td><td class="type">—</td><td>goods lines only; service lines use milestone value instead</td></tr>
+          <tr><td class="field">status</td><td class="type">enum</td><td>open · partially_fulfilled · fulfilled · cancelled</td></tr>
+        </table>
+      </div>
+
+      <div class="schema-wrap">
+        <div class="tbl-title">goods_receipt_line <span class="dim">the verification-layer record for goods</span></div>
+        <table>
+          <tr><th>Field</th><th>Type</th><th>Notes</th></tr>
+          <tr><td class="field">po_line_id</td><td class="type">fk</td><td></td></tr>
+          <tr><td class="field">quantity_delivered / accepted / rejected</td><td class="type">decimal</td><td>partial and short-shipment both fall out of this split</td></tr>
+          <tr><td class="field">condition</td><td class="type">enum</td><td>good · damaged · short</td></tr>
+          <tr><td class="field">serial_numbers</td><td class="type">jsonb[]</td><td>feeds asset auto-creation, see §08</td></tr>
+          <tr><td class="field">verified_by / verified_at</td><td class="type">fk / ts</td><td>must differ from the requestor — segregation of duties</td></tr>
+        </table>
+      </div>
+
+      <div class="schema-wrap">
+        <div class="tbl-title">service_acceptance_line <span class="dim">the equivalent record for services</span></div>
+        <table>
+          <tr><th>Field</th><th>Type</th><th>Notes</th></tr>
+          <tr><td class="field">po_line_id / milestone_id</td><td class="type">fk</td><td>milestone_id null when acceptance_type = full_completion</td></tr>
+          <tr><td class="field">accepted_value</td><td class="type">decimal</td><td>for partial/milestone billing</td></tr>
+          <tr><td class="field">deliverable_reference_url</td><td class="type">text</td><td>evidence attached at acceptance</td></tr>
+          <tr><td class="field">status</td><td class="type">enum</td><td>accepted · rejected · partial</td></tr>
+        </table>
+      </div>
+
+      <p>Invoice matching reads both tables through one lens: a line item is either <em>confirmed received</em> (goods) or <em>confirmed accepted</em> (service) before an invoice can match against it — the 3-way match logic doesn't need to know which branch it came from.</p>
+
+      <h3>Exception paths this schema has to carry</h3>
+      <table>
+        <tr><th>Scenario</th><th>Handling</th></tr>
+        <tr><td>Partial or short delivery</td><td><code>quantity_accepted</code> &lt; ordered; line stays <code>partially_fulfilled</code>, PO remains open for the balance</td></tr>
+        <tr><td>Quality rejection</td><td><code>vendor_return</code> record — return shipment, credit note, status through to closed</td></tr>
+        <tr><td>Service rejected / incomplete</td><td>line status <code>rejected</code>, rework requested, milestone not billed</td></tr>
+        <tr><td>Vendor can't fulfill</td><td>PO cancellation, re-sourcing from RFQ stage</td></tr>
+      </table>
+    </section>
+
+    <section id="approvals">
+      <span class="sec-num">04 — Approvals</span>
+      <h2>Approval engine</h2>
+      <p>A PR's required approvers are assembled from rules at submission, then stay open to ad-hoc additions until fully cleared — not a single fixed chain.</p>
+      <div class="schema-wrap">
+        <div class="tbl-title">approval_rule <span class="dim">the configurable matrix</span></div>
+        <table>
+          <tr><th>Field</th><th>Type</th><th>Notes</th></tr>
+          <tr><td class="field">category_id / department_id / cost_center_id</td><td class="type">fk, nullable</td><td>null = wildcard — this is how a rule becomes "global" vs "specific"</td></tr>
+          <tr><td class="field">min_value / max_value</td><td class="type">decimal</td><td>range this rule applies in</td></tr>
+          <tr><td class="field">combination_mode</td><td class="type">enum</td><td>additive (default, unions with other matches) · exclusive (overrides lower-priority rules)</td></tr>
+        </table>
+      </div>
+      <div class="schema-wrap">
+        <div class="tbl-title">requisition_approval_requirement <span class="dim">the frozen instance for one PR</span></div>
+        <table>
+          <tr><th>Field</th><th>Type</th><th>Notes</th></tr>
+          <tr><td class="field">source</td><td class="type">enum</td><td>rule · ad_hoc</td></tr>
+          <tr><td class="field">assigned_user_id</td><td class="type">fk</td><td>resolved person, frozen at add-time</td></tr>
+          <tr><td class="field">added_by_user_id / reason</td><td class="type">fk / text</td><td>reason required when source = ad_hoc; only a currently-pending approver may add a row</td></tr>
+          <tr><td class="field">group_no / group_sequence</td><td class="type">int</td><td>same group = parallel, e.g. director + IT head both required; later group = gated behind earlier one</td></tr>
+        </table>
+      </div>
+      <p><strong>Example:</strong> an IT-asset PR matches a category rule (IT head + director, parallel) with no upper value bound; a chair PR under a threshold matches only a department-head rule. Either approver on the IT PR can still pull in a security reviewer ad hoc, with a reason logged.</p>
+      <h3>Rejection</h3>
+      <p>Two distinct outcomes, not one: <strong>rejected with defects</strong> returns to the requestor to fix and resubmit (other approvers' decisions stand unless value/category changed materially); <strong>rejected and closed</strong> requires a mandatory reason and ends the PR permanently.</p>
+    </section>
+
+    <section id="trust">
+      <span class="sec-num">05 — Vendor trust</span>
+      <h2>PO authenticity — the vendor's side</h2>
+      <p>A vendor should never have to trust a PDF or an email. Every layer below is independent, so no single compromised channel breaks the chain: <span class="badge trust">digital signature + hash</span> <span class="badge trust">unique QR verification</span> <span class="badge trust">immutable audit entry</span> <span class="badge trust">signatory registry</span></p>
+      <ul>
+        <li><strong>Vendor portal is the source of truth</strong> — not the emailed PDF. Vendors log in (or scan a QR) to confirm a PO, never act on the document alone.</li>
+        <li><strong>Bank-detail changes are locked</strong> after onboarding and can only change through an out-of-band callback to the vendor's originally registered number — never via email or PO amendment. This is the highest-value control: most large procurement fraud is a bank-swap, not a fake PO.</li>
+        <li><strong>Authorized-signatory registry</strong> lets a vendor cross-check who at the company can approve a PO at a given value.</li>
+        <li><strong>Value-escalated verification</strong> — small POs need only the portal check; above a configurable threshold, a callback or recorded confirmation is required before the vendor proceeds.</li>
+      </ul>
+    </section>
+
+    <section id="fraud">
+      <span class="sec-num">06 — Fraud</span>
+      <h2>Duplicate &amp; fraud detection</h2>
+      <p>Invoice-number matching alone catches almost nothing. Layered detection runs at both invoice intake and pre-payment:</p>
+      <table>
+        <tr><th>Layer</th><th>Catches</th></tr>
+        <tr><td>Fuzzy match</td><td>Same vendor + similar amount within N days, different invoice number — the classic resubmission</td></tr>
+        <tr><td>Document fingerprinting</td><td>Perceptual hash of the uploaded file — same scan, one field edited</td></tr>
+        <tr><td>Bank-account watch</td><td>Same account number across multiple "different" vendors — shell-vendor pattern</td></tr>
+        <tr><td>Behavioral anomaly</td><td>Spend spikes, amounts clustered just under an approval threshold, off-cadence submissions</td></tr>
+        <tr><td>Risk scoring</td><td>Combines the above into an explainable score, routed to human review — never an auto-block</td></tr>
+      </table>
+      <div class="callout risk"><strong>Open tension</strong> — the bank-account watch is far stronger compared <em>across</em> tenants, which conflicts with strict per-tenant isolation. Needs an explicit, opt-in, anonymized shared-signals layer, deliberately separate from tenant data itself. See §12.</div>
+    </section>
+
+    <section id="catalog">
+      <span class="sec-num">07 — Catalog</span>
+      <h2>Self-regulating catalog</h2>
+      <p>Any user can create a new item while raising a PR, so the catalog needs active duplicate suppression, not after-the-fact cleanup.</p>
+      <ul>
+        <li><strong>Prevent at creation:</strong> fuzzy string + phonetic + semantic-embedding search against existing items as the user types, surfacing "did you mean…" before a new entry is allowed</li>
+        <li><strong>Don't block, flag:</strong> new items go live immediately as <code>unverified</code>, queued for a catalog steward</li>
+        <li><strong>Periodic clustering</strong> surfaces likely-duplicate groups for one-click merge</li>
+        <li><strong>Merges remap, never delete</strong> — old item IDs point to the canonical one so historical spend analytics stay intact</li>
+        <li><strong>Usage-weighted ranking</strong> in typeahead so people naturally pick the existing entry over typing a new one</li>
+      </ul>
+    </section>
+
+    <section id="assets">
+      <span class="sec-num">08 — Assets</span>
+      <h2>Asset lifecycle &amp; QR</h2>
+      <p>Goods above a tenant-configured category/value threshold auto-register as assets at GRN confirmation, each getting a QR-linked digital passport.</p>
+      <ul>
+        <li><strong>Passport contents:</strong> procurement trail, custody chain, warranty status, service/repair log (each entry tagged AMC-covered or billable), linked AMC contract</li>
+        <li><strong>AMC as its own contract entity</strong> — one contract can cover many assets; auto-renewal alerts; auto-check coverage before approving a repair spend</li>
+        <li><strong>Two-tier QR access, one physical label:</strong> a signed-in, role-permissioned user sees the full passport; an unauthenticated scan sees name/category/status only, plus <em>report an issue</em> / <em>request maintenance</em> actions</li>
+        <li><strong>Third tier for external repair vendors:</strong> a time-boxed magic link scoped to one open service ticket — never standing portal access</li>
+      </ul>
+    </section>
+
+    <section id="pwa">
+      <span class="sec-num">09 — Delivery</span>
+      <h2>PWA &amp; performance</h2>
+      <ul>
+        <li>Web Push for approval/alert notifications — no app-store dependency, reaches every authorized user</li>
+        <li>Domain-verified sign-up by default (only verified company email domains can register); IP/VPN allowlisting available as an enterprise-tier option</li>
+        <li>Service-worker app-shell caching, server-side catalog search (the catalog never ships client-side), paginated/virtualized queues</li>
+        <li>Mobile-first for the field roles that need it most — facilities/maintenance and goods receivers work from a phone, not a desk</li>
+      </ul>
+    </section>
+
+    <section id="nfr">
+      <span class="sec-num">10 — Platform</span>
+      <h2>Multi-tenancy &amp; isolation</h2>
+      <ul>
+        <li>Every record scoped by <code>tenant_id</code>, enforced at the database layer (row-level security), not just application-code filtering</li>
+        <li>Per-tenant encryption keys; isolated object-storage paths; tenant-scoped auth tokens that structurally cannot cross tenants</li>
+        <li>Stronger isolation tiers (schema- or database-per-tenant) available for enterprise/regulated customers on request</li>
+        <li>Platform super admin: subscription/billing, feature flags per tenant, resource-usage visibility, API key issuance, logged/time-boxed support impersonation</li>
+      </ul>
+
+      <h3>Integrated vs. split infra</h3>
+      <p>The storage decision made for customer #1 (§15) generalizes into a real platform capability, not a one-off: two offering modes, selectable per tenant, not hardcoded platform-wide.</p>
+      <ul>
+        <li><strong>Fully integrated (default).</strong> Platform owns and bills for everything — hosting, storage, and all intelligence-API usage (OCR, embeddings, fraud scoring) bundled into subscription pricing. One number, no infrastructure decisions for the customer. Platform bears all usage-cost risk and prices to cover it.</li>
+        <li><strong>Split infra (opt-in).</strong> Customer brings and directly pays for storage and/or their own AI-API accounts (OpenAI, an OCR provider); the app operates using the customer's credentials, so that vendor bills the customer directly, not the platform. Removes the platform's exposure to usage volatility and keeps the subscription flat regardless of the customer's actual document volume — but shifts real setup/management burden onto the customer (creating and rotating API keys, a second bill to reconcile) and reintroduces the credential-custody security surface (their keys, encrypted, held by the platform) already flagged for storage.</li>
+      </ul>
+      <p>Model as a per-tenant setting, mirrored across both resources — <code>storage_mode</code> and <code>intelligence_api_mode</code>, each <code>platform_managed</code> or <code>customer_provided</code> — not a platform-wide fork. A technical, control-conscious customer can go split on storage while staying fully integrated on the intelligence add-ons until they actually buy that tier; a less technical customer defaults to fully integrated on both.</p>
+      <div class="callout"><strong>Where this actually bites:</strong> the moment a customer buys the fraud-detection or catalog-dedup add-on (§06/§07), that's the natural decision point to offer both modes — integrated (platform runs the AI calls, marks the API cost into the subscription price) or split (customer supplies their own key, pays a lower subscription since there's no cost pass-through, but owns the account management). Worth being honest that split-infra-for-APIs is a much bigger ask than split storage for a non-technical buyer — managing an OpenAI or OCR account, watching rate limits, and reconciling a second bill is real friction for a company whose core business isn't software. Likely a stronger fit for larger, IT-staffed enterprise customers than for customer #1.</div>
+    </section>
+
+    <section id="roadmap" class="wide" style="max-width:none;">
+      <span class="sec-num">11 — Roadmap</span>
+      <h2>Phased build plan</h2>
+      <p style="max-width:66ch;">Five phases, each shipping something usable on its own. Later phases depend on earlier ones being live, not just designed.</p>
+
+      <div class="roadmap">
+        <div class="phase">
+          <div class="phase-head"><span class="phase-num">0</span><span class="phase-name">Platform foundation</span><span class="phase-goal">No end-user value yet — everything else depends on this being right</span></div>
+          <div class="phase-body">
+            <div class="phase-col"><h4>Build</h4><ul>
+              <li>Tenant isolation model (RLS) &amp; provisioning</li>
+              <li>Domain-verified auth, SSO groundwork</li>
+              <li>Tenant-configurable role/permission framework</li>
+              <li>Platform super-admin console v1</li>
+              <li>Append-only audit-log infrastructure</li>
+            </ul></div>
+            <div class="phase-col deferred"><h4>Deferred</h4><ul>
+              <li>Schema/DB-per-tenant isolation tier</li>
+              <li>Enterprise SSO/SAML, IP allowlisting</li>
+            </ul></div>
+          </div>
+        </div>
+
+        <div class="phase">
+          <div class="phase-head"><span class="phase-num">1</span><span class="phase-name">Core procurement (MVP)</span><span class="phase-goal">Replaces the paper/WhatsApp process end to end</span></div>
+          <div class="phase-body">
+            <div class="phase-col"><h4>Build</h4><ul>
+              <li>Catalog v1 (search, no smart dedup)</li>
+              <li>PR creation, budget/cost-center check</li>
+              <li>Approval engine: rule matrix + ad hoc + reject/revive/close</li>
+              <li>RFQ, quotation comparison, PO generation with signature+hash</li>
+              <li>Goods GRN (full receipt) &amp; service completion acceptance</li>
+              <li>Invoice capture, exact 3-way match, manual payment queue</li>
+              <li>Coordinator dashboard, email notifications</li>
+            </ul></div>
+            <div class="phase-col deferred"><h4>Deferred</h4><ul>
+              <li>Partial delivery, vendor returns, milestone billing</li>
+              <li>Vendor portal, QR verification</li>
+              <li>Fuzzy/behavioral fraud detection</li>
+            </ul></div>
+          </div>
+        </div>
+
+        <div class="phase">
+          <div class="phase-head"><span class="phase-num">2</span><span class="phase-name">Trust, mobile &amp; decision support</span><span class="phase-goal">Hardens what MVP left open, gets the app into pockets</span></div>
+          <div class="phase-body">
+            <div class="phase-col"><h4>Build</h4><ul>
+              <li>Vendor portal, public QR verification, signatory registry</li>
+              <li>Bank-detail lock + out-of-band change verification</li>
+              <li>Approver decision-support panel (item/vendor history, budget)</li>
+              <li>Partial delivery, quality rejection, vendor-return flow</li>
+              <li>Milestone-based service acceptance</li>
+              <li>PWA v1: push notifications, offline shell, domain restriction</li>
+            </ul></div>
+            <div class="phase-col deferred"><h4>Deferred</h4><ul>
+              <li>Asset register &amp; QR passports</li>
+              <li>Catalog fuzzy/semantic dedup</li>
+            </ul></div>
+          </div>
+        </div>
+
+        <div class="phase">
+          <div class="phase-head"><span class="phase-num">3</span><span class="phase-name">Assets &amp; intelligence</span><span class="phase-goal">Turns receipts into a managed asset register, adds real fraud defense</span></div>
+          <div class="phase-body">
+            <div class="phase-col"><h4>Build</h4><ul>
+              <li>Asset auto-creation, QR digital passport, two-tier access</li>
+              <li>Report-issue / request-maintenance flows, service ticketing</li>
+              <li>AMC contracts &amp; renewal alerts</li>
+              <li>Catalog: fuzzy + semantic dedup, merge tooling, usage ranking</li>
+              <li>Fraud engine: fingerprinting, behavioral scoring, risk queue</li>
+              <li>Vendor scorecards, spend analytics</li>
+            </ul></div>
+            <div class="phase-col deferred"><h4>Deferred</h4><ul>
+              <li>ERP connectors</li>
+              <li>Cross-tenant fraud-signal sharing</li>
+            </ul></div>
+          </div>
+        </div>
+
+        <div class="phase">
+          <div class="phase-head"><span class="phase-num">4</span><span class="phase-name">Enterprise &amp; ecosystem</span><span class="phase-goal">Opens the platform outward, for customers who've outgrown phase 3</span></div>
+          <div class="phase-body">
+            <div class="phase-col"><h4>Build</h4><ul>
+              <li>ERP connectors (Tally, Zoho, QuickBooks, SAP, Oracle)</li>
+              <li>SSO/SAML, IP allowlisting, e-signature integration</li>
+              <li>Public API &amp; webhooks</li>
+              <li>Opt-in anonymized cross-tenant fraud-signal sharing</li>
+              <li>Advanced subscription/billing tiers</li>
+            </ul></div>
+            <div class="phase-col deferred"><h4>Deferred</h4><ul>
+              <li>Plugin marketplace (revisit based on demand)</li>
+            </ul></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="open">
+      <span class="sec-num">12 — Open</span>
+      <h2>Decisions to make before phase 0 locks</h2>
+      <div class="qgrid">
+        <div class="qcard"><h4>Isolation tier default</h4>RLS-with-shared-database for all tenants, or schema/DB-per-tenant for enterprise customers from day one? Changes phase 0 cost significantly.</div>
+        <div class="qcard"><h4>"Closed domain" access</h4>Tenant-branded private subdomain, or network-level restriction (IP/VPN, domain-verified signup) — or both? Confirmed lean is the latter, given sensitivity.</div>
+        <div class="qcard"><h4>Cross-tenant fraud signals</h4>Bank-watch and behavioral fraud detection get stronger across tenants, which cuts against strict isolation. Needs explicit opt-in design, not a default.</div>
+        <div class="qcard"><h4>Default approval group behavior</h4>Should same-group approvers default to parallel (any order) with sequential the exception, or the reverse? Affects every tenant's first-run experience.</div>
+      </div>
+    </section>
+
+    <section id="stack" class="wide" style="max-width:760px;">
+      <span class="sec-num">13 — Stack</span>
+      <h2>Recommended tech stack</h2>
+      <p>Chosen against two constraints the rest of this document keeps returning to: isolation has to be enforced at the data layer, not app code (§10), and the PWA has to stay light on a mid-range phone (§09). Everything below traces back to those two, plus the fact that the domain model — approval graphs, goods/service branching, audit trail — is deeply relational.</p>
+
+      <div class="schema-wrap">
+        <div class="tbl-title">Core stack <span class="dim">layer → choice → why</span></div>
+        <table>
+          <tr><th>Layer</th><th>Choice</th><th>Why</th></tr>
+          <tr><td class="field">Database</td><td>PostgreSQL 15+, Row-Level Security</td><td>The only mainstream DB with mature, battle-tested RLS — the isolation model in §10 needs it enforced at this layer, not filtered in application code.</td></tr>
+          <tr><td class="field">Search &amp; matching</td><td><code>pg_trgm</code> + <code>pgvector</code></td><td>Fuzzy and semantic catalog matching (§07) and invoice/document similarity (§06), without standing up a separate search cluster this early.</td></tr>
+          <tr><td class="field">ORM</td><td>Drizzle</td><td>Thin enough to stay close to raw SQL for setting the per-request RLS session variable. Prisma is a fine alternative with better docs, but needs more manual wiring for RLS.</td></tr>
+          <tr><td class="field">Backend</td><td>Node.js + TypeScript, modular monolith</td><td>One language across the approval engine, PDF/QR generation, and notification dispatch; shares types with the frontend end to end.</td></tr>
+          <tr><td class="field">Frontend</td><td>Next.js (App Router) + TypeScript, Tailwind, shadcn/ui</td><td>Route-based code splitting keeps the bundle light (§09); shadcn ships copied source, not a runtime component-library dependency.</td></tr>
+          <tr><td class="field">PWA layer</td><td>Workbox service worker + Web Push (VAPID)</td><td>Covers §09's offline shell and push-notification requirement directly.</td></tr>
+          <tr><td class="field">Auth</td><td>WorkOS AuthKit (or Clerk)</td><td>Domain-verified sign-up now; SSO/SAML in phase 4 becomes a config flip instead of a rebuild — hand-rolled SAML is a bad place to spend engineering time.</td></tr>
+          <tr><td class="field">Object storage</td><td>Cloudflare R2 (S3-compatible)</td><td>Per-tenant prefix isolation, no egress fees for the PDF- and photo-heavy asset passports in §08.</td></tr>
+          <tr><td class="field">Background jobs</td><td>BullMQ + Redis</td><td>SLA escalation, AMC renewal alerts, catalog clustering (§07/§08) all need a real queue, not cron scripts.</td></tr>
+          <tr><td class="field">PDF &amp; signing</td><td><code>pdf-lib</code> generation, internal hash + HMAC signature</td><td>The tamper-evident PO in §05 doesn't need full PKI/PAdES on day one — that's the phase-4 e-signature integration.</td></tr>
+          <tr><td class="field">Fraud/ML service</td><td>Python (FastAPI) microservice, phase 3+</td><td>Perceptual hashing and behavioral scoring (§06) lean on Python's ML ecosystem; kept as a separate service so the core app stays boring and fully typed.</td></tr>
+          <tr><td class="field">Hosting</td><td>Vercel (frontend) + Neon/Supabase (Postgres) + Railway (Redis/worker/ML)</td><td>Fastest path through phases 0–1 without hand-building infra; migrate pieces to AWS/GCP if an enterprise deal demands VPC-level isolation.</td></tr>
+        </table>
+      </div>
+
+      <h3>Fork points worth deciding now</h3>
+      <div class="callout"><strong>Supabase vs. self-managed Postgres</strong> — Supabase bundles RLS tooling, auth, and storage, cutting real time off phase 0. Self-managed (RDS/Neon) gives more control if schema- or database-per-tenant isolation is coming sooner than phase 3 for a specific enterprise customer.</div>
+      <div class="callout"><strong>Monolith vs. early service split</strong> — recommend staying a single Node/TS modular monolith through phase 2, and splitting out only the Python fraud/ML service when phase 3 actually needs it. Splitting earlier than the work demands just adds deployment overhead.</div>
+      <div class="callout"><strong>Drizzle vs. Prisma</strong> — both work fine here; pick based on team familiarity. Drizzle maps more directly to the RLS session-variable pattern, Prisma has the bigger hiring pool and docs base.</div>
+
+      <p>This also resolves the isolation-tier question left open in §12: RLS on a shared database at launch, with schema- or database-per-tenant available later on the same schema design — Postgres supports both without a rewrite.</p>
+
+      <h3>Hosting topology</h3>
+      <p>Three platforms, each doing what it's actually best at — chosen to avoid the four-provider sprawl (frontend host, DB host, Redis host, worker host) that a pure serverless-first plan tends to accumulate.</p>
+      <div class="schema-wrap">
+        <div class="tbl-title">Where things run <span class="dim">by phase</span></div>
+        <table>
+          <tr><th>Component</th><th>Platform</th><th>From</th></tr>
+          <tr><td class="field">Next.js app (frontend + server actions/API)</td><td>Vercel</td><td>Phase 0</td></tr>
+          <tr><td class="field">Postgres</td><td>Neon or Supabase — managed pooling (PgBouncer) built in, needed the moment serverless functions talk to it directly</td><td>Phase 0</td></tr>
+          <tr><td class="field">Auth</td><td>WorkOS (hosted)</td><td>Phase 0</td></tr>
+          <tr><td class="field">Object storage</td><td>Cloudflare R2</td><td>Phase 1</td></tr>
+          <tr><td class="field">Redis + BullMQ worker</td><td>Railway — always-on process, no separate queue/worker provider needed</td><td>Phase 2</td></tr>
+          <tr><td class="field">Fraud/ML service</td><td>Railway, same project as the worker</td><td>Phase 3</td></tr>
+        </table>
+      </div>
+      <div class="callout"><strong>Simpler two-platform alternative</strong> — drop Neon/Supabase and use Railway's own Postgres plugin too, adding PgBouncer as a Railway service by hand. Loses automatic pooling/RLS tooling/branching convenience, gains one fewer account. Worth it only if the team would rather optimize for fewer bills than for those extras.</div>
+    </section>
+
+    <section id="sprints" class="wide" style="max-width:none;">
+      <span class="sec-num">14 — Sprints</span>
+      <h2>Sprint plan — phase 0 &amp; 1</h2>
+      <p style="max-width:66ch;">Eleven sprints, sequenced by dependency rather than calendar time — assume ~2 weeks each as a starting planning unit and adjust to actual team velocity. Sized for roughly two full-stack engineers; with three or four, sprints that don't share a dependency (e.g. catalog work in S3 and the approval-engine backend in S5 once S2 is done) can run in parallel instead of serially.</p>
+
+      <div class="roadmap">
+        <div class="phase">
+          <div class="phase-head"><span class="phase-num">0</span><span class="phase-name">Repo &amp; environment bootstrap</span><span class="phase-goal">Nothing feature-shaped yet — just a deployable skeleton</span></div>
+          <div class="phase-body">
+            <div class="phase-col"><h4>Tickets</h4><ul>
+              <li>Git init, Next.js (App Router) + TS + Tailwind + shadcn/ui scaffold</li>
+              <li>Neon/Supabase project, Drizzle wired, apply <code>0001_init.sql</code></li>
+              <li>Lint/typecheck/test CI pipeline on PR</li>
+              <li>Vercel preview + prod deploy skeleton, env vars wired</li>
+            </ul></div>
+            <div class="phase-col"><h4>Depends on</h4><ul><li>Nothing — this is the starting point</li></ul></div>
+          </div>
+        </div>
+
+        <div class="phase">
+          <div class="phase-head"><span class="phase-num">1</span><span class="phase-name">Tenancy &amp; auth</span><span class="phase-goal">Every later ticket needs this to exist first</span></div>
+          <div class="phase-body">
+            <div class="phase-col"><h4>Tickets</h4><ul>
+              <li>Tenant provisioning (<code>tenants</code>: create, slug, status)</li>
+              <li>WorkOS AuthKit — domain-verified sign-up/login</li>
+              <li>Request middleware that sets <code>app.tenant_id</code> per transaction — the RLS wiring, critical path</li>
+              <li>User invite/accept flow (<code>users</code>)</li>
+            </ul></div>
+            <div class="phase-col"><h4>Depends on</h4><ul><li>S0</li></ul></div>
+          </div>
+        </div>
+
+        <div class="phase">
+          <div class="phase-head"><span class="phase-num">2</span><span class="phase-name">Roles &amp; platform console v1</span><span class="phase-goal">Closes out phase 0</span></div>
+          <div class="phase-body">
+            <div class="phase-col"><h4>Tickets</h4><ul>
+              <li>Roles CRUD + seed defaults (requestor, dept head, procurement officer, finance approver, CFO, admin)</li>
+              <li><code>user_roles</code> assignment UI (role + scope)</li>
+              <li>Departments &amp; cost centers CRUD</li>
+              <li>Platform super-admin console v1: tenant list, create/suspend, basic feature flags</li>
+              <li>Establish the <code>audit_log</code> write pattern — every mutation from here on logs</li>
+            </ul></div>
+            <div class="phase-col"><h4>Depends on</h4><ul><li>S1</li></ul></div>
+          </div>
+        </div>
+
+        <div class="phase">
+          <div class="phase-head"><span class="phase-num">3</span><span class="phase-name">Catalog v1</span><span class="phase-goal">First phase-1 slice</span></div>
+          <div class="phase-body">
+            <div class="phase-col"><h4>Tickets</h4><ul>
+              <li><code>catalog_categories</code> + <code>catalog_items</code> CRUD</li>
+              <li>Trigram typeahead search on item creation</li>
+              <li><em>No dedup/merge tooling yet — that's phase 3 of the roadmap</em></li>
+            </ul></div>
+            <div class="phase-col"><h4>Depends on</h4><ul><li>S2</li></ul></div>
+          </div>
+        </div>
+
+        <div class="phase">
+          <div class="phase-head"><span class="phase-num">4</span><span class="phase-name">PR creation</span><span class="phase-goal">Any user can raise a request</span></div>
+          <div class="phase-body">
+            <div class="phase-col"><h4>Tickets</h4><ul>
+              <li><code>purchase_requisitions</code> + lines creation flow</li>
+              <li>Department/cost-center selection, budget display (soft warning, not hard block yet)</li>
+              <li>Draft → submit transition</li>
+              <li>"My requests" list view</li>
+            </ul></div>
+            <div class="phase-col"><h4>Depends on</h4><ul><li>S3</li></ul></div>
+          </div>
+        </div>
+
+        <div class="phase">
+          <div class="phase-head"><span class="phase-num">5</span><span class="phase-name">Approval engine core</span><span class="phase-goal">The centerpiece of §04</span></div>
+          <div class="phase-body">
+            <div class="phase-col"><h4>Tickets</h4><ul>
+              <li>Rule-matrix admin UI (<code>approval_rules</code> + requirements)</li>
+              <li>Rule-resolution algorithm on submit → <code>requisition_approval_requirements</code></li>
+              <li>Approver inbox: pending list, approve/reject actions</li>
+              <li>Ad-hoc approver addition (reason required, pending-approver-only guardrail)</li>
+            </ul></div>
+            <div class="phase-col"><h4>Depends on</h4><ul><li>S4</li></ul></div>
+          </div>
+        </div>
+
+        <div class="phase">
+          <div class="phase-head"><span class="phase-num">6</span><span class="phase-name">Reject/revive &amp; notifications</span><span class="phase-goal">Closes the loop on a PR's terminal states</span></div>
+          <div class="phase-body">
+            <div class="phase-col"><h4>Tickets</h4><ul>
+              <li>Rejected-with-defects → revise → resubmit flow</li>
+              <li>Rejected-and-closed flow, mandatory reason</li>
+              <li>Transactional email wired (submit / approval-needed / approved / rejected)</li>
+              <li>Simple "pending N days" indicator (full SLA escalation is phase 2)</li>
+            </ul></div>
+            <div class="phase-col"><h4>Depends on</h4><ul><li>S5</li></ul></div>
+          </div>
+        </div>
+
+        <div class="phase">
+          <div class="phase-head"><span class="phase-num">7</span><span class="phase-name">RFQ, vendor &amp; PO issuance</span><span class="phase-goal">First money-shaped output</span></div>
+          <div class="phase-body">
+            <div class="phase-col"><h4>Tickets</h4><ul>
+              <li><code>vendors</code> + <code>vendor_users</code> records (internal entry, no vendor-facing portal yet)</li>
+              <li><code>rfqs</code> + invitations + <code>vendor_quotations</code>, manually entered by procurement</li>
+              <li><code>purchase_orders</code> generation from an approved PR + selected quotation</li>
+              <li>PO document hash + QR token (§05's trust anchors, minus the vendor-facing verification page — phase 2)</li>
+              <li>PDF generation (<code>pdf-lib</code>), emailed to vendor contact</li>
+            </ul></div>
+            <div class="phase-col"><h4>Depends on</h4><ul><li>S6 — needs an approved PR to convert</li></ul></div>
+          </div>
+        </div>
+
+        <div class="phase">
+          <div class="phase-head"><span class="phase-num">8</span><span class="phase-name">Goods receipt &amp; service acceptance</span><span class="phase-goal">The verification layer from the original brief</span></div>
+          <div class="phase-body">
+            <div class="phase-col"><h4>Tickets</h4><ul>
+              <li><code>goods_receipt_notes</code> + lines, full receipt only</li>
+              <li><code>service_acceptances</code> + lines, full-completion only</li>
+              <li>Wire the segregation-of-duties trigger into the UI — receiver picker excludes the requestor</li>
+            </ul></div>
+            <div class="phase-col"><h4>Depends on</h4><ul><li>S7 — needs an issued PO</li></ul></div>
+          </div>
+        </div>
+
+        <div class="phase">
+          <div class="phase-head"><span class="phase-num">9</span><span class="phase-name">Invoice &amp; payment</span><span class="phase-goal">Closes the requisition-to-payment loop</span></div>
+          <div class="phase-body">
+            <div class="phase-col"><h4>Tickets</h4><ul>
+              <li>Invoice capture (manual entry/upload — OCR is a later phase)</li>
+              <li>3-way match against GRN/service-acceptance lines; exact-duplicate constraint already in the schema</li>
+              <li>Exception queue UI for mismatches</li>
+              <li><code>payment_instructions</code> queue + CFO/controller release action</li>
+            </ul></div>
+            <div class="phase-col"><h4>Depends on</h4><ul><li>S8</li></ul></div>
+          </div>
+        </div>
+
+        <div class="phase">
+          <div class="phase-head"><span class="phase-num">10</span><span class="phase-name">Coordinator dashboard &amp; hardening</span><span class="phase-goal">MVP demo/UAT readiness</span></div>
+          <div class="phase-body">
+            <div class="phase-col"><h4>Tickets</h4><ul>
+              <li>End-to-end lifecycle tracker (PR → RFQ → PO → GRN/service → invoice → payment)</li>
+              <li>RLS isolation test suite — prove tenant A can never reach tenant B's data through any endpoint</li>
+              <li>Golden-path e2e tests</li>
+            </ul></div>
+            <div class="phase-col"><h4>Depends on</h4><ul><li>S9 — needs the full chain to visualize</li></ul></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="customer1" class="wide" style="max-width:760px;">
+      <span class="sec-num">15 — Customer #1</span>
+      <h2>Confirmed scope &amp; pricing</h2>
+      <p>First reference customer: managing director of an oil-extraction company, sole go-ahead authority, confirmed rollout plan. Real pain named directly: missed payments, delayed payments, double payments, unverified payments, unclear approval source, rework from lost paperwork, invoice recall. ~150 bills/month ongoing volume.</p>
+
+      <h3>Base tier — "basic flow" (₹1.2 lakh/year)</h3>
+      <p>Maps directly onto the phase-1 schema and sprint plan already built — the phase boundaries and the pricing-tier boundaries turned out to be the same boundary.</p>
+      <ul>
+        <li>Requisition → approval (rule-based + ad hoc) → PO → invoice match → payment queue → audit log</li>
+        <li><strong>Goods receipt:</strong> delivery-challan referenced, full or partial quantity</li>
+        <li><strong>Service acceptance:</strong> a real confirmation step, deliberately lighter than goods — no delivery challan, no quantity/partial tracking, just a check that the work was actually delivered before invoice matching proceeds. Preserves the founding requirement (§01/§03): someone confirms receipt before payment, for goods <em>and</em> services.</li>
+        <li>Exact-match duplicate detection included free — a database constraint (vendor + invoice number), not a paid feature, since it directly addresses his named "double payments" pain at zero marginal cost</li>
+        <li><strong>Document storage:</strong> he procures and pays for it directly — positioned as data control, not cost-sharing. Documents only (PDFs, photos); structured records (approvals, invoices, audit trail) stay in the platform database. This is the first instance of the general <em>split infra</em> tenant setting formalized in §10 — <code>storage_mode = customer_provided</code>; his <code>intelligence_api_mode</code> stays <code>platform_managed</code> until he buys an intelligence add-on.</li>
+      </ul>
+      <div class="callout risk"><strong>Confirm before signing</strong> — no RFQ/vendor-quotation-comparison step is included in this description (PO appears to issue directly). Confirm that's intentional for v1 and not an omission.</div>
+
+      <h3>Add-on tier — priced by cost driver, not by feature size</h3>
+      <div class="schema-wrap">
+        <div class="tbl-title">Value-adds <span class="dim">split by whether the feature has ongoing marginal cost</span></div>
+        <table>
+          <tr><th>Feature</th><th>Pricing</th><th>Why this bucket</th></tr>
+          <tr><td class="field">Asset/QR/AMC tracking (§08)</td><td>One-time build fee</td><td>No ongoing marginal cost; the sharpest differentiator for an equipment-heavy oil-extraction customer specifically — likely the strongest early add-on to sell</td></tr>
+          <tr><td class="field">Vendor portal, PO trust/verification (§05)</td><td>One-time / phase-2 build</td><td>Mostly build effort, minimal recurring cost</td></tr>
+          <tr><td class="field">Smart catalog dedup, fuzzy/semantic (§07)</td><td>Additional subscription</td><td>Ongoing embedding-API cost per catalog write</td></tr>
+          <tr><td class="field">Fraud detection beyond exact-match (§06)</td><td>Additional subscription</td><td>Ongoing OCR/embedding-API cost per invoice</td></tr>
+          <tr><td class="field">ERP integrations, SSO/SAML, e-signature</td><td>Phase-4 enterprise add-on</td><td>Standard enterprise-tier pricing once relevant</td></tr>
+        </table>
+      </div>
+
+      <h3>Economics</h3>
+      <div class="schema-wrap">
+        <div class="tbl-title">Base-tier margin <span class="dim">at ~150 bills/month</span></div>
+        <table>
+          <tr><th>Line</th><th>Amount</th></tr>
+          <tr><td class="field">Platform cost (phase 0–1 scope: Vercel + Neon + WorkOS + R2)</td><td>~₹60,000–90,000/year</td></tr>
+          <tr><td class="field">Base subscription price</td><td>₹1,20,000/year</td></tr>
+          <tr><td class="field">Gross margin, base tier only</td><td>~₹30,000–60,000/year</td></tr>
+        </table>
+      </div>
+      <div class="callout"><strong>This is a founding-customer rate, not the steady-state anchor.</strong> Domestic comparables support ₹3–4 lakh/year for the differentiated version of this product (§ pricing discussion). ₹1.2L/year is a legitimate land-and-expand entry price for reference customer #1 — price customer #2 against value delivered, not against this floor.</div>
+    </section>
+
+    <section id="mocks" class="wide" style="max-width:none;">
+      <span class="sec-num">16 — Mockups</span>
+      <h2>UI mockups</h2>
+      <p style="max-width:66ch;">All seven screens now at a consistent high-fidelity pass — real app chrome, real data drawn from the scope above, not placeholder text. The platform-console screens use an amber accent instead of the tenant app's teal, deliberately, so the two systems read as visually distinct — a super admin should never mistake which environment they're in.</p>
+
+      <h3>Backend — platform &amp; tenant admin</h3>
+
+      <p class="mock-label">Platform super admin — tenants (§02)</p>
+      <div class="hifi-frame">
+        <div class="hifi-top platform">
+          <div class="hifi-logo">P</div>
+          <span class="hifi-brand">Platform console</span>
+          <span class="hifi-search">Search tenants, invoices, API keys…</span>
+          <div class="hifi-topright">
+            <span class="hifi-bell">&#9679;</span>
+            <div class="hifi-user">
+              <div class="hifi-avatar" style="background:var(--amber-soft);color:var(--amber);">PO</div>
+              <div><div class="hifi-username">Platform ops</div><div class="hifi-userrole">Super admin</div></div>
+            </div>
+          </div>
+        </div>
+        <div class="hifi-body" style="grid-template-columns:168px 1fr;">
+          <div class="hifi-nav">
+            <div class="hifi-nav-item active platform"><span class="hifi-nav-dot"></span>Tenants</div>
+            <div class="hifi-nav-item"><span class="hifi-nav-dot"></span>Billing</div>
+            <div class="hifi-nav-item"><span class="hifi-nav-dot"></span>Feature flags</div>
+            <div class="hifi-nav-item"><span class="hifi-nav-dot"></span>Resource usage</div>
+            <div class="hifi-nav-item"><span class="hifi-nav-dot"></span>API keys</div>
+          </div>
+          <div class="hifi-detail">
+            <div class="hifi-dhead"><div class="hifi-dtitle" style="font-size:18px;">Tenants</div><span class="hifi-btn primary" style="font-size:11px;padding:7px 14px;">+ New tenant</span></div>
+            <div class="hifi-stats">
+              <div class="hifi-stat"><div class="n">2</div><div class="l">Tenants</div></div>
+              <div class="hifi-stat"><div class="n">₹10,000</div><div class="l">MRR</div></div>
+              <div class="hifi-stat"><div class="n">1</div><div class="l">Active</div></div>
+              <div class="hifi-stat"><div class="n">1</div><div class="l">Trial</div></div>
+            </div>
+            <table class="mock-table" style="font-size:11.5px;">
+              <tr><th>Tenant</th><th>Plan</th><th>Status</th><th>Storage</th><th>Users</th><th>Last active</th></tr>
+              <tr><td>Oil Extraction Co Ltd</td><td>Base — ₹1.2L/yr</td><td><span class="mock-pill ok">Active</span></td><td><span class="mock-pill warn">Split</span></td><td>8</td><td>2h ago</td></tr>
+              <tr><td>Demo — Internal</td><td>Trial</td><td><span class="mock-pill info">Trial</span></td><td><span class="mock-pill ok">Integrated</span></td><td>1</td><td>3d ago</td></tr>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <p class="mock-label">Tenant admin — approval rule matrix (§04)</p>
+      <div class="hifi-frame">
+        <div class="hifi-top">
+          <div class="hifi-logo">P</div>
+          <span class="hifi-brand">Procurement</span>
+          <span class="hifi-tenant">Oil Extraction Co Ltd</span>
+          <span class="hifi-search">Search requisitions, vendors, POs…</span>
+          <div class="hifi-topright">
+            <span class="hifi-bell">&#9679;</span>
+            <div class="hifi-user"><div class="hifi-avatar">RI</div><div><div class="hifi-username">Rakesh Iyer</div><div class="hifi-userrole">Tenant admin</div></div></div>
+          </div>
+        </div>
+        <div class="hifi-body">
+          <div class="hifi-nav">
+            <div class="hifi-nav-item active"><span class="hifi-nav-dot"></span>Rules</div>
+            <div class="hifi-nav-item"><span class="hifi-nav-dot"></span>Roles</div>
+            <div class="hifi-nav-item"><span class="hifi-nav-dot"></span>Departments</div>
+            <div class="hifi-nav-item"><span class="hifi-nav-dot"></span>Catalog</div>
+            <div class="hifi-nav-item"><span class="hifi-nav-dot"></span>Vendors</div>
+          </div>
+          <div class="hifi-list">
+            <div class="hifi-list-head"><span class="hifi-list-title">Rules (3)</span><span class="hifi-btn primary" style="font-size:10px;padding:5px 10px;">+ New</span></div>
+            <div class="hifi-row selected">
+              <div class="hifi-row-top"><span class="hifi-row-title">IT assets — senior sign-off</span><span class="hifi-switch"></span></div>
+              <div class="hifi-row-meta"><span>IT assets · any value</span></div>
+            </div>
+            <div class="hifi-row">
+              <div class="hifi-row-top"><span class="hifi-row-title">Furniture — dept approval</span><span class="hifi-switch"></span></div>
+              <div class="hifi-row-meta"><span>Furniture · &lt; ₹20,000</span></div>
+            </div>
+            <div class="hifi-row">
+              <div class="hifi-row-top"><span class="hifi-row-title">High value — override</span><span class="hifi-switch"></span></div>
+              <div class="hifi-row-meta"><span>Any · &gt; ₹5,00,000 · default: on</span></div>
+            </div>
+          </div>
+          <div class="hifi-detail">
+            <div class="hifi-dhead"><div class="hifi-dtitle" style="font-size:17px;">IT assets — senior sign-off</div></div>
+            <p class="hifi-dsub">Rule ID app_rule_014 · active since Jan 2026</p>
+            <div class="hifi-formrow" style="margin-bottom:16px;">
+              <div class="hifi-field"><label>Category</label><input class="hifi-input" value="IT assets" readonly></div>
+              <div class="hifi-field"><label>Department</label><input class="hifi-input" value="Any (global)" readonly></div>
+            </div>
+            <div class="hifi-formrow" style="margin-bottom:16px;">
+              <div class="hifi-field"><label>Min value</label><input class="hifi-input" value="₹0" readonly></div>
+              <div class="hifi-field"><label>Max value</label><input class="hifi-input" value="No ceiling" readonly></div>
+            </div>
+            <div class="hifi-field">
+              <label>Combination mode</label>
+              <div class="hifi-radio-opt"><span class="hifi-radio-dot on"></span>Additive — unions with other matching rules</div>
+              <div class="hifi-radio-opt"><span class="hifi-radio-dot"></span>Exclusive — overrides lower-priority rules</div>
+            </div>
+            <p class="hifi-chainlabel">Group 1 · both required, parallel</p>
+            <div class="hifi-chain" style="margin-bottom:20px;">
+              <div class="hifi-chainchip self">IT Head</div>
+              <div class="hifi-chainchip self">Director</div>
+              <span class="hifi-btn ghost" style="padding:7px 10px;">+ Add approver role</span>
+            </div>
+            <div class="hifi-actions" style="border-top:none;padding-top:0;">
+              <span class="hifi-btn">Cancel</span>
+              <span class="hifi-btn primary">Save rule</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <p class="mock-label">Tenant admin — roles &amp; scope assignment (§02)</p>
+      <div class="hifi-frame">
+        <div class="hifi-top">
+          <div class="hifi-logo">P</div>
+          <span class="hifi-brand">Procurement</span>
+          <span class="hifi-tenant">Oil Extraction Co Ltd</span>
+          <span class="hifi-search">Search requisitions, vendors, POs…</span>
+          <div class="hifi-topright">
+            <span class="hifi-bell">&#9679;</span>
+            <div class="hifi-user"><div class="hifi-avatar">RI</div><div><div class="hifi-username">Rakesh Iyer</div><div class="hifi-userrole">Tenant admin</div></div></div>
+          </div>
+        </div>
+        <div class="hifi-body">
+          <div class="hifi-nav">
+            <div class="hifi-nav-item"><span class="hifi-nav-dot"></span>Rules</div>
+            <div class="hifi-nav-item active"><span class="hifi-nav-dot"></span>Roles</div>
+            <div class="hifi-nav-item"><span class="hifi-nav-dot"></span>Departments</div>
+            <div class="hifi-nav-item"><span class="hifi-nav-dot"></span>Catalog</div>
+            <div class="hifi-nav-item"><span class="hifi-nav-dot"></span>Vendors</div>
+          </div>
+          <div class="hifi-list">
+            <div class="hifi-list-head"><span class="hifi-list-title">Assignments (3)</span></div>
+            <div class="hifi-row selected">
+              <div class="hifi-row-top"><span class="hifi-row-title">Priya Sharma</span></div>
+              <div class="hifi-row-meta"><span>Department head · Drilling ops</span></div>
+            </div>
+            <div class="hifi-row">
+              <div class="hifi-row-top"><span class="hifi-row-title">Arjun Mehta</span></div>
+              <div class="hifi-row-meta"><span>IT head · Global</span></div>
+            </div>
+            <div class="hifi-row">
+              <div class="hifi-row-top"><span class="hifi-row-title">Rakesh Iyer</span></div>
+              <div class="hifi-row-meta"><span>Director · Global</span></div>
+            </div>
+          </div>
+          <div class="hifi-detail">
+            <div class="hifi-dhead"><div class="hifi-dtitle" style="font-size:17px;">+ Assign role</div></div>
+            <p class="hifi-dsub">Grants a functional role the approval engine resolves against (§04)</p>
+            <div class="hifi-field"><label>User</label><input class="hifi-input" value="Search by name or email…" readonly></div>
+            <div class="hifi-field"><label>Role</label><input class="hifi-input" value="Department head" readonly></div>
+            <div class="hifi-field">
+              <label>Scope</label>
+              <div class="hifi-radio-opt"><span class="hifi-radio-dot on"></span>Department — Drilling operations</div>
+              <div class="hifi-radio-opt"><span class="hifi-radio-dot"></span>Global — applies tenant-wide</div>
+            </div>
+            <div class="hifi-field"><label>Effective from</label><input class="hifi-input" value="Today" readonly></div>
+            <div class="hifi-actions" style="border-top:none;padding-top:6px;">
+              <span class="hifi-btn">Cancel</span>
+              <span class="hifi-btn primary">Assign role</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <h3>Front end — customer facing</h3>
+
+      <p class="mock-label">Requestor — new requisition (§03) — feeds PR-1042 into the approval inbox below</p>
+      <div class="hifi-frame">
+        <div class="hifi-top">
+          <div class="hifi-logo">P</div>
+          <span class="hifi-brand">Procurement</span>
+          <span class="hifi-tenant">Oil Extraction Co Ltd</span>
+          <span class="hifi-search">Search requisitions, vendors, POs…</span>
+          <div class="hifi-topright">
+            <span class="hifi-bell">&#9679;</span>
+            <div class="hifi-user">
+              <div class="hifi-avatar alt">PS</div>
+              <div><div class="hifi-username">Priya Sharma</div><div class="hifi-userrole">Drilling operations</div></div>
+            </div>
+          </div>
+        </div>
+        <div class="hifi-body" style="grid-template-columns:168px 1fr;">
+          <div class="hifi-nav">
+            <div class="hifi-nav-item"><span class="hifi-nav-dot"></span>Dashboard</div>
+            <div class="hifi-nav-item active"><span class="hifi-nav-dot"></span>Requisitions</div>
+            <div class="hifi-nav-item"><span class="hifi-nav-dot"></span>Approvals</div>
+            <div class="hifi-nav-item"><span class="hifi-nav-dot"></span>Purchase orders</div>
+            <div class="hifi-nav-item"><span class="hifi-nav-dot"></span>Vendors</div>
+            <div class="hifi-nav-item"><span class="hifi-nav-dot"></span>Assets</div>
+            <div class="hifi-nav-item"><span class="hifi-nav-dot"></span>Reports</div>
+          </div>
+          <div class="hifi-form">
+            <div class="hifi-dhead" style="margin-bottom:2px;">
+              <div class="hifi-dtitle" style="font-size:18px;">New requisition</div>
+              <span style="font-size:10.5px;color:var(--ink-faint);">Draft · saved 2s ago</span>
+            </div>
+            <p class="hifi-dsub" style="margin-bottom:18px;">Drilling operations · Priya Sharma</p>
+
+            <div class="hifi-field">
+              <label>Fulfillment type</label>
+              <div class="hifi-toggle"><span class="hifi-toggle-opt active">Goods</span><span class="hifi-toggle-opt">Service</span></div>
+            </div>
+
+            <div class="hifi-field">
+              <label>Item</label>
+              <input class="hifi-input" value="Laptop, Dell Latitude" readonly>
+              <div class="hifi-match">✓ Matched from catalog · used 47× this year — no new entry created</div>
+            </div>
+
+            <div class="hifi-formrow">
+              <div class="hifi-field">
+                <label>Quantity</label>
+                <input class="hifi-input" value="1 · each" readonly>
+              </div>
+              <div class="hifi-field">
+                <label>Estimated unit price</label>
+                <input class="hifi-input" value="₹58,000" readonly>
+                <div class="hifi-hint">Last purchased at ₹52,000 (12 Mar 2026)</div>
+              </div>
+            </div>
+
+            <div class="hifi-formrow">
+              <div class="hifi-field">
+                <label>Cost center</label>
+                <input class="hifi-input" value="Drilling operations — IT" readonly>
+              </div>
+              <div class="hifi-field">
+                <label>Needed by</label>
+                <input class="hifi-input" value="20 Aug 2026" readonly>
+              </div>
+            </div>
+
+            <div class="hifi-field">
+              <label>Justification</label>
+              <div class="hifi-textarea">"Replacing a laptop that failed hardware diagnostics — IT ticket #4471 attached."</div>
+              <div class="hifi-attach">📎 IT-ticket-4471.pdf</div>
+            </div>
+
+            <div class="hifi-field">
+              <label>Budget impact</label>
+              <div class="mock-bar"><div class="mock-bar-fill" style="width:47%;"></div></div>
+              <div class="hifi-hint">₹2.1L used → ₹2.68L of ₹5L after this request</div>
+            </div>
+
+            <p class="hifi-chainlabel">This request will need</p>
+            <div class="hifi-chain" style="margin-bottom:22px;">
+              <div class="hifi-chainchip">IT Head</div>
+              <div class="hifi-chainchip">Director</div>
+              <span style="font-size:11px;color:var(--ink-faint);align-self:center;">both required, in parallel</span>
+            </div>
+
+            <div class="hifi-actions" style="border-top:none;padding-top:0;">
+              <span class="hifi-btn">Save as draft</span>
+              <span class="hifi-btn primary">Submit for approval</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <p class="mock-label">Coordinator — lifecycle tracker (§01)</p>
+      <div class="mock-frame" style="max-width:400px;">
+        <div class="mock-titlebar"><span class="mock-dot"></span><span class="mock-dot"></span><span class="mock-dot"></span><span class="mock-url">app.platform.app / requests / PR-1042</span></div>
+        <div class="mock-main" style="padding:16px 18px;">
+          <div class="mock-steps">
+            <div class="mock-step done">Submitted</div>
+            <div class="mock-step done">Approved</div>
+            <div class="mock-step done">PO issued</div>
+            <div class="mock-step current">Goods received</div>
+            <div class="mock-step">Invoice matched</div>
+            <div class="mock-step">Paid</div>
+          </div>
+          <div class="mock-kv"><span>Requestor</span><span>Priya Sharma</span></div>
+          <div class="mock-kv"><span>Vendor</span><span>Om Traders</span></div>
+          <div class="mock-kv"><span>Amount</span><span>₹58,000</span></div>
+          <div class="mock-kv"><span>Current owner</span><span>Ramesh K — stores</span></div>
+          <div class="mock-kv"><span>Time in stage</span><span style="color:var(--amber);">2 days</span></div>
+        </div>
+      </div>
+
+      <p class="mock-label">Approver — inbox with decision-support panel (§ approver decision-support)</p>
+      <div class="hifi-frame">
+        <div class="hifi-top">
+          <div class="hifi-logo">P</div>
+          <span class="hifi-brand">Procurement</span>
+          <span class="hifi-tenant">Oil Extraction Co Ltd</span>
+          <span class="hifi-search">Search requisitions, vendors, POs…</span>
+          <div class="hifi-topright">
+            <span class="hifi-bell">&#9679;</span>
+            <div class="hifi-user">
+              <div class="hifi-avatar">AM</div>
+              <div><div class="hifi-username">Arjun Mehta</div><div class="hifi-userrole">IT Head</div></div>
+            </div>
+          </div>
+        </div>
+        <div class="hifi-body">
+          <div class="hifi-nav">
+            <div class="hifi-nav-item"><span class="hifi-nav-dot"></span>Dashboard</div>
+            <div class="hifi-nav-item"><span class="hifi-nav-dot"></span>Requisitions</div>
+            <div class="hifi-nav-item active"><span class="hifi-nav-dot"></span>Approvals</div>
+            <div class="hifi-nav-item"><span class="hifi-nav-dot"></span>Purchase orders</div>
+            <div class="hifi-nav-item"><span class="hifi-nav-dot"></span>Vendors</div>
+            <div class="hifi-nav-item"><span class="hifi-nav-dot"></span>Assets</div>
+            <div class="hifi-nav-item"><span class="hifi-nav-dot"></span>Reports</div>
+          </div>
+          <div class="hifi-list">
+            <div class="hifi-list-head"><span class="hifi-list-title">Approvals</span><span class="hifi-sort">Oldest first ▾</span></div>
+            <div class="hifi-chips">
+              <span class="hifi-chip active">All 2</span>
+              <span class="hifi-chip">Mine 2</span>
+              <span class="hifi-chip">Urgent 1</span>
+            </div>
+            <div class="hifi-row selected">
+              <div class="hifi-row-top"><span class="hifi-row-title">Laptop, Dell Latitude</span><span class="mock-pill warn">2d</span></div>
+              <div class="hifi-row-meta"><span>Priya Sharma · Drilling ops</span><span style="font-variant-numeric:tabular-nums;">₹58,000</span></div>
+            </div>
+            <div class="hifi-row">
+              <div class="hifi-row-top"><span class="hifi-row-title">Office chair</span><span class="mock-pill ok">4h</span></div>
+              <div class="hifi-row-meta"><span>Kavita Rao · Admin</span><span style="font-variant-numeric:tabular-nums;">₹8,200</span></div>
+            </div>
+          </div>
+          <div class="hifi-detail">
+            <div class="hifi-dhead">
+              <div>
+                <div class="hifi-dtitle">Laptop, Dell Latitude</div>
+              </div>
+              <div class="hifi-damount">₹58,000</div>
+            </div>
+            <div class="hifi-dsub">PR-1042 · submitted 2 days ago by Priya Sharma, Drilling operations</div>
+
+            <p class="hifi-chainlabel">Required approvers · group 1, both required</p>
+            <div class="hifi-chain">
+              <div class="hifi-chainchip self">You — Arjun Mehta, IT Head <span class="mock-pill warn">Pending</span></div>
+              <div class="hifi-chainchip">Rakesh Iyer, Director <span class="mock-pill warn">Pending</span></div>
+            </div>
+
+            <div class="cardgrid">
+              <div class="hifi-card">
+                <h5>Item history</h5>
+                <div class="big">₹52,000</div>
+                <div class="sub">Last purchased 12 Mar 2026 · ↑ 11.5% this time</div>
+                <div class="sub" style="margin-top:6px;"><a href="#" style="border:none;">3 similar requests this quarter →</a></div>
+              </div>
+              <div class="hifi-card">
+                <h5>Vendor — Om Traders</h5>
+                <div class="big">4.6 ★</div>
+                <div class="sub">92% on-time · 0 disputes · vendor since 2023</div>
+              </div>
+              <div class="hifi-card">
+                <h5>Budget — drilling ops, IT</h5>
+                <div class="mock-bar" style="margin-top:2px;"><div class="mock-bar-fill" style="width:47%;"></div></div>
+                <div class="sub" style="margin-top:6px;">₹2.35L of ₹5L used if approved</div>
+              </div>
+              <div class="hifi-card">
+                <h5>Duplicate / fraud check</h5>
+                <div class="big" style="color:var(--verified);font-size:13px;">No flags</div>
+                <div class="sub">Exact &amp; fuzzy match clear against last 90 days</div>
+              </div>
+            </div>
+
+            <p class="hifi-chainlabel">Requestor's note</p>
+            <div class="hifi-justif">"Replacing a laptop that failed hardware diagnostics — IT ticket #4471 attached."</div>
+
+            <div class="hifi-actions">
+              <span class="hifi-comment">Add a comment (optional)</span>
+              <span class="hifi-btn primary">Approve</span>
+              <span class="hifi-btn danger">Reject</span>
+              <span class="hifi-btn ghost">+ Add approver</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <p class="mock-label">Mobile — asset QR passport (§08)</p>
+      <div class="hifi-phone">
+        <div class="hifi-phone-screen">
+          <div class="hifi-statusbar"><span>9:41</span><span>••• 5G 84%</span></div>
+          <div class="hifi-phone-body">
+            <div style="display:flex;align-items:center;gap:10px;margin:10px 0 12px;">
+              <div class="hifi-logo" style="border-radius:9px;font-size:11px;">HP</div>
+              <div>
+                <div style="font-weight:600;font-size:13.5px;">HP LaserJet Pro M404</div>
+                <div style="font-size:10.5px;color:var(--ink-faint);">Asset AST-2031</div>
+              </div>
+            </div>
+            <div style="margin-bottom:12px;"><span class="mock-pill ok">AMC active</span> <span class="mock-pill info">Signed in — full view</span></div>
+            <div class="mock-kv"><span>Custodian</span><span>Finance, reception</span></div>
+            <div class="mock-kv"><span>Purchased</span><span>12 Mar 2025</span></div>
+            <div class="mock-kv"><span>Cost</span><span>₹28,500</span></div>
+            <p class="hifi-chainlabel" style="margin-top:14px;">Procurement trail</p>
+            <div class="mock-kv"><span>PR raised — Priya Sharma</span><span>2 Mar</span></div>
+            <div class="mock-kv"><span>PO-4471 — Om Traders</span><span>5 Mar</span></div>
+            <div class="mock-kv"><span>Delivered, verified</span><span>12 Mar</span></div>
+            <p class="hifi-chainlabel" style="margin-top:14px;">Service &amp; repair</p>
+            <div class="mock-kv"><span>Paper jam repair, under AMC</span><span>14 Jan</span></div>
+            <div class="mock-kv" style="border-bottom:none;"><span>Next AMC visit</span><span style="color:var(--amber);">15 Feb</span></div>
+            <div style="display:flex;gap:8px;margin-top:16px;">
+              <span class="hifi-btn ghost" style="flex:1;text-align:center;border:1px solid var(--rule-strong);">Report issue</span>
+              <span class="hifi-btn primary" style="flex:1;text-align:center;">Maintenance</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<footer>Procurement &amp; asset platform — scope v0.3 — internal planning document</footer>
