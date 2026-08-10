@@ -10,3 +10,5 @@ dist/
 .vercel
 coverage/
 .env*
+*.local
+supabase/.temp
