@@ -70,6 +70,9 @@ export const tenants = pgTable("tenants", {
   // Set deliberately by a platform admin onboarding a customer — never
   // auto-created from a sign-in attempt. See §14 Sprint 1 / 0002 migration.
   workosOrganizationId: text("workos_organization_id").unique(),
+  // "Basic" flags for the platform console (§14 Sprint 2) — a per-tenant
+  // toggle bag, not a targeting/rollout system.
+  featureFlags: jsonb("feature_flags").notNull().default({}),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });

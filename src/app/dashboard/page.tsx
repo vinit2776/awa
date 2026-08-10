@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { signOut } from "@workos-inc/authkit-nextjs";
 import { getCurrentUserAndTenant } from "@/db/session";
 import { withTenant } from "@/db/withTenant";
@@ -27,11 +28,16 @@ export default async function DashboardPage() {
             Signed in as {user.fullName} ({user.email})
           </p>
         </div>
-        <form action={handleSignOut}>
-          <button type="submit" className={cn(buttonVariants({ variant: "outline" }))}>
-            Sign out
-          </button>
-        </form>
+        <div className="flex gap-2">
+          <Link href="/dashboard/admin/departments" className={cn(buttonVariants({ variant: "outline" }))}>
+            Admin
+          </Link>
+          <form action={handleSignOut}>
+            <button type="submit" className={cn(buttonVariants({ variant: "outline" }))}>
+              Sign out
+            </button>
+          </form>
+        </div>
       </div>
 
       <div>
