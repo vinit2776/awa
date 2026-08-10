@@ -11,12 +11,13 @@ async function createCostCenter(formData: FormData) {
   const { user, tenant } = await getCurrentUserAndTenant();
   const name = String(formData.get("name") ?? "").trim();
   const code = String(formData.get("code") ?? "").trim();
+  const annualBudget = String(formData.get("annualBudget") ?? "").trim() || null;
   if (!name || !code) return;
 
   await withTenant(tenant.id, async (tx) => {
     const [created] = await tx
       .insert(costCentersTable)
-      .values({ tenantId: tenant.id, name, code })
+      .values({ tenantId: tenant.id, name, code, annualBudget })
       .returning();
     await logAction(tx, {
       tenantId: tenant.id,
@@ -48,6 +49,7 @@ export default async function CostCentersPage() {
             <th className="py-2 font-normal">Name</th>
             <th className="py-2 font-normal">Code</th>
             <th className="py-2 font-normal">Currency</th>
+            <th className="py-2 font-normal">Annual budget</th>
           </tr>
         </thead>
         <tbody>
@@ -56,6 +58,7 @@ export default async function CostCentersPage() {
               <td className="py-2">{c.name}</td>
               <td className="py-2">{c.code}</td>
               <td className="py-2">{c.currency}</td>
+              <td className="py-2">{c.annualBudget ?? "—"}</td>
             </tr>
           ))}
         </tbody>
@@ -69,6 +72,17 @@ export default async function CostCentersPage() {
         <div className="flex flex-col gap-1">
           <label htmlFor="code" className="text-xs text-muted-foreground">Code</label>
           <input id="code" name="code" required className="h-8 w-28 rounded-md border px-2 text-sm" placeholder="e.g. DR-IT" />
+        </div>
+        <div className="flex flex-col gap-1">
+          <label htmlFor="annualBudget" className="text-xs text-muted-foreground">Annual budget</label>
+          <input
+            id="annualBudget"
+            name="annualBudget"
+            type="number"
+            step="0.01"
+            className="h-8 w-32 rounded-md border px-2 text-sm"
+            placeholder="optional"
+          />
         </div>
         <button type="submit" className={cn(buttonVariants())}>Add</button>
       </form>

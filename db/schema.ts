@@ -113,6 +113,7 @@ export const costCenters = pgTable("cost_centers", {
   name: text("name").notNull(),
   code: text("code").notNull(),
   currency: text("currency").notNull().default("INR"),
+  annualBudget: numeric("annual_budget", { precision: 14, scale: 2 }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [unique().on(t.tenantId, t.code)]);
 

@@ -29,6 +29,9 @@ export default async function DashboardPage() {
           </p>
         </div>
         <div className="flex gap-2">
+          <Link href="/dashboard/requisitions" className={cn(buttonVariants({ variant: "outline" }))}>
+            My requests
+          </Link>
           <Link href="/dashboard/admin/departments" className={cn(buttonVariants({ variant: "outline" }))}>
             Admin
           </Link>
