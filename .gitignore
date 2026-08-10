@@ -12,3 +12,6 @@ coverage/
 .env*
 *.local
 supabase/.temp
+*.tsbuildinfo
+next-env.d.ts
+*.pem
