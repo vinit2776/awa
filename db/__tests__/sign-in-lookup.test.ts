@@ -10,17 +10,18 @@ let tenantB: typeof tenants.$inferSelect;
 let admin: typeof platformAdmins.$inferSelect;
 
 beforeAll(async () => {
+  const suffix = crypto.randomUUID().slice(0, 8);
   [tenantA] = await adminDb
     .insert(tenants)
-    .values({ name: "Sign-in Lookup Co A", slug: "sign-in-lookup-co-a", workosOrganizationId: "org_lookup_a" })
+    .values({ name: "Sign-in Lookup Co A", slug: `sign-in-lookup-co-a-${suffix}`, workosOrganizationId: `org_lookup_a_${suffix}` })
     .returning();
   [tenantB] = await adminDb
     .insert(tenants)
-    .values({ name: "Sign-in Lookup Co B", slug: "sign-in-lookup-co-b", workosOrganizationId: "org_lookup_b" })
+    .values({ name: "Sign-in Lookup Co B", slug: `sign-in-lookup-co-b-${suffix}`, workosOrganizationId: `org_lookup_b_${suffix}` })
     .returning();
   [admin] = await adminDb
     .insert(platformAdmins)
-    .values({ email: "sil-admin@example.com", fullName: "Sil Admin", role: "support" })
+    .values({ email: `sil-admin-${suffix}@example.com`, fullName: "Sil Admin", role: "support" })
     .returning();
 });
 
@@ -47,7 +48,7 @@ describe("resolveSignInTargets", () => {
     const result = await resolveSignInTargets("single@example.com");
     expect(result.isPlatformAdmin).toBe(false);
     expect(result.tenants).toHaveLength(1);
-    expect(result.tenants[0].organizationId).toBe("org_lookup_a");
+    expect(result.tenants[0].organizationId).toBe(tenantA.workosOrganizationId);
   });
 
   it("resolves every tenant when the same email is pre-provisioned under more than one", async () => {
@@ -59,11 +60,13 @@ describe("resolveSignInTargets", () => {
     );
     const result = await resolveSignInTargets("shared@example.com");
     expect(result.tenants).toHaveLength(2);
-    expect(result.tenants.map((t) => t.organizationId).sort()).toEqual(["org_lookup_a", "org_lookup_b"]);
+    expect(result.tenants.map((t) => t.organizationId).sort()).toEqual(
+      [tenantA.workosOrganizationId, tenantB.workosOrganizationId].sort(),
+    );
   });
 
   it("flags isPlatformAdmin for a platform admin's email, regardless of case", async () => {
-    const result = await resolveSignInTargets("SIL-Admin@Example.com");
+    const result = await resolveSignInTargets(admin.email.toUpperCase());
     expect(result.isPlatformAdmin).toBe(true);
     expect(result.tenants).toHaveLength(0);
   });

@@ -52,7 +52,8 @@ let approver: typeof users.$inferSelect;
 let receiver: typeof users.$inferSelect;
 
 beforeAll(async () => {
-  [tenant] = await adminDb.insert(tenants).values({ name: "Golden Path Co", slug: "golden-path-co" }).returning();
+  const suffix = crypto.randomUUID().slice(0, 8);
+  [tenant] = await adminDb.insert(tenants).values({ name: "Golden Path Co", slug: `golden-path-co-${suffix}` }).returning();
   [requestor] = await adminDb.insert(users).values({ tenantId: tenant.id, email: "gp-requestor@example.com", fullName: "Rachel Requestor", status: "active" }).returning();
   [approver] = await adminDb.insert(users).values({ tenantId: tenant.id, email: "gp-approver@example.com", fullName: "Dave Director", status: "active" }).returning();
   [receiver] = await adminDb.insert(users).values({ tenantId: tenant.id, email: "gp-receiver@example.com", fullName: "Ravi Receiver", status: "active" }).returning();

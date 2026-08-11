@@ -28,8 +28,9 @@ let tenantA: typeof tenants.$inferSelect;
 let tenantB: typeof tenants.$inferSelect;
 
 beforeAll(async () => {
-  [tenantA] = await adminDb.insert(tenants).values({ name: "RLS Test A", slug: "rls-test-a" }).returning();
-  [tenantB] = await adminDb.insert(tenants).values({ name: "RLS Test B", slug: "rls-test-b" }).returning();
+  const suffix = crypto.randomUUID().slice(0, 8);
+  [tenantA] = await adminDb.insert(tenants).values({ name: "RLS Test A", slug: `rls-test-a-${suffix}` }).returning();
+  [tenantB] = await adminDb.insert(tenants).values({ name: "RLS Test B", slug: `rls-test-b-${suffix}` }).returning();
 
   await withTenant(tenantA.id, async (tx) => {
     const [dept] = await tx.insert(departments).values({ tenantId: tenantA.id, name: "Dept A" }).returning();

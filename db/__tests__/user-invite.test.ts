@@ -11,10 +11,11 @@ let restrictedTenant: typeof tenants.$inferSelect;
 let admin: typeof users.$inferSelect;
 
 beforeAll(async () => {
-  [tenant] = await adminDb.insert(tenants).values({ name: "Invite Test Co", slug: "invite-test-co", workosOrganizationId: "org_invite_test" }).returning();
+  const suffix = crypto.randomUUID().slice(0, 8);
+  [tenant] = await adminDb.insert(tenants).values({ name: "Invite Test Co", slug: `invite-test-co-${suffix}`, workosOrganizationId: `org_invite_test_${suffix}` }).returning();
   [restrictedTenant] = await adminDb
     .insert(tenants)
-    .values({ name: "Invite Restricted Co", slug: "invite-restricted-co", workosOrganizationId: "org_invite_restricted", allowedEmailDomains: ["acme.com"] })
+    .values({ name: "Invite Restricted Co", slug: `invite-restricted-co-${suffix}`, workosOrganizationId: `org_invite_restricted_${suffix}`, allowedEmailDomains: ["acme.com"] })
     .returning();
   [admin] = await adminDb.insert(users).values({ tenantId: tenant.id, email: "admin@example.com", fullName: "Admin Person", status: "active" }).returning();
 });

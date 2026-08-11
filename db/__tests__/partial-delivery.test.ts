@@ -65,7 +65,8 @@ async function makeServicePo() {
 }
 
 beforeAll(async () => {
-  [tenant] = await adminDb.insert(tenants).values({ name: "Partial Delivery Co", slug: "partial-delivery-co" }).returning();
+  const suffix = crypto.randomUUID().slice(0, 8);
+  [tenant] = await adminDb.insert(tenants).values({ name: "Partial Delivery Co", slug: `partial-delivery-co-${suffix}` }).returning();
   [requestor] = await adminDb.insert(users).values({ tenantId: tenant.id, email: "pd-requestor@example.com", fullName: "Pat Requestor", status: "active" }).returning();
   [receiver] = await adminDb.insert(users).values({ tenantId: tenant.id, email: "pd-receiver@example.com", fullName: "Rae Receiver", status: "active" }).returning();
   [vendor] = await withTenant(tenant.id, (tx) => tx.insert(vendors).values({ tenantId: tenant.id, name: "Partial Vendor" }).returning());

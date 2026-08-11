@@ -23,7 +23,8 @@ let item: typeof catalogItems.$inferSelect;
 let neverPurchasedItem: typeof catalogItems.$inferSelect;
 
 beforeAll(async () => {
-  [tenant] = await adminDb.insert(tenants).values({ name: "Decision Support Co", slug: "decision-support-co" }).returning();
+  const suffix = crypto.randomUUID().slice(0, 8);
+  [tenant] = await adminDb.insert(tenants).values({ name: "Decision Support Co", slug: `decision-support-co-${suffix}` }).returning();
   [requestor] = await adminDb.insert(users).values({ tenantId: tenant.id, email: "ds-requestor@example.com", fullName: "Rachel Requestor", status: "active" }).returning();
 
   await withTenant(tenant.id, async (tx) => {
