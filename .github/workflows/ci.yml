@@ -35,17 +35,57 @@ jobs:
         if: steps.gate.outputs.skip == 'false'
         run: npm run lint
 
+      - name: Generate Next.js types
+        if: steps.gate.outputs.skip == 'false'
+        # `LayoutProps`/`PageProps` etc. are ambient types Next.js writes
+        # into .next/types on dev/build/typegen — a fresh CI checkout has
+        # no .next directory, so `tsc --noEmit` fails on every route file
+        # using them unless something generates those types first. This
+        # has been silently failing since Sprint 7 (every CI run on
+        # main up to and including Sprint 17 is red) because nothing
+        # gated a merge on it until the go-live policy wired the test
+        # step in — worth catching now, not after branch protection is
+        # actually turned on.
+        run: npx next typegen
+
       - name: Typecheck
         if: steps.gate.outputs.skip == 'false'
         run: npm run typecheck
 
       - name: Build
         if: steps.gate.outputs.skip == 'false'
+        # Next's build-time page-data collection loads every route module,
+        # including ones that import db/session.ts -> db/adminClient.ts —
+        # that module throws at import time if DATABASE_URL_MIGRATIONS
+        # isn't set at all, regardless of whether the route actually runs
+        # a query during the build. DATABASE_URL isn't strictly needed
+        # here (db/client.ts is lazy), included anyway so Build and Test
+        # see the same environment.
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DATABASE_URL_MIGRATIONS: ${{ secrets.DATABASE_URL_MIGRATIONS }}
         run: npm run build
 
       - name: Test
         if: steps.gate.outputs.skip == 'false'
+        # The full suite exercises every db/*.ts module that reads a
+        # secret at call time, not just the two DB connection strings —
+        # BANK_ACCOUNT_ENCRYPTION_KEY (bank-accounts/crypto tests) and
+        # VENDOR_SESSION_SECRET (vendor-portal tests) throw outright
+        # without a value, and push.test.ts's assertions on send counts
+        # depend on VAPID being configured, not just "doesn't crash"
+        # (db/push.ts quietly no-ops without it, by design, which still
+        # fails the test's "was called" assertion). Missing these caused
+        # a worse symptom than their own test files failing: an
+        # in-flight transaction thrown out of by a missing-secret error
+        # left the shared pooled connection in a state that broke an
+        # unrelated later test file's cleanup with a foreign-key error.
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           DATABASE_URL_MIGRATIONS: ${{ secrets.DATABASE_URL_MIGRATIONS }}
+          BANK_ACCOUNT_ENCRYPTION_KEY: ${{ secrets.BANK_ACCOUNT_ENCRYPTION_KEY }}
+          VENDOR_SESSION_SECRET: ${{ secrets.VENDOR_SESSION_SECRET }}
+          NEXT_PUBLIC_VAPID_PUBLIC_KEY: ${{ secrets.NEXT_PUBLIC_VAPID_PUBLIC_KEY }}
+          VAPID_PRIVATE_KEY: ${{ secrets.VAPID_PRIVATE_KEY }}
+          VAPID_SUBJECT: ${{ secrets.VAPID_SUBJECT }}
         run: npm run test

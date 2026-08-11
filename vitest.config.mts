@@ -7,8 +7,17 @@ import { defineConfig } from "vitest/config";
 export default defineConfig({
   test: {
     setupFiles: ["./vitest.setup.ts"],
-    testTimeout: 30_000,
-    hookTimeout: 30_000,
+    // 30s was fine locally but too tight in CI (added Sprint 18): CI's
+    // runner is further from the Supabase ap-south-1 database than
+    // local dev is, and any test doing several sequential DB round
+    // trips (golden-path.test.ts's whole flow, service-milestones.test.ts's
+    // multi-acceptance case) can cross 30s there even though it
+    // comfortably passes locally. Raised globally rather than patched
+    // per test, since the next multi-round-trip test added would just
+    // hit the same wall — this doesn't loosen detection of an actually
+    // hung test locally, everything already finishes well under it.
+    testTimeout: 60_000,
+    hookTimeout: 60_000,
     fileParallelism: false,
   },
 });
