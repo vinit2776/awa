@@ -17,7 +17,10 @@ export default authkitProxy({
     // (getCurrentVendorUser), the same way WorkOS-gated dashboard routes
     // call getCurrentUserAndTenant; this entry just keeps authkitProxy
     // from intercepting first and redirecting to WorkOS sign-in instead.
-    unauthenticatedPaths: ["/", "/callback", "/po-verify/:path*", "/offline", "/vendor-portal/:path*"],
+    // /choose-tenant is part of the pre-sign-in flow itself (S: fix
+    // callback org resolution) — reached before WorkOS auth completes,
+    // when the same email is pre-provisioned under more than one tenant.
+    unauthenticatedPaths: ["/", "/callback", "/choose-tenant", "/po-verify/:path*", "/offline", "/vendor-portal/:path*"],
   },
 });
 
