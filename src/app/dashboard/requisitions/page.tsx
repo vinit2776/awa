@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { desc, eq, inArray } from "drizzle-orm";
+import { and, asc, desc, eq, inArray } from "drizzle-orm";
 import { getCurrentUserAndTenant } from "@/db/session";
 import { withTenant } from "@/db/withTenant";
 import {
@@ -7,6 +7,7 @@ import {
   requisitionApprovalRequirements as requirementsTable,
   departments as departmentsTable,
   costCenters as costCentersTable,
+  requisitionStatus,
 } from "@/db/schema";
 import { buttonVariants } from "@/components/ui/button";
 import { Breadcrumbs } from "@/components/ui/breadcrumbs";
@@ -18,18 +19,54 @@ function pendingDays(submittedAt: Date | null): number | null {
   return Math.floor((Date.now() - submittedAt.getTime()) / 86_400_000);
 }
 
-export default async function RequisitionsPage() {
+function humanizeStatus(status: string): string {
+  return status.replace(/_/g, " ");
+}
+
+type StatusValue = (typeof requisitionStatus.enumValues)[number];
+type SortValue = "status_asc" | "status_desc";
+
+export default async function RequisitionsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ status?: string; sort?: string }>;
+}) {
+  const params = await searchParams;
   const { user, tenant } = await getCurrentUserAndTenant();
+
+  const statusFilter = requisitionStatus.enumValues.includes(params.status as StatusValue)
+    ? (params.status as StatusValue)
+    : null;
+  const sort: SortValue | null = params.sort === "status_asc" || params.sort === "status_desc" ? params.sort : null;
+
+  const orderBy =
+    sort === "status_asc"
+      ? [asc(purchaseRequisitionsTable.status), desc(purchaseRequisitionsTable.createdAt)]
+      : sort === "status_desc"
+        ? [desc(purchaseRequisitionsTable.status), desc(purchaseRequisitionsTable.createdAt)]
+        : [desc(purchaseRequisitionsTable.createdAt)];
 
   const [requisitions, departments, costCenters] = await withTenant(tenant.id, async (tx) => [
     await tx
       .select()
       .from(purchaseRequisitionsTable)
-      .where(eq(purchaseRequisitionsTable.requestorId, user.id))
-      .orderBy(desc(purchaseRequisitionsTable.createdAt)),
+      .where(
+        and(
+          eq(purchaseRequisitionsTable.requestorId, user.id),
+          ...(statusFilter ? [eq(purchaseRequisitionsTable.status, statusFilter)] : []),
+        ),
+      )
+      .orderBy(...orderBy),
     await tx.select().from(departmentsTable),
     await tx.select().from(costCentersTable),
   ]);
+
+  const nextSort: SortValue | null = sort === "status_asc" ? "status_desc" : sort === "status_desc" ? null : "status_asc";
+  const sortHref = `?${new URLSearchParams({
+    ...(statusFilter ? { status: statusFilter } : {}),
+    ...(nextSort ? { sort: nextSort } : {}),
+  }).toString()}`;
+  const clearFilterHref = sort ? `?${new URLSearchParams({ sort }).toString()}` : "/dashboard/requisitions";
 
   const rejectedIds = requisitions.filter((r) => r.status === "rejected_revisable" || r.status === "rejected_closed").map((r) => r.id);
   const rejectionReasons = rejectedIds.length
@@ -55,13 +92,37 @@ export default async function RequisitionsPage() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="font-serif text-lg text-foreground">My requests</h1>
-            <p className="text-sm text-muted-foreground">{requisitions.length} in {tenant.name}</p>
+            <p className="text-sm text-muted-foreground">
+              {requisitions.length} in {tenant.name}
+              {statusFilter && ` matching "${humanizeStatus(statusFilter)}"`}
+            </p>
           </div>
           <Link href="/dashboard/requisitions/new" className={cn(buttonVariants())}>
             New requisition
           </Link>
         </div>
       </div>
+
+      <form method="GET" className="flex items-end gap-2">
+        {sort && <input type="hidden" name="sort" value={sort} />}
+        <div className="flex flex-col gap-1">
+          <label htmlFor="status" className="text-xs text-muted-foreground">Status</label>
+          <select id="status" name="status" defaultValue={statusFilter ?? ""} className="h-8 rounded-md border px-2 text-sm">
+            <option value="">All statuses</option>
+            {requisitionStatus.enumValues.map((s) => (
+              <option key={s} value={s}>{humanizeStatus(s)}</option>
+            ))}
+          </select>
+        </div>
+        <button type="submit" className={cn(buttonVariants({ variant: "outline", size: "sm" }))}>
+          Filter
+        </button>
+        {statusFilter && (
+          <Link href={clearFilterHref} className="text-xs text-muted-foreground underline">
+            Clear
+          </Link>
+        )}
+      </form>
 
       <table className="w-full text-sm">
         <thead>
@@ -70,11 +131,24 @@ export default async function RequisitionsPage() {
             <th className="py-2 font-normal">Department</th>
             <th className="py-2 font-normal">Cost center</th>
             <th className="py-2 font-normal">Total</th>
-            <th className="py-2 font-normal">Status</th>
+            <th className="py-2 font-normal">
+              <Link href={sortHref} className="hover:text-foreground">
+                Status
+                {sort === "status_asc" && " ▲"}
+                {sort === "status_desc" && " ▼"}
+              </Link>
+            </th>
             <th></th>
           </tr>
         </thead>
         <tbody>
+          {requisitions.length === 0 && (
+            <tr>
+              <td colSpan={6} className="py-6 text-center text-sm text-muted-foreground">
+                No requisitions match this filter.
+              </td>
+            </tr>
+          )}
           {requisitions.map((r) => {
             const days = pendingDays(r.submittedAt);
             const showPending = days !== null && (r.status === "submitted" || r.status === "pending_approval");
