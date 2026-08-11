@@ -4,6 +4,7 @@ import { withTenant } from "@/db/withTenant";
 import { logAction } from "@/db/audit";
 import { costCenters as costCentersTable } from "@/db/schema";
 import { buttonVariants } from "@/components/ui/button";
+import { Breadcrumbs } from "@/components/ui/breadcrumbs";
 import { cn } from "@/lib/utils";
 
 async function createCostCenter(formData: FormData) {
@@ -38,9 +39,18 @@ export default async function CostCentersPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div>
-        <h1 className="font-serif text-lg text-foreground">Cost centers</h1>
-        <p className="text-sm text-muted-foreground">{costCenters.length} in {tenant.name}</p>
+      <div className="flex flex-col gap-2">
+        <Breadcrumbs
+          items={[
+            { label: "Dashboard", href: "/dashboard" },
+            { label: "Admin", href: "/dashboard/admin/departments" },
+            { label: "Cost centers" },
+          ]}
+        />
+        <div>
+          <h1 className="font-serif text-lg text-foreground">Cost centers</h1>
+          <p className="text-sm text-muted-foreground">{costCenters.length} in {tenant.name}</p>
+        </div>
       </div>
 
       <table className="w-full text-sm">

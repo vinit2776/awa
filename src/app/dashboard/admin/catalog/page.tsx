@@ -2,6 +2,7 @@ import { getCurrentUserAndTenant } from "@/db/session";
 import { withTenant } from "@/db/withTenant";
 import { catalogCategories, catalogItems } from "@/db/schema";
 import { buttonVariants } from "@/components/ui/button";
+import { Breadcrumbs } from "@/components/ui/breadcrumbs";
 import { cn } from "@/lib/utils";
 import { createCategory, createItem } from "./actions";
 import { ItemNameField } from "./ItemNameField";
@@ -18,11 +19,20 @@ export default async function CatalogPage() {
 
   return (
     <div className="flex flex-col gap-10">
-      <div>
-        <h1 className="font-serif text-lg text-foreground">Catalog</h1>
-        <p className="text-sm text-muted-foreground">
-          {categories.length} categories, {items.length} items in {tenant.name}
-        </p>
+      <div className="flex flex-col gap-2">
+        <Breadcrumbs
+          items={[
+            { label: "Dashboard", href: "/dashboard" },
+            { label: "Admin", href: "/dashboard/admin/departments" },
+            { label: "Catalog" },
+          ]}
+        />
+        <div>
+          <h1 className="font-serif text-lg text-foreground">Catalog</h1>
+          <p className="text-sm text-muted-foreground">
+            {categories.length} categories, {items.length} items in {tenant.name}
+          </p>
+        </div>
       </div>
 
       <section className="flex flex-col gap-3">

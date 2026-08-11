@@ -9,6 +9,7 @@ import {
   roles as rolesTable,
 } from "@/db/schema";
 import { buttonVariants } from "@/components/ui/button";
+import { Breadcrumbs } from "@/components/ui/breadcrumbs";
 import { cn } from "@/lib/utils";
 import { createRule, createRuleRequirement, toggleRuleActive } from "./actions";
 
@@ -36,9 +37,18 @@ export default async function ApprovalRulesPage() {
 
   return (
     <div className="flex flex-col gap-10">
-      <div>
-        <h1 className="font-serif text-lg text-foreground">Approval rules</h1>
-        <p className="text-sm text-muted-foreground">{rules.length} rules in {tenant.name}</p>
+      <div className="flex flex-col gap-2">
+        <Breadcrumbs
+          items={[
+            { label: "Dashboard", href: "/dashboard" },
+            { label: "Admin", href: "/dashboard/admin/departments" },
+            { label: "Approval rules" },
+          ]}
+        />
+        <div>
+          <h1 className="font-serif text-lg text-foreground">Approval rules</h1>
+          <p className="text-sm text-muted-foreground">{rules.length} rules in {tenant.name}</p>
+        </div>
       </div>
 
       <section className="flex flex-col gap-3">

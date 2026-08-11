@@ -5,6 +5,7 @@ import { logAction } from "@/db/audit";
 import { seedDefaultRoles } from "@/db/seedDefaultRoles";
 import { roles as rolesTable } from "@/db/schema";
 import { buttonVariants } from "@/components/ui/button";
+import { Breadcrumbs } from "@/components/ui/breadcrumbs";
 import { cn } from "@/lib/utils";
 
 async function seedDefaults() {
@@ -54,18 +55,27 @@ export default async function RolesPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="font-serif text-lg text-foreground">Roles</h1>
-          <p className="text-sm text-muted-foreground">{roles.length} in {tenant.name}</p>
+      <div className="flex flex-col gap-2">
+        <Breadcrumbs
+          items={[
+            { label: "Dashboard", href: "/dashboard" },
+            { label: "Admin", href: "/dashboard/admin/departments" },
+            { label: "Roles" },
+          ]}
+        />
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="font-serif text-lg text-foreground">Roles</h1>
+            <p className="text-sm text-muted-foreground">{roles.length} in {tenant.name}</p>
+          </div>
+          {roles.length === 0 && (
+            <form action={seedDefaults}>
+              <button type="submit" className={cn(buttonVariants({ variant: "outline" }))}>
+                Seed default roles
+              </button>
+            </form>
+          )}
         </div>
-        {roles.length === 0 && (
-          <form action={seedDefaults}>
-            <button type="submit" className={cn(buttonVariants({ variant: "outline" }))}>
-              Seed default roles
-            </button>
-          </form>
-        )}
       </div>
 
       <table className="w-full text-sm">

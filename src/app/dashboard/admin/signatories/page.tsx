@@ -2,6 +2,7 @@ import { getCurrentUserAndTenant } from "@/db/session";
 import { withTenant } from "@/db/withTenant";
 import { signatories as signatoriesTable, users as usersTable } from "@/db/schema";
 import { buttonVariants } from "@/components/ui/button";
+import { Breadcrumbs } from "@/components/ui/breadcrumbs";
 import { cn } from "@/lib/utils";
 import { createSignatory, toggleSignatoryActive } from "./actions";
 
@@ -17,11 +18,20 @@ export default async function SignatoriesPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div>
-        <h1 className="font-serif text-lg text-foreground">Signatories</h1>
-        <p className="text-sm text-muted-foreground">
-          {signatoryRows.length} in {tenant.name} — shown on the public PO verification page so a vendor can confirm who&apos;s authorized to sign.
-        </p>
+      <div className="flex flex-col gap-2">
+        <Breadcrumbs
+          items={[
+            { label: "Dashboard", href: "/dashboard" },
+            { label: "Admin", href: "/dashboard/admin/departments" },
+            { label: "Signatories" },
+          ]}
+        />
+        <div>
+          <h1 className="font-serif text-lg text-foreground">Signatories</h1>
+          <p className="text-sm text-muted-foreground">
+            {signatoryRows.length} in {tenant.name} — shown on the public PO verification page so a vendor can confirm who&apos;s authorized to sign.
+          </p>
+        </div>
       </div>
 
       <table className="w-full text-sm">
