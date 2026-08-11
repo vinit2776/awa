@@ -1,6 +1,8 @@
 import { eq } from "drizzle-orm";
 import { withAuth } from "@workos-inc/authkit-nextjs";
+import { redirect } from "next/navigation";
 import { adminDb } from "./adminClient";
+import { isPlatformAdminEmail } from "./platformAdmins";
 import { tenants, users } from "./schema";
 
 /**
@@ -21,6 +23,17 @@ export async function getCurrentUserAndTenant() {
     .limit(1);
 
   if (!row) {
+    // A platform admin has no tenant/users row by design (they're a
+    // different kind of principal, see db/platformSession.ts) — every
+    // dashboard page calls this, and the callback's returnPathname is
+    // always "/dashboard" regardless of who signed in, so this is the
+    // one place that can actually redirect them to where they belong
+    // instead of surfacing the generic "not linked" error meant for a
+    // genuinely mis-provisioned tenant user.
+    if (await isPlatformAdminEmail(workosUser.email)) {
+      redirect("/platform");
+    }
+
     throw new Error(
       `Signed in as ${workosUser.email} but not linked to an internal user — ` +
         `the callback route should have run linkUserOnSignIn first.`,
