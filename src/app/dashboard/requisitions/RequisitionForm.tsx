@@ -15,9 +15,9 @@ type Line = LineInput & { key: string };
 
 const emptyLine = (): Line => ({
   key: crypto.randomUUID(),
-  catalogItemId: "",
-  freeTextDescription: "",
-  categoryId: "",
+  catalogItemId: null,
+  freeTextDescription: null,
+  categoryId: null,
   fulfillmentType: "goods",
   quantity: "1",
   uom: "each",
