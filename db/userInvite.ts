@@ -1,8 +1,8 @@
-import { eq } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import type { db } from "./client";
 import { logAction } from "./audit";
 import { isEmailAllowedForTenant } from "./domainRestriction";
-import { tenants, users } from "./schema";
+import { tenants, users, userRoles } from "./schema";
 
 /**
  * The provisioning step db/tenant.ts#linkUserOnSignIn has always assumed
@@ -64,6 +64,53 @@ export async function inviteUser(
     }
     throw err;
   }
+}
+
+/**
+ * Found live (S: admin console dogfooding): assigning a role has no
+ * duplicate guard, so two clicks on "Assign" — or two admins racing on
+ * the same user — silently create identical user_roles rows. Checked
+ * here rather than as a DB unique constraint: scope_id is NULL for
+ * global-scoped assignments, and Postgres treats every NULL as distinct
+ * from every other NULL, so a plain UNIQUE(tenant_id, user_id, role_id,
+ * scope_type, scope_id) wouldn't actually catch the global case that
+ * caused this in the first place.
+ */
+export async function assignUserRole(
+  tx: typeof db,
+  tenantId: string,
+  actorUserId: string,
+  params: { userId: string; roleId: string; scopeType: "global" | "department" | "cost_center"; scopeId: string | null },
+): Promise<{ error?: string; id?: string }> {
+  const { userId, roleId, scopeType, scopeId } = params;
+  if (!userId || !roleId) return { error: "User and role are required." };
+
+  const duplicate = await tx
+    .select({ id: userRoles.id })
+    .from(userRoles)
+    .where(
+      and(
+        eq(userRoles.tenantId, tenantId),
+        eq(userRoles.userId, userId),
+        eq(userRoles.roleId, roleId),
+        eq(userRoles.scopeType, scopeType),
+        scopeId === null ? isNull(userRoles.scopeId) : eq(userRoles.scopeId, scopeId),
+      ),
+    );
+  if (duplicate.length > 0) {
+    return { error: "That role and scope is already assigned to this user." };
+  }
+
+  const [created] = await tx.insert(userRoles).values({ tenantId, userId, roleId, scopeType, scopeId }).returning();
+  await logAction(tx, {
+    tenantId,
+    actorUserId,
+    action: "user_role.assigned",
+    entityType: "user_role",
+    entityId: created.id,
+    metadata: { userId, roleId, scopeType, scopeId },
+  });
+  return { id: created.id };
 }
 
 export async function setUserStatus(

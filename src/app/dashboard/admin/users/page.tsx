@@ -3,8 +3,7 @@ import { revalidatePath } from "next/cache";
 import { eq } from "drizzle-orm";
 import { getCurrentUserAndTenant } from "@/db/session";
 import { withTenant } from "@/db/withTenant";
-import { logAction } from "@/db/audit";
-import { inviteUser, setUserStatus } from "@/db/userInvite";
+import { inviteUser, setUserStatus, assignUserRole } from "@/db/userInvite";
 import {
   users as usersTable,
   roles as rolesTable,
@@ -49,20 +48,10 @@ async function assignRole(formData: FormData) {
   const scopeId = scopeType === "global" ? null : String(formData.get("scopeId") ?? "") || null;
   if (!userId || !roleId) return;
 
-  await withTenant(tenant.id, async (tx) => {
-    const [created] = await tx
-      .insert(userRolesTable)
-      .values({ tenantId: tenant.id, userId, roleId, scopeType, scopeId })
-      .returning();
-    await logAction(tx, {
-      tenantId: tenant.id,
-      actorUserId: actor.id,
-      action: "user_role.assigned",
-      entityType: "user_role",
-      entityId: created.id,
-      metadata: { userId, roleId, scopeType, scopeId },
-    });
-  });
+  const result = await withTenant(tenant.id, (tx) => assignUserRole(tx, tenant.id, actor.id, { userId, roleId, scopeType, scopeId }));
+  if (result.error) {
+    redirect(`/dashboard/admin/users?error=${encodeURIComponent(result.error)}`);
+  }
 
   revalidatePath("/dashboard/admin/users");
 }
