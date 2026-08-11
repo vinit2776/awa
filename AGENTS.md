@@ -7,3 +7,32 @@ This version has breaking changes — APIs, conventions, and file structure may 
 This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
 
 <!-- END:nextjs-agent-rules -->
+
+# Go-live policy
+
+## Shipping changes
+
+Every change — feature, fix, chore — goes through a branch and a PR into `main`, not a direct push. This replaces the direct-to-main pattern used for Sprints 0–16; from here on:
+
+1. `git checkout main && git pull && git checkout -b <type>/<desc>` — types: `feat`, `fix`, `chore`, `refactor`, `docs`, matching the conventional-commit style already used in this repo's history.
+2. Open a PR. CI (`.github/workflows/ci.yml`) must pass — lint, typecheck, build, **and test** — before merge. Vercel gives every PR a preview deploy automatically; use it to click through the change before merging.
+3. Merge to `main` triggers Vercel's production auto-deploy (`awa-platform-tau.vercel.app`) — there is no separate deploy step.
+4. Delete the branch after merge.
+
+This needs GitHub branch protection turned on for `main` (require the PR + require the CI check) — CI passing today doesn't actually block a merge or a direct push until that's configured in the repo settings.
+
+## CI gates (`.github/workflows/ci.yml`)
+
+- lint, typecheck, build — already wired.
+- test (`npm run test`, vitest) — runs `db/__tests__/rls-isolation.test.ts` and `golden-path.test.ts` against the same dev Supabase database the test suite already targets locally (see `vitest.config.ts`); no isolated test DB exists yet. Each test creates and cleans up its own throwaway tenant, the same discipline as every manual verification script since Sprint 1 — just automated now. Needs `DATABASE_URL` and `DATABASE_URL_MIGRATIONS` set as GitHub Actions repo secrets (same values as the dev/local `.env.local`, not the Vercel Production env vars) — set via the repo Settings → Secrets UI or `gh secret set`, never pasted into chat, same discipline as every other secret in this project (see `SETUP.md`).
+- Revisit the shared-dev-DB choice once the dev database holds anything resembling real data, or once concurrent CI runs start colliding on tenant cleanup — switch to an isolated test DB (new Supabase project) at that point rather than before.
+
+## Launch readiness (one-time, before customer #1)
+
+Carried forward from gaps already flagged in `README.md` / `SETUP.md` — not a recurring gate, a checklist to clear once:
+
+- [ ] Switch WorkOS credentials from test-mode (`sk_test_...`) to live/production in the WorkOS dashboard (`SETUP.md`).
+- [ ] Wire a real email provider — notifications currently log to console only (`db/notifications.ts`).
+- [ ] Decide role-based UI permission gating (flagged as a known gap in `README.md`).
+- [ ] Turn on GitHub branch protection on `main` (PR + passing CI required) per the shipping policy above.
+- [ ] Confirm `db/__tests__/rls-isolation.test.ts` is green — this is the test that actually proves tenant isolation holds; treat a failure here as a launch blocker, not a flaky test to skip.

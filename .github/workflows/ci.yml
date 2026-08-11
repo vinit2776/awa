@@ -42,3 +42,10 @@ jobs:
       - name: Build
         if: steps.gate.outputs.skip == 'false'
         run: npm run build
+
+      - name: Test
+        if: steps.gate.outputs.skip == 'false'
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DATABASE_URL_MIGRATIONS: ${{ secrets.DATABASE_URL_MIGRATIONS }}
+        run: npm run test
