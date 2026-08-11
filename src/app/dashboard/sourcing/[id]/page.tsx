@@ -69,12 +69,22 @@ export default async function SourcingDetailPage({ params }: { params: Promise<{
           <p className="text-sm text-muted-foreground">
             {vendorName(po.vendorId)} — {po.totalAmount} {po.currency}
           </p>
-          <a
-            href={`/dashboard/sourcing/${requisition.id}/po/${po.id}/pdf`}
-            className={cn(buttonVariants({ variant: "outline", size: "sm" }), "w-fit")}
-          >
-            Download PDF
-          </a>
+          <div className="flex gap-2">
+            <a
+              href={`/dashboard/sourcing/${requisition.id}/po/${po.id}/pdf`}
+              className={cn(buttonVariants({ variant: "outline", size: "sm" }), "w-fit")}
+            >
+              Download PDF
+            </a>
+            <a
+              href={`/po-verify/${po.qrToken}`}
+              target="_blank"
+              rel="noreferrer"
+              className={cn(buttonVariants({ variant: "outline", size: "sm" }), "w-fit")}
+            >
+              View what the vendor sees
+            </a>
+          </div>
         </section>
       ) : !rfq ? (
         <form action={createRfq}>

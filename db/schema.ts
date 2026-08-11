@@ -217,6 +217,16 @@ export const vendorUsers = pgTable("vendor_users", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [unique().on(t.tenantId, t.vendorId, t.email)]);
 
+export const signatories = pgTable("signatories", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  tenantId: uuid("tenant_id").notNull().references(() => tenants.id),
+  userId: uuid("user_id").notNull().references(() => users.id),
+  title: text("title").notNull(),
+  maxAuthorizedValue: numeric("max_authorized_value", { precision: 14, scale: 2 }),
+  active: boolean("active").notNull().default(true),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [unique().on(t.tenantId, t.userId)]);
+
 // =========================================================================
 // Requisition & approval engine (§04)
 // =========================================================================
