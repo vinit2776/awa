@@ -13,6 +13,7 @@ const ADMIN_NAV_ITEMS = [
   { href: "/dashboard/admin/signatories", label: "Signatories" },
   { href: "/dashboard/admin/roles", label: "Roles" },
   { href: "/dashboard/admin/users", label: "Users & assignment" },
+  { href: "/dashboard/admin/audit", label: "Audit log" },
 ];
 
 export function AdminNav() {
