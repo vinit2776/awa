@@ -188,6 +188,10 @@ export const vendors = pgTable("vendors", {
   name: text("name").notNull(),
   taxId: text("tax_id"),
   status: vendorStatus("status").notNull().default("pending"),
+  // The number someone calls for out-of-band bank-detail verification
+  // (§05) — captured once at onboarding, never taken alongside a
+  // change request itself.
+  registeredPhone: text("registered_phone"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
@@ -198,6 +202,7 @@ export const vendorBankAccounts = pgTable("vendor_bank_accounts", {
   vendorId: uuid("vendor_id").notNull().references(() => vendors.id),
   accountHolderName: text("account_holder_name").notNull(),
   accountNumberEnc: text("account_number_enc").notNull(),
+  accountNumberLast4: text("account_number_last4").notNull(),
   bankName: text("bank_name").notNull(),
   ifscOrSwift: text("ifsc_or_swift").notNull(),
   status: bankAccountStatus("status").notNull().default("pending_verification"),

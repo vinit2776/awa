@@ -27,6 +27,12 @@ All 7 environment variables (`DATABASE_URL`, `WORKOS_API_KEY`, `WORKOS_CLIENT_ID
 
 **Note:** WorkOS credentials are currently test-mode (`sk_test_...`). Switch to a live/production environment in the WorkOS dashboard before this goes in front of customer #1 — test-mode keys shouldn't handle real user sign-ins.
 
+## Bank account encryption (Sprint 11 / phase 2)
+
+`vendor_bank_accounts.account_number_enc` is AES-256-GCM encrypted via `db/crypto.ts`, keyed by `BANK_ACCOUNT_ENCRYPTION_KEY` — generated with `openssl rand -base64 32`, never a value typed or reused. Set independently per environment (Production/Preview/Development each got their own key, not a shared one) via `vercel env add`, never pasted into chat. `account_number_last4` is stored in cleartext alongside the encrypted value specifically so the UI never needs to decrypt just to render a masked display — nothing in the app currently decrypts the full number at all; that capability exists in `db/crypto.ts` for whenever real payment execution is built, but isn't wired into any UI yet.
+
+**Rotating this key makes every previously-encrypted account number permanently undecryptable** — treat it like a database credential, not a config toggle.
+
 ## CI/CD
 
 `.github/workflows/ci.yml` runs lint/typecheck/build on every PR and is live now that Sprint 0 added `package.json`. Deployment itself is handled by Vercel's GitHub integration (step 1 above), not by this workflow.

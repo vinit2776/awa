@@ -11,10 +11,11 @@ export async function createVendor(formData: FormData) {
   const { user, tenant } = await getCurrentUserAndTenant();
   const name = String(formData.get("name") ?? "").trim();
   const taxId = String(formData.get("taxId") ?? "").trim() || null;
+  const registeredPhone = String(formData.get("registeredPhone") ?? "").trim() || null;
   if (!name) return;
 
   await withTenant(tenant.id, async (tx) => {
-    const [created] = await tx.insert(vendors).values({ tenantId: tenant.id, name, taxId }).returning();
+    const [created] = await tx.insert(vendors).values({ tenantId: tenant.id, name, taxId, registeredPhone }).returning();
     await logAction(tx, {
       tenantId: tenant.id,
       actorUserId: user.id,

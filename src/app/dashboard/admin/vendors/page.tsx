@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { getCurrentUserAndTenant } from "@/db/session";
 import { withTenant } from "@/db/withTenant";
 import { vendors as vendorsTable, vendorUsers as vendorUsersTable } from "@/db/schema";
@@ -28,6 +29,7 @@ export default async function VendorsPage() {
               <th className="py-2 font-normal">Tax ID</th>
               <th className="py-2 font-normal">Status</th>
               <th className="py-2 font-normal">Contacts</th>
+              <th></th>
               <th></th>
             </tr>
           </thead>
@@ -63,6 +65,11 @@ export default async function VendorsPage() {
                     <button type="submit" className={cn(buttonVariants({ variant: "outline", size: "sm" }))}>Save</button>
                   </form>
                 </td>
+                <td className="py-2">
+                  <Link href={`/dashboard/admin/vendors/${v.id}`} className={cn(buttonVariants({ variant: "outline", size: "sm" }))}>
+                    Manage
+                  </Link>
+                </td>
               </tr>
             ))}
           </tbody>
@@ -79,6 +86,10 @@ export default async function VendorsPage() {
           <div className="flex flex-col gap-1">
             <label className="text-xs text-muted-foreground">Tax ID</label>
             <input name="taxId" className="h-8 rounded-md border px-2 text-sm" placeholder="e.g. GSTIN" />
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-xs text-muted-foreground">Registered phone</label>
+            <input name="registeredPhone" className="h-8 rounded-md border px-2 text-sm" placeholder="for bank-detail callback verification" />
           </div>
           <button type="submit" className={cn(buttonVariants())}>Add</button>
         </form>
