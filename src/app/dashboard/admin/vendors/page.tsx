@@ -3,6 +3,7 @@ import { getCurrentUserAndTenant } from "@/db/session";
 import { withTenant } from "@/db/withTenant";
 import { vendors as vendorsTable, vendorUsers as vendorUsersTable } from "@/db/schema";
 import { buttonVariants } from "@/components/ui/button";
+import { Breadcrumbs } from "@/components/ui/breadcrumbs";
 import { cn } from "@/lib/utils";
 import { createVendor, setVendorStatus, addVendorContact } from "./actions";
 
@@ -16,13 +17,22 @@ export default async function VendorsPage() {
 
   return (
     <div className="flex flex-col gap-10">
-      <div>
-        <h1 className="font-serif text-lg text-foreground">Vendors</h1>
-        <p className="text-sm text-muted-foreground">{vendors.length} in {tenant.name}</p>
-        <p className="mt-1 text-xs text-muted-foreground">
-          A vendor contact added below can sign in at <code>/vendor-portal</code> with a one-time email link to view
-          and confirm POs issued to their company — no password, no separate invite step needed here.
-        </p>
+      <div className="flex flex-col gap-2">
+        <Breadcrumbs
+          items={[
+            { label: "Dashboard", href: "/dashboard" },
+            { label: "Admin", href: "/dashboard/admin/departments" },
+            { label: "Vendors" },
+          ]}
+        />
+        <div>
+          <h1 className="font-serif text-lg text-foreground">Vendors</h1>
+          <p className="text-sm text-muted-foreground">{vendors.length} in {tenant.name}</p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            A vendor contact added below can sign in at <code>/vendor-portal</code> with a one-time email link to view
+            and confirm POs issued to their company — no password, no separate invite step needed here.
+          </p>
+        </div>
       </div>
 
       <section className="flex flex-col gap-3">

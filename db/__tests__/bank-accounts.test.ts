@@ -11,7 +11,8 @@ let officer: typeof users.$inferSelect;
 let vendor: typeof vendors.$inferSelect;
 
 beforeAll(async () => {
-  [tenant] = await adminDb.insert(tenants).values({ name: "Bank Lock Co", slug: "bank-lock-co" }).returning();
+  const suffix = crypto.randomUUID().slice(0, 8);
+  [tenant] = await adminDb.insert(tenants).values({ name: "Bank Lock Co", slug: `bank-lock-co-${suffix}` }).returning();
   [officer] = await adminDb.insert(users).values({ tenantId: tenant.id, email: "bankofficer@example.com", fullName: "Bea Officer", status: "active" }).returning();
   [vendor] = await adminDb.insert(vendors).values({ tenantId: tenant.id, name: "Locked Vendor", registeredPhone: "+91-98765-00000" }).returning();
 });

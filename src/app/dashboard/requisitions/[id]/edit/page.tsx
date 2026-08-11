@@ -12,6 +12,7 @@ import {
   catalogCategories as catalogCategoriesTable,
   catalogItems as catalogItemsTable,
 } from "@/db/schema";
+import { Breadcrumbs } from "@/components/ui/breadcrumbs";
 import { RequisitionForm } from "../../RequisitionForm";
 
 export default async function EditRequisitionPage({ params }: { params: Promise<{ id: string }> }) {
@@ -57,14 +58,23 @@ export default async function EditRequisitionPage({ params }: { params: Promise<
 
   return (
     <div className="flex flex-col gap-6 p-8">
-      <div>
-        <h1 className="font-serif text-lg text-foreground">Revise requisition</h1>
-        <p className="text-sm text-muted-foreground">{tenant.name}</p>
-        {rejection?.comment && (
-          <p className="mt-2 max-w-2xl rounded-md border border-amber-500 p-3 text-sm">
-            Rejected: {rejection.comment}
-          </p>
-        )}
+      <div className="flex flex-col gap-2">
+        <Breadcrumbs
+          items={[
+            { label: "Dashboard", href: "/dashboard" },
+            { label: "My requests", href: "/dashboard/requisitions" },
+            { label: "Revise requisition" },
+          ]}
+        />
+        <div>
+          <h1 className="font-serif text-lg text-foreground">Revise requisition</h1>
+          <p className="text-sm text-muted-foreground">{tenant.name}</p>
+          {rejection?.comment && (
+            <p className="mt-2 max-w-2xl rounded-md border border-amber-500 p-3 text-sm">
+              Rejected: {rejection.comment}
+            </p>
+          )}
+        </div>
       </div>
       <RequisitionForm
         departments={departments}

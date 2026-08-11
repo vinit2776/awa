@@ -44,7 +44,8 @@ async function makeServicePo(totalAmount: string) {
 }
 
 beforeAll(async () => {
-  [tenant] = await adminDb.insert(tenants).values({ name: "Milestone Co", slug: "milestone-co" }).returning();
+  const suffix = crypto.randomUUID().slice(0, 8);
+  [tenant] = await adminDb.insert(tenants).values({ name: "Milestone Co", slug: `milestone-co-${suffix}` }).returning();
   [requestor] = await adminDb.insert(users).values({ tenantId: tenant.id, email: "ms-requestor@example.com", fullName: "Mo Requestor", status: "active" }).returning();
   [vendor] = await withTenant(tenant.id, (tx) => tx.insert(vendors).values({ tenantId: tenant.id, name: "Milestone Vendor" }).returning());
 });

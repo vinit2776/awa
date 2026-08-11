@@ -33,7 +33,8 @@ let requestor: typeof users.$inferSelect;
 let otherApprover: typeof users.$inferSelect;
 
 beforeAll(async () => {
-  [tenant] = await adminDb.insert(tenants).values({ name: "SoD Co", slug: "sod-co" }).returning();
+  const tenantSuffix = crypto.randomUUID().slice(0, 8);
+  [tenant] = await adminDb.insert(tenants).values({ name: "SoD Co", slug: `sod-co-${tenantSuffix}` }).returning();
   [requestor] = await adminDb.insert(users).values({ tenantId: tenant.id, email: "sod-requestor@example.com", fullName: "Sam Requestor", status: "active" }).returning();
   [otherApprover] = await adminDb.insert(users).values({ tenantId: tenant.id, email: "sod-other@example.com", fullName: "Ana Other", status: "active" }).returning();
 });

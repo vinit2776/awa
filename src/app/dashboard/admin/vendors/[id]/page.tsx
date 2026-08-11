@@ -4,6 +4,7 @@ import { getCurrentUserAndTenant } from "@/db/session";
 import { withTenant } from "@/db/withTenant";
 import { vendors as vendorsTable, vendorBankAccounts as bankAccountsTable, users as usersTable } from "@/db/schema";
 import { buttonVariants } from "@/components/ui/button";
+import { Breadcrumbs } from "@/components/ui/breadcrumbs";
 import { cn } from "@/lib/utils";
 import { submitBankAccount, verifyBankAccount } from "./actions";
 
@@ -23,11 +24,21 @@ export default async function VendorDetailPage({ params }: { params: Promise<{ i
 
   return (
     <div className="flex flex-col gap-8">
-      <div>
-        <h1 className="font-serif text-lg text-foreground">{vendor.name}</h1>
-        <p className="text-sm text-muted-foreground">
-          {vendor.status} · Registered phone: {vendor.registeredPhone ?? "not on file"}
-        </p>
+      <div className="flex flex-col gap-2">
+        <Breadcrumbs
+          items={[
+            { label: "Dashboard", href: "/dashboard" },
+            { label: "Admin", href: "/dashboard/admin/departments" },
+            { label: "Vendors", href: "/dashboard/admin/vendors" },
+            { label: vendor.name },
+          ]}
+        />
+        <div>
+          <h1 className="font-serif text-lg text-foreground">{vendor.name}</h1>
+          <p className="text-sm text-muted-foreground">
+            {vendor.status} · Registered phone: {vendor.registeredPhone ?? "not on file"}
+          </p>
+        </div>
       </div>
 
       <section className="flex flex-col gap-3">

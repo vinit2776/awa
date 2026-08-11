@@ -7,9 +7,10 @@ import { platformAdmins } from "../schema";
 let admin: typeof platformAdmins.$inferSelect;
 
 beforeAll(async () => {
+  const suffix = crypto.randomUUID().slice(0, 8);
   [admin] = await adminDb
     .insert(platformAdmins)
-    .values({ email: "pa-test@example.com", fullName: "Pat Admin", role: "support" })
+    .values({ email: `pa-test-${suffix}@example.com`, fullName: "Pat Admin", role: "support" })
     .returning();
 });
 
@@ -19,7 +20,7 @@ afterAll(async () => {
 
 describe("isPlatformAdminEmail", () => {
   it("matches a platform admin's email", async () => {
-    expect(await isPlatformAdminEmail("pa-test@example.com")).toBe(true);
+    expect(await isPlatformAdminEmail(admin.email)).toBe(true);
   });
 
   it("does not match a tenant user's email", async () => {

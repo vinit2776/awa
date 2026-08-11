@@ -16,7 +16,8 @@ let tenant: typeof tenants.$inferSelect;
 let user: typeof users.$inferSelect;
 
 beforeAll(async () => {
-  [tenant] = await adminDb.insert(tenants).values({ name: "Push Test Co", slug: "push-test-co" }).returning();
+  const suffix = crypto.randomUUID().slice(0, 8);
+  [tenant] = await adminDb.insert(tenants).values({ name: "Push Test Co", slug: `push-test-co-${suffix}` }).returning();
   [user] = await adminDb.insert(users).values({ tenantId: tenant.id, email: "push@example.com", fullName: "Push User", status: "active" }).returning();
 });
 

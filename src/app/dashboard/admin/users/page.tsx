@@ -12,6 +12,7 @@ import {
   costCenters as costCentersTable,
 } from "@/db/schema";
 import { buttonVariants } from "@/components/ui/button";
+import { Breadcrumbs } from "@/components/ui/breadcrumbs";
 import { cn } from "@/lib/utils";
 
 async function inviteUserAction(formData: FormData) {
@@ -83,9 +84,18 @@ export default async function UsersPage({ searchParams }: { searchParams: Promis
 
   return (
     <div className="flex flex-col gap-10">
-      <div>
-        <h1 className="font-serif text-lg text-foreground">Users</h1>
-        <p className="text-sm text-muted-foreground">{tenantUsers.length} in {tenant.name}</p>
+      <div className="flex flex-col gap-2">
+        <Breadcrumbs
+          items={[
+            { label: "Dashboard", href: "/dashboard" },
+            { label: "Admin", href: "/dashboard/admin/departments" },
+            { label: "Users & assignment" },
+          ]}
+        />
+        <div>
+          <h1 className="font-serif text-lg text-foreground">Users</h1>
+          <p className="text-sm text-muted-foreground">{tenantUsers.length} in {tenant.name}</p>
+        </div>
       </div>
 
       <section className="flex flex-col gap-3">

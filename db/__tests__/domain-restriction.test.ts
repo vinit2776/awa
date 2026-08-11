@@ -8,13 +8,14 @@ let unrestrictedTenant: typeof tenants.$inferSelect;
 let restrictedTenant: typeof tenants.$inferSelect;
 
 beforeAll(async () => {
+  const suffix = crypto.randomUUID().slice(0, 8);
   [unrestrictedTenant] = await adminDb
     .insert(tenants)
-    .values({ name: "Unrestricted Co", slug: "unrestricted-co", workosOrganizationId: "org_unrestricted_test" })
+    .values({ name: "Unrestricted Co", slug: `unrestricted-co-${suffix}`, workosOrganizationId: `org_unrestricted_test_${suffix}` })
     .returning();
   [restrictedTenant] = await adminDb
     .insert(tenants)
-    .values({ name: "Restricted Co", slug: "restricted-co", workosOrganizationId: "org_restricted_test", allowedEmailDomains: ["acme.com"] })
+    .values({ name: "Restricted Co", slug: `restricted-co-${suffix}`, workosOrganizationId: `org_restricted_test_${suffix}`, allowedEmailDomains: ["acme.com"] })
     .returning();
 });
 

@@ -9,6 +9,7 @@ import {
   costCenters as costCentersTable,
 } from "@/db/schema";
 import { buttonVariants } from "@/components/ui/button";
+import { Breadcrumbs } from "@/components/ui/breadcrumbs";
 import { cn } from "@/lib/utils";
 import { submitRequisition } from "./actions";
 
@@ -49,14 +50,17 @@ export default async function RequisitionsPage() {
 
   return (
     <div className="flex flex-col gap-6 p-8">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="font-serif text-lg text-foreground">My requests</h1>
-          <p className="text-sm text-muted-foreground">{requisitions.length} in {tenant.name}</p>
+      <div className="flex flex-col gap-2">
+        <Breadcrumbs items={[{ label: "Dashboard", href: "/dashboard" }, { label: "My requests" }]} />
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="font-serif text-lg text-foreground">My requests</h1>
+            <p className="text-sm text-muted-foreground">{requisitions.length} in {tenant.name}</p>
+          </div>
+          <Link href="/dashboard/requisitions/new" className={cn(buttonVariants())}>
+            New requisition
+          </Link>
         </div>
-        <Link href="/dashboard/requisitions/new" className={cn(buttonVariants())}>
-          New requisition
-        </Link>
       </div>
 
       <table className="w-full text-sm">

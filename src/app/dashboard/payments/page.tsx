@@ -3,6 +3,7 @@ import { getCurrentUserAndTenant } from "@/db/session";
 import { withTenant } from "@/db/withTenant";
 import { paymentInstructions as paymentInstructionsTable, invoices as invoicesTable, vendors as vendorsTable } from "@/db/schema";
 import { buttonVariants } from "@/components/ui/button";
+import { Breadcrumbs } from "@/components/ui/breadcrumbs";
 import { cn } from "@/lib/utils";
 import { releasePayment } from "./actions";
 
@@ -20,9 +21,12 @@ export default async function PaymentsPage() {
 
   return (
     <div className="flex flex-col gap-6 p-8">
-      <div>
-        <h1 className="font-serif text-lg text-foreground">Payment queue</h1>
-        <p className="text-sm text-muted-foreground">{payments.length} queued for release in {tenant.name}</p>
+      <div className="flex flex-col gap-2">
+        <Breadcrumbs items={[{ label: "Dashboard", href: "/dashboard" }, { label: "Payments" }]} />
+        <div>
+          <h1 className="font-serif text-lg text-foreground">Payment queue</h1>
+          <p className="text-sm text-muted-foreground">{payments.length} queued for release in {tenant.name}</p>
+        </div>
       </div>
 
       <table className="w-full text-sm">

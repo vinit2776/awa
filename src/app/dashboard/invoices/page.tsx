@@ -4,6 +4,7 @@ import { getCurrentUserAndTenant } from "@/db/session";
 import { withTenant } from "@/db/withTenant";
 import { invoices as invoicesTable, vendors as vendorsTable } from "@/db/schema";
 import { buttonVariants } from "@/components/ui/button";
+import { Breadcrumbs } from "@/components/ui/breadcrumbs";
 import { cn } from "@/lib/utils";
 
 export default async function InvoicesPage() {
@@ -19,17 +20,20 @@ export default async function InvoicesPage() {
 
   return (
     <div className="flex flex-col gap-6 p-8">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="font-serif text-lg text-foreground">Invoices</h1>
-          <p className="text-sm text-muted-foreground">
-            {invoiceRows.length} in {tenant.name}
-            {exceptionCount > 0 && <span className="text-amber-600"> · {exceptionCount} need review</span>}
-          </p>
+      <div className="flex flex-col gap-2">
+        <Breadcrumbs items={[{ label: "Dashboard", href: "/dashboard" }, { label: "Invoices" }]} />
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="font-serif text-lg text-foreground">Invoices</h1>
+            <p className="text-sm text-muted-foreground">
+              {invoiceRows.length} in {tenant.name}
+              {exceptionCount > 0 && <span className="text-amber-600"> · {exceptionCount} need review</span>}
+            </p>
+          </div>
+          <Link href="/dashboard/invoices/new" className={cn(buttonVariants())}>
+            Capture invoice
+          </Link>
         </div>
-        <Link href="/dashboard/invoices/new" className={cn(buttonVariants())}>
-          Capture invoice
-        </Link>
       </div>
 
       <table className="w-full text-sm">

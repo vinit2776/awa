@@ -10,6 +10,7 @@ import {
   purchaseOrders as purchaseOrdersTable,
 } from "@/db/schema";
 import { buttonVariants } from "@/components/ui/button";
+import { Breadcrumbs } from "@/components/ui/breadcrumbs";
 import { cn } from "@/lib/utils";
 import { approveForPayment, overrideException, disputeInvoice } from "../actions";
 
@@ -37,12 +38,21 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
 
   return (
     <div className="flex flex-col gap-6 p-8">
-      <div>
-        <h1 className="font-serif text-lg text-foreground">{invoice.invoiceNumber}</h1>
-        <p className="text-sm text-muted-foreground">
-          {vendor?.name ?? "—"} · {po?.poNumber ?? "—"} · {invoice.totalAmount} {invoice.currency} ·{" "}
-          <span className={invoice.status === "exception" ? "text-amber-600" : undefined}>{invoice.status}</span>
-        </p>
+      <div className="flex flex-col gap-2">
+        <Breadcrumbs
+          items={[
+            { label: "Dashboard", href: "/dashboard" },
+            { label: "Invoices", href: "/dashboard/invoices" },
+            { label: invoice.invoiceNumber },
+          ]}
+        />
+        <div>
+          <h1 className="font-serif text-lg text-foreground">{invoice.invoiceNumber}</h1>
+          <p className="text-sm text-muted-foreground">
+            {vendor?.name ?? "—"} · {po?.poNumber ?? "—"} · {invoice.totalAmount} {invoice.currency} ·{" "}
+            <span className={invoice.status === "exception" ? "text-amber-600" : undefined}>{invoice.status}</span>
+          </p>
+        </div>
       </div>
 
       <table className="w-full text-sm">

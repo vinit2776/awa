@@ -28,8 +28,9 @@ let vendorB: typeof vendors.$inferSelect;
 let requestor: typeof users.$inferSelect;
 
 beforeAll(async () => {
-  [tenantA] = await adminDb.insert(tenants).values({ name: "Vendor Portal Co A", slug: "vendor-portal-co-a" }).returning();
-  [tenantB] = await adminDb.insert(tenants).values({ name: "Vendor Portal Co B", slug: "vendor-portal-co-b" }).returning();
+  const suffix = crypto.randomUUID().slice(0, 8);
+  [tenantA] = await adminDb.insert(tenants).values({ name: "Vendor Portal Co A", slug: `vendor-portal-co-a-${suffix}` }).returning();
+  [tenantB] = await adminDb.insert(tenants).values({ name: "Vendor Portal Co B", slug: `vendor-portal-co-b-${suffix}` }).returning();
   [vendorA] = await withTenant(tenantA.id, (tx) => tx.insert(vendors).values({ tenantId: tenantA.id, name: "Acme Supplies" }).returning());
   [vendorB] = await withTenant(tenantB.id, (tx) => tx.insert(vendors).values({ tenantId: tenantB.id, name: "Acme Supplies (other buyer)" }).returning());
   [requestor] = await withTenant(tenantA.id, (tx) =>
