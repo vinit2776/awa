@@ -19,7 +19,7 @@ export default async function CatalogPage() {
   return (
     <div className="flex flex-col gap-10">
       <div>
-        <h1 className="text-lg font-medium">Catalog</h1>
+        <h1 className="font-serif text-lg text-foreground">Catalog</h1>
         <p className="text-sm text-muted-foreground">
           {categories.length} categories, {items.length} items in {tenant.name}
         </p>

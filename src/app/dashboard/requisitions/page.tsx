@@ -51,7 +51,7 @@ export default async function RequisitionsPage() {
     <div className="flex flex-col gap-6 p-8">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-lg font-medium">My requests</h1>
+          <h1 className="font-serif text-lg text-foreground">My requests</h1>
           <p className="text-sm text-muted-foreground">{requisitions.length} in {tenant.name}</p>
         </div>
         <Link href="/dashboard/requisitions/new" className={cn(buttonVariants())}>

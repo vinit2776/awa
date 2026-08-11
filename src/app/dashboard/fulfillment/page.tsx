@@ -19,7 +19,7 @@ export default async function FulfillmentPage() {
   return (
     <div className="flex flex-col gap-6 p-8">
       <div>
-        <h1 className="text-lg font-medium">Fulfillment</h1>
+        <h1 className="font-serif text-lg text-foreground">Fulfillment</h1>
         <p className="text-sm text-muted-foreground">{purchaseOrders.length} POs open for receipt or acceptance</p>
       </div>
 

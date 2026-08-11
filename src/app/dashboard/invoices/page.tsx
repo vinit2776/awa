@@ -21,7 +21,7 @@ export default async function InvoicesPage() {
     <div className="flex flex-col gap-6 p-8">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-lg font-medium">Invoices</h1>
+          <h1 className="font-serif text-lg text-foreground">Invoices</h1>
           <p className="text-sm text-muted-foreground">
             {invoiceRows.length} in {tenant.name}
             {exceptionCount > 0 && <span className="text-amber-600"> · {exceptionCount} need review</span>}

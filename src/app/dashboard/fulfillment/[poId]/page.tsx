@@ -96,7 +96,7 @@ export default async function FulfillmentDetailPage({
   return (
     <div className="flex flex-col gap-8 p-8">
       <div>
-        <h1 className="text-lg font-medium">{po.poNumber}</h1>
+        <h1 className="font-serif text-lg text-foreground">{po.poNumber}</h1>
         <p className="text-sm text-muted-foreground">
           {vendor?.name ?? "—"} · {po.totalAmount} {po.currency} · {po.status}
         </p>

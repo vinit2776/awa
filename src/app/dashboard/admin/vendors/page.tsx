@@ -17,7 +17,7 @@ export default async function VendorsPage() {
   return (
     <div className="flex flex-col gap-10">
       <div>
-        <h1 className="text-lg font-medium">Vendors</h1>
+        <h1 className="font-serif text-lg text-foreground">Vendors</h1>
         <p className="text-sm text-muted-foreground">{vendors.length} in {tenant.name}</p>
         <p className="mt-1 text-xs text-muted-foreground">
           A vendor contact added below can sign in at <code>/vendor-portal</code> with a one-time email link to view

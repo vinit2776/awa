@@ -38,7 +38,7 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
   return (
     <div className="flex flex-col gap-6 p-8">
       <div>
-        <h1 className="text-lg font-medium">{invoice.invoiceNumber}</h1>
+        <h1 className="font-serif text-lg text-foreground">{invoice.invoiceNumber}</h1>
         <p className="text-sm text-muted-foreground">
           {vendor?.name ?? "—"} · {po?.poNumber ?? "—"} · {invoice.totalAmount} {invoice.currency} ·{" "}
           <span className={invoice.status === "exception" ? "text-amber-600" : undefined}>{invoice.status}</span>

@@ -21,7 +21,7 @@ export default async function PaymentsPage() {
   return (
     <div className="flex flex-col gap-6 p-8">
       <div>
-        <h1 className="text-lg font-medium">Payment queue</h1>
+        <h1 className="font-serif text-lg text-foreground">Payment queue</h1>
         <p className="text-sm text-muted-foreground">{payments.length} queued for release in {tenant.name}</p>
       </div>
 

@@ -28,7 +28,7 @@ export default async function NewInvoicePage({ searchParams }: { searchParams: P
   if (!poId) {
     return (
       <div className="flex flex-col gap-6 p-8">
-        <h1 className="text-lg font-medium">Capture invoice</h1>
+        <h1 className="font-serif text-lg text-foreground">Capture invoice</h1>
         <form method="get" className="flex items-end gap-2">
           <div className="flex flex-col gap-1">
             <label className="text-xs text-muted-foreground">PO</label>
@@ -55,7 +55,7 @@ export default async function NewInvoicePage({ searchParams }: { searchParams: P
   return (
     <div className="flex flex-col gap-6 p-8">
       <div>
-        <h1 className="text-lg font-medium">Capture invoice</h1>
+        <h1 className="font-serif text-lg text-foreground">Capture invoice</h1>
         <p className="text-sm text-muted-foreground">{po?.poNumber} — {vendorName(po?.vendorId ?? "")}</p>
       </div>
 

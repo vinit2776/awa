@@ -58,7 +58,7 @@ export default async function EditRequisitionPage({ params }: { params: Promise<
   return (
     <div className="flex flex-col gap-6 p-8">
       <div>
-        <h1 className="text-lg font-medium">Revise requisition</h1>
+        <h1 className="font-serif text-lg text-foreground">Revise requisition</h1>
         <p className="text-sm text-muted-foreground">{tenant.name}</p>
         {rejection?.comment && (
           <p className="mt-2 max-w-2xl rounded-md border border-amber-500 p-3 text-sm">
