@@ -66,7 +66,12 @@ export async function createInvoice(formData: FormData) {
     // The unique(tenant_id, vendor_id, invoice_number) constraint is the
     // phase-1 exact-duplicate-invoice baseline (§06) — this just turns
     // the raw constraint violation into a message someone can act on.
-    if (err instanceof Error && "code" in err && err.code === "23505") {
+    // drizzle-orm wraps the real PostgresError (which carries .code) in
+    // DrizzleQueryError#cause, not on the top-level error itself — this
+    // check was wrong since Sprint 9 and never actually caught anything;
+    // found while fixing the identical bug freshly written in S15.
+    const cause = err instanceof Error ? err.cause : undefined;
+    if (cause && typeof cause === "object" && "code" in cause && cause.code === "23505") {
       fail("This invoice number has already been submitted for this vendor.");
     }
     throw err;

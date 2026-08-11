@@ -27,5 +27,13 @@ export async function getCurrentUserAndTenant() {
     );
   }
 
+  // Checked on every request, not just at sign-in — a disabled user's
+  // existing WorkOS session cookie stays valid until it naturally
+  // expires, so "disabled" only actually revokes access if this check
+  // runs here too, not only in linkUserOnSignIn's one-time JIT path.
+  if (row.user.status === "disabled") {
+    throw new Error(`This account (${row.user.email}) has been disabled. Contact your tenant administrator.`);
+  }
+
   return row;
 }

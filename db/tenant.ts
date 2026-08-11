@@ -1,5 +1,6 @@
 import { and, eq } from "drizzle-orm";
 import { adminDb } from "./adminClient";
+import { isEmailAllowedForTenant } from "./domainRestriction";
 import { tenants, users } from "./schema";
 
 export class TenantLinkError extends Error {}
@@ -26,7 +27,17 @@ export async function linkUserOnSignIn(params: {
     .from(users)
     .where(eq(users.workosUserId, params.workosUserId))
     .limit(1);
-  if (alreadyLinked) return alreadyLinked;
+  if (alreadyLinked) {
+    // A disabled user's WorkOS session cookie can still be valid (this
+    // fast path only runs once at initial callback anyway — the check
+    // that actually matters on every subsequent request is in
+    // db/session.ts#getCurrentUserAndTenant — but rejecting it here too
+    // means a disabled user can't even complete a fresh sign-in attempt).
+    if (alreadyLinked.status === "disabled") {
+      throw new TenantLinkError(`This account (${alreadyLinked.email}) has been disabled.`);
+    }
+    return alreadyLinked;
+  }
 
   if (!params.workosOrganizationId) {
     throw new TenantLinkError(
@@ -45,13 +56,10 @@ export async function linkUserOnSignIn(params: {
     );
   }
 
-  if (tenant.allowedEmailDomains.length > 0) {
-    const domain = params.email.split("@")[1]?.toLowerCase();
-    if (!domain || !tenant.allowedEmailDomains.includes(domain)) {
-      throw new TenantLinkError(
-        `${params.email} isn't on an allowed domain for tenant ${tenant.slug}. This tenant restricts sign-in to: ${tenant.allowedEmailDomains.join(", ")}.`,
-      );
-    }
+  if (!isEmailAllowedForTenant(tenant.allowedEmailDomains, params.email)) {
+    throw new TenantLinkError(
+      `${params.email} isn't on an allowed domain for tenant ${tenant.slug}. This tenant restricts sign-in to: ${tenant.allowedEmailDomains.join(", ")}.`,
+    );
   }
 
   const [pending] = await adminDb
