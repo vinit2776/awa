@@ -1,5 +1,6 @@
 import { handleAuth } from "@workos-inc/authkit-nextjs";
 import { NextResponse } from "next/server";
+import { isPlatformAdminEmail } from "@/db/platformAdmins";
 import { linkUserOnSignIn, TenantLinkError } from "@/db/tenant";
 
 // A TenantLinkError here (tenant not linked to this org yet, or this email
@@ -17,6 +18,13 @@ import { linkUserOnSignIn, TenantLinkError } from "@/db/tenant";
 export const GET = handleAuth({
   returnPathname: "/dashboard",
   onSuccess: async ({ user, organizationId }) => {
+    // A platform admin isn't a tenant user at all — nothing to link.
+    // Without this check every platform-admin sign-in hit
+    // linkUserOnSignIn unconditionally and threw a TenantLinkError
+    // (no organization, or no tenant/users row for them), meaning the
+    // platform console's own sign-in path had never actually worked.
+    if (await isPlatformAdminEmail(user.email)) return;
+
     await linkUserOnSignIn({
       workosUserId: user.id,
       workosOrganizationId: organizationId,
