@@ -12,4 +12,14 @@ Next.js (App Router) + TypeScript, Postgres (Neon/Supabase) with RLS, Drizzle, W
 
 ## Status
 
-Sprint 1 (tenancy &amp; auth) complete. Next.js app scaffolded, phase 0–1 schema live on Supabase with RLS actually enforced (verified, not assumed — see `SETUP.md`), WorkOS AuthKit wired end to end: sign in → tenant/user resolved → RLS-scoped query, all on a dedicated `app_runtime` role rather than the table owner. Sprint 2 (roles &amp; platform console) is next per the scope doc's §14 sprint plan.
+**Phase 1 (Core procurement MVP) complete** — Sprints 0–10 per the scope doc's §14 sprint plan:
+
+- Tenancy, auth (WorkOS AuthKit, JIT-linked, no self-serve signup), RLS enforced on a dedicated `app_runtime` role — verified via a live isolation test suite (`db/__tests__/rls-isolation.test.ts`), not just assumed
+- Roles, platform admin console, catalog with trigram-fuzzy dedup hints
+- Requisition creation with budget display, a rule-matrix approval engine (additive/exclusive combination, ad-hoc approver addition), reject/revise/resubmit
+- RFQ → vendor quotations → PO issuance with a document hash, QR token, and a real PDF (`pdf-lib` + `qrcode`)
+- Goods receipt and service acceptance, including the segregation-of-duties DB trigger wired into the UI
+- Invoice capture, exact 3-way match against receipt/acceptance records, an exception queue, and a payment release queue
+- A coordinator-facing lifecycle tracker (`/dashboard/lifecycle`) and a golden-path integration test (`db/__tests__/golden-path.test.ts`) walking one requisition through every stage
+
+Known gaps carried forward deliberately, not silently: no email provider account exists yet (notifications are wired but stubbed to a console transport), no role-based UI permission gating, and the test suite isn't wired into CI (would need either a DB secret shared with the live dev database or an isolated test DB — a decision to make explicitly). Phase 2 (trust, mobile &amp; decision support — vendor portal, QR verification, bank-detail lock, fraud detection) is next per the roadmap.
