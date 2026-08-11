@@ -1,7 +1,8 @@
 import { notFound } from "next/navigation";
-import { and, desc, eq, notInArray, sql } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 import { getCurrentUserAndTenant } from "@/db/session";
 import { withTenant } from "@/db/withTenant";
+import { getCommittedByCostCenter } from "@/db/budget";
 import {
   purchaseRequisitions as purchaseRequisitionsTable,
   purchaseRequisitionLines as purchaseRequisitionLinesTable,
@@ -13,17 +14,11 @@ import {
 } from "@/db/schema";
 import { RequisitionForm } from "../../RequisitionForm";
 
-const NON_COMMITTED_STATUSES: ("draft" | "cancelled" | "rejected_closed")[] = [
-  "draft",
-  "cancelled",
-  "rejected_closed",
-];
-
 export default async function EditRequisitionPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const { user, tenant } = await getCurrentUserAndTenant();
 
-  const [requisition, lines, rejection, departments, costCenters, categories, catalogItems, committedRows] =
+  const [requisition, lines, rejection, departments, costCenters, categories, catalogItems, committedByCostCenter] =
     await withTenant(tenant.id, async (tx) => {
       const [requisition] = await tx
         .select()
@@ -35,7 +30,7 @@ export default async function EditRequisitionPage({ params }: { params: Promise<
             eq(purchaseRequisitionsTable.status, "rejected_revisable"),
           ),
         );
-      if (!requisition) return [null, [], null, [], [], [], [], []] as const;
+      if (!requisition) return [null, [], null, [], [], [], [], {}] as const;
 
       const lines = await tx
         .select()
@@ -53,23 +48,12 @@ export default async function EditRequisitionPage({ params }: { params: Promise<
       const costCenters = await tx.select().from(costCentersTable);
       const categories = await tx.select().from(catalogCategoriesTable);
       const catalogItems = await tx.select().from(catalogItemsTable);
-      const committedRows = await tx
-        .select({
-          costCenterId: purchaseRequisitionsTable.costCenterId,
-          committed: sql<string>`coalesce(sum(${purchaseRequisitionsTable.totalEstimatedValue}), 0)`,
-        })
-        .from(purchaseRequisitionsTable)
-        .where(notInArray(purchaseRequisitionsTable.status, NON_COMMITTED_STATUSES))
-        .groupBy(purchaseRequisitionsTable.costCenterId);
+      const committedByCostCenter = await getCommittedByCostCenter(tx);
 
-      return [requisition, lines, rejection ?? null, departments, costCenters, categories, catalogItems, committedRows] as const;
+      return [requisition, lines, rejection ?? null, departments, costCenters, categories, catalogItems, committedByCostCenter] as const;
     });
 
   if (!requisition) notFound();
-
-  const committedByCostCenter = Object.fromEntries(
-    committedRows.filter((r) => r.costCenterId).map((r) => [r.costCenterId as string, Number(r.committed)]),
-  );
 
   return (
     <div className="flex flex-col gap-6 p-8">

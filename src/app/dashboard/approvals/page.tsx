@@ -1,9 +1,13 @@
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import { getCurrentUserAndTenant } from "@/db/session";
 import { withTenant } from "@/db/withTenant";
+import { getCommittedByCostCenter } from "@/db/budget";
+import { getItemPurchaseHistory, type ItemPurchaseHistoryEntry } from "@/db/itemHistory";
 import {
   requisitionApprovalRequirements as requirementsTable,
   purchaseRequisitions as purchaseRequisitionsTable,
+  purchaseRequisitionLines as purchaseRequisitionLinesTable,
+  catalogItems as catalogItemsTable,
   users as usersTable,
   departments as departmentsTable,
   costCenters as costCentersTable,
@@ -20,16 +24,15 @@ function pendingDays(submittedAt: Date | null): number | null {
 export default async function ApprovalsInboxPage() {
   const { user, tenant } = await getCurrentUserAndTenant();
 
-  const [pendingRequirements, requisitions, users, departments, costCenters] = await withTenant(
-    tenant.id,
-    async (tx) => [
+  const [pendingRequirements, requisitions, users, departments, costCenters, committedByCostCenter] =
+    await withTenant(tenant.id, async (tx) => [
       await tx.select().from(requirementsTable).where(eq(requirementsTable.status, "pending")),
       await tx.select().from(purchaseRequisitionsTable).where(eq(purchaseRequisitionsTable.status, "pending_approval")),
       await tx.select().from(usersTable),
       await tx.select().from(departmentsTable),
       await tx.select().from(costCentersTable),
-    ],
-  );
+      await getCommittedByCostCenter(tx),
+    ]);
 
   const currentGroupByRequisition = new Map<string, number>();
   for (const req of pendingRequirements) {
@@ -51,6 +54,30 @@ export default async function ApprovalsInboxPage() {
       currentGroupByRequisition.get(req.requisitionId) === req.groupNo,
   );
 
+  // Decision-support context (S13, §04): budget standing for each
+  // requisition's cost center, and purchase history for each catalog
+  // item on the line — only for what's actually in front of this
+  // approver right now, not the whole catalog.
+  const requisitionIds = myActionable.map((req) => req.requisitionId);
+  const [lines, catalogItems] = requisitionIds.length
+    ? await withTenant(tenant.id, async (tx) => [
+        await tx.select().from(purchaseRequisitionLinesTable).where(inArray(purchaseRequisitionLinesTable.requisitionId, requisitionIds)),
+        await tx.select().from(catalogItemsTable),
+      ])
+    : [[], []];
+
+  const catalogItemIds = [...new Set(lines.map((l) => l.catalogItemId).filter((id): id is string => id !== null))];
+  const itemHistoryById = new Map<string, ItemPurchaseHistoryEntry[]>();
+  if (catalogItemIds.length > 0) {
+    await withTenant(tenant.id, async (tx) => {
+      for (const itemId of catalogItemIds) {
+        itemHistoryById.set(itemId, await getItemPurchaseHistory(tx, itemId, 3));
+      }
+    });
+  }
+
+  const itemName = (id: string | null) => catalogItems.find((i) => i.id === id)?.name ?? null;
+
   return (
     <div className="flex flex-col gap-8 p-8">
       <div>
@@ -61,6 +88,11 @@ export default async function ApprovalsInboxPage() {
       <div className="flex flex-col gap-6">
         {myActionable.map((req) => {
           const requisition = requisitionById.get(req.requisitionId)!;
+          const linesForReq = lines.filter((l) => l.requisitionId === req.requisitionId);
+          const costCenter = costCenters.find((c) => c.id === requisition.costCenterId);
+          const budget = costCenter?.annualBudget ? Number(costCenter.annualBudget) : null;
+          const committed = requisition.costCenterId ? (committedByCostCenter[requisition.costCenterId] ?? 0) : 0;
+
           return (
             <div key={req.id} className="flex flex-col gap-3 rounded-md border p-4">
               <div className="flex items-center justify-between">
@@ -80,6 +112,37 @@ export default async function ApprovalsInboxPage() {
                   )}
                 </div>
               </div>
+
+              {budget !== null && (
+                <p className="text-xs text-muted-foreground">
+                  Cost center budget: {budget.toFixed(2)} — already committed: {committed.toFixed(2)} — remaining after
+                  this: <span className={budget - committed < 0 ? "text-amber-600" : undefined}>{(budget - committed).toFixed(2)}</span>
+                </p>
+              )}
+
+              {linesForReq.length > 0 && (
+                <div className="flex flex-col gap-1 rounded-md bg-muted/40 p-2 text-xs">
+                  {linesForReq.map((line) => {
+                    const history = line.catalogItemId ? itemHistoryById.get(line.catalogItemId) : undefined;
+                    return (
+                      <div key={line.id}>
+                        <span className="font-medium">
+                          {line.freeTextDescription ?? itemName(line.catalogItemId) ?? "Item"} — {line.quantity} {line.uom} @{" "}
+                          {line.estimatedUnitPrice}
+                        </span>
+                        {history && history.length > 0 ? (
+                          <span className="text-muted-foreground">
+                            {" "}
+                            — previously: {history.map((h) => `${h.unitPrice} (${h.vendorName})`).join(", ")}
+                          </span>
+                        ) : line.catalogItemId ? (
+                          <span className="text-muted-foreground"> — never purchased before</span>
+                        ) : null}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
 
               <div className="flex flex-wrap items-end gap-2">
                 <form action={approveRequirement} className="flex items-end gap-2">

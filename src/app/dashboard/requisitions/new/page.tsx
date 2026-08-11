@@ -1,46 +1,26 @@
-import { notInArray, sql } from "drizzle-orm";
 import { getCurrentUserAndTenant } from "@/db/session";
 import { withTenant } from "@/db/withTenant";
+import { getCommittedByCostCenter } from "@/db/budget";
 import {
   departments as departmentsTable,
   costCenters as costCentersTable,
   catalogCategories as catalogCategoriesTable,
   catalogItems as catalogItemsTable,
-  purchaseRequisitions as purchaseRequisitionsTable,
 } from "@/db/schema";
 import { RequisitionForm } from "../RequisitionForm";
-
-// Requisitions in these statuses don't consume budget — a draft isn't a
-// commitment yet, and a cancelled/closed-rejected one never became one.
-const NON_COMMITTED_STATUSES: ("draft" | "cancelled" | "rejected_closed")[] = [
-  "draft",
-  "cancelled",
-  "rejected_closed",
-];
 
 export default async function NewRequisitionPage() {
   const { tenant } = await getCurrentUserAndTenant();
 
-  const [departments, costCenters, categories, catalogItems, committedRows] = await withTenant(
+  const [departments, costCenters, categories, catalogItems, committedByCostCenter] = await withTenant(
     tenant.id,
     async (tx) => [
       await tx.select().from(departmentsTable),
       await tx.select().from(costCentersTable),
       await tx.select().from(catalogCategoriesTable),
       await tx.select().from(catalogItemsTable),
-      await tx
-        .select({
-          costCenterId: purchaseRequisitionsTable.costCenterId,
-          committed: sql<string>`coalesce(sum(${purchaseRequisitionsTable.totalEstimatedValue}), 0)`,
-        })
-        .from(purchaseRequisitionsTable)
-        .where(notInArray(purchaseRequisitionsTable.status, NON_COMMITTED_STATUSES))
-        .groupBy(purchaseRequisitionsTable.costCenterId),
+      await getCommittedByCostCenter(tx),
     ],
-  );
-
-  const committedByCostCenter = Object.fromEntries(
-    committedRows.filter((r) => r.costCenterId).map((r) => [r.costCenterId as string, Number(r.committed)]),
   );
 
   return (
