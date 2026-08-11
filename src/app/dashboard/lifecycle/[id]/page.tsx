@@ -54,7 +54,7 @@ export default async function LifecycleDetailPage({ params }: { params: Promise<
   return (
     <div className="flex flex-col gap-6 p-8">
       <div>
-        <h1 className="text-lg font-medium">Requisition lifecycle</h1>
+        <h1 className="font-serif text-lg text-foreground">Requisition lifecycle</h1>
         <p className="text-sm text-muted-foreground">Current stage: {stage}</p>
       </div>
 

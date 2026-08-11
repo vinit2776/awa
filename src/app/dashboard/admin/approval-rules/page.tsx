@@ -37,7 +37,7 @@ export default async function ApprovalRulesPage() {
   return (
     <div className="flex flex-col gap-10">
       <div>
-        <h1 className="text-lg font-medium">Approval rules</h1>
+        <h1 className="font-serif text-lg text-foreground">Approval rules</h1>
         <p className="text-sm text-muted-foreground">{rules.length} rules in {tenant.name}</p>
       </div>
 

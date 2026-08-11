@@ -95,7 +95,7 @@ export default async function UsersPage({ searchParams }: { searchParams: Promis
   return (
     <div className="flex flex-col gap-10">
       <div>
-        <h1 className="text-lg font-medium">Users</h1>
+        <h1 className="font-serif text-lg text-foreground">Users</h1>
         <p className="text-sm text-muted-foreground">{tenantUsers.length} in {tenant.name}</p>
       </div>
 

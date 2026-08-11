@@ -26,7 +26,7 @@ export default async function NewRequisitionPage() {
   return (
     <div className="flex flex-col gap-6 p-8">
       <div>
-        <h1 className="text-lg font-medium">New requisition</h1>
+        <h1 className="font-serif text-lg text-foreground">New requisition</h1>
         <p className="text-sm text-muted-foreground">{tenant.name}</p>
       </div>
       <RequisitionForm

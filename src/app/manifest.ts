@@ -9,8 +9,8 @@ export default function manifest(): MetadataRoute.Manifest {
     description: "Multi-tenant requisition-to-payment procurement platform.",
     start_url: "/dashboard",
     display: "standalone",
-    background_color: "#0f172a",
-    theme_color: "#0f172a",
+    background_color: "#fcfcfb",
+    theme_color: "#d97757",
     icons: [
       { src: "/icon.svg", sizes: "any", type: "image/svg+xml", purpose: "any" },
     ],

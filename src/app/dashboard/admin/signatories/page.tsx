@@ -18,7 +18,7 @@ export default async function SignatoriesPage() {
   return (
     <div className="flex flex-col gap-6">
       <div>
-        <h1 className="text-lg font-medium">Signatories</h1>
+        <h1 className="font-serif text-lg text-foreground">Signatories</h1>
         <p className="text-sm text-muted-foreground">
           {signatoryRows.length} in {tenant.name} — shown on the public PO verification page so a vendor can confirm who&apos;s authorized to sign.
         </p>

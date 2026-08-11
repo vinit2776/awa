@@ -39,7 +39,7 @@ export default async function LifecyclePage() {
   return (
     <div className="flex flex-col gap-6 p-8">
       <div>
-        <h1 className="text-lg font-medium">Lifecycle</h1>
+        <h1 className="font-serif text-lg text-foreground">Lifecycle</h1>
         <p className="text-sm text-muted-foreground">{requisitions.length} requisitions in {tenant.name}</p>
       </div>
 

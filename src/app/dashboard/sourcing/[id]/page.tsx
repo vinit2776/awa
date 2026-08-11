@@ -46,7 +46,7 @@ export default async function SourcingDetailPage({ params }: { params: Promise<{
   return (
     <div className="flex flex-col gap-8 p-8">
       <div>
-        <h1 className="text-lg font-medium">Source requisition</h1>
+        <h1 className="font-serif text-lg text-foreground">Source requisition</h1>
         <p className="text-sm text-muted-foreground">
           {requisition.totalEstimatedValue} {requisition.currency} · {requisition.status}
         </p>

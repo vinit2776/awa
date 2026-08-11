@@ -24,7 +24,7 @@ export default async function VendorDetailPage({ params }: { params: Promise<{ i
   return (
     <div className="flex flex-col gap-8">
       <div>
-        <h1 className="text-lg font-medium">{vendor.name}</h1>
+        <h1 className="font-serif text-lg text-foreground">{vendor.name}</h1>
         <p className="text-sm text-muted-foreground">
           {vendor.status} · Registered phone: {vendor.registeredPhone ?? "not on file"}
         </p>
