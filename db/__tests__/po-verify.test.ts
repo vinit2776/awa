@@ -18,7 +18,8 @@ let signer: typeof users.$inferSelect;
 let unregisteredSigner: typeof users.$inferSelect;
 
 beforeAll(async () => {
-  [tenant] = await adminDb.insert(tenants).values({ name: "PO Verify Co", slug: "po-verify-co" }).returning();
+  const suffix = crypto.randomUUID().slice(0, 8);
+  [tenant] = await adminDb.insert(tenants).values({ name: "PO Verify Co", slug: `po-verify-co-${suffix}` }).returning();
   [signer] = await adminDb.insert(users).values({ tenantId: tenant.id, email: "signer@example.com", fullName: "Sara Signer", status: "active" }).returning();
   [unregisteredSigner] = await adminDb.insert(users).values({ tenantId: tenant.id, email: "unregistered@example.com", fullName: "Uma Unregistered", status: "active" }).returning();
 });
