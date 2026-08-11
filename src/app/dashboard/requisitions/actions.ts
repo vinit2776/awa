@@ -7,6 +7,8 @@ import { withTenant } from "@/db/withTenant";
 import { logAction } from "@/db/audit";
 import { resolveApprovals } from "@/db/approvals";
 import { notifyUser } from "@/db/notifications";
+import { uploadRequisitionDocument } from "@/db/documentStorage";
+import { extractLineItemsFromDocument } from "@/db/documentExtraction";
 import { purchaseRequisitions, purchaseRequisitionLines } from "@/db/schema";
 
 export type LineInput = {
@@ -25,6 +27,7 @@ export async function createRequisition(input: {
   justification: string;
   lines: LineInput[];
   submit: boolean;
+  sourceDocumentKey?: string | null;
 }) {
   const { user, tenant } = await getCurrentUserAndTenant();
 
@@ -51,6 +54,7 @@ export async function createRequisition(input: {
         totalEstimatedValue: total,
         status: input.submit ? "submitted" : "draft",
         submittedAt: input.submit ? new Date() : null,
+        sourceDocumentKey: input.sourceDocumentKey || null,
       })
       .returning();
 
@@ -211,4 +215,47 @@ export async function reviseAndResubmitRequisition(input: {
 
   revalidatePath("/dashboard/requisitions");
   return result;
+}
+
+export type ExtractedRequisitionDraft = {
+  lines: LineInput[];
+  vendorName: string | null;
+  sourceDocumentKey: string;
+  error?: string;
+};
+
+/**
+ * Uploads a quotation/proforma/GST invoice to R2 and attempts to
+ * extract line items from it. Always returns the uploaded key (so it
+ * can still be attached to the requisition even when extraction fails
+ * or isn't configured) plus whatever lines were extracted — empty when
+ * extraction isn't available, with `error` explaining why. The caller
+ * shows the extracted lines pre-filled into the same editable table
+ * manual entry uses; nothing here submits a requisition.
+ */
+export async function extractRequisitionFromDocument(formData: FormData): Promise<{ error?: string } & Partial<ExtractedRequisitionDraft>> {
+  const { tenant } = await getCurrentUserAndTenant();
+  const file = formData.get("file");
+  if (!(file instanceof File)) return { error: "No file was selected." };
+
+  const upload = await uploadRequisitionDocument(tenant.id, file);
+  if (upload.error || !upload.key) return { error: upload.error ?? "Upload failed." };
+
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  const extraction = await extractLineItemsFromDocument({ bytes, mimeType: file.type });
+
+  return {
+    sourceDocumentKey: upload.key,
+    vendorName: extraction.vendorName,
+    error: extraction.error,
+    lines: extraction.lines.map((l) => ({
+      catalogItemId: null,
+      freeTextDescription: l.description,
+      categoryId: null,
+      fulfillmentType: "goods",
+      quantity: l.quantity,
+      uom: l.uom,
+      estimatedUnitPrice: l.estimatedUnitPrice,
+    })),
+  };
 }
