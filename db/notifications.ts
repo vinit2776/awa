@@ -6,7 +6,8 @@ export type NotificationType =
   | "requisition_submitted"
   | "approval_needed"
   | "requisition_approved"
-  | "requisition_rejected";
+  | "requisition_rejected"
+  | "vendor_po_issued";
 
 /**
  * Transactional email has no provider account wired yet (Resend, SES,
@@ -32,4 +33,12 @@ export async function notifyUser(
   const [user] = await tx.select({ email: users.email, fullName: users.fullName }).from(users).where(eq(users.id, userId));
   if (!user) return;
   await deliver({ type, toEmail: user.email, subject, body });
+}
+
+// Vendor contacts (vendor_users) have no auth of their own — no user_id
+// to look up, just an email captured at data entry — so this takes the
+// address directly rather than resolving it from a users row.
+export async function notifyVendor(toEmail: string | null, subject: string, body: string) {
+  if (!toEmail) return;
+  await deliver({ type: "vendor_po_issued", toEmail, subject, body });
 }
