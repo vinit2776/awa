@@ -13,10 +13,13 @@ async function handleSignIn() {
   redirect(signInUrl);
 }
 
-export default function Home() {
+export default async function Home({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
+  const { error } = await searchParams;
+
   return (
     <div className="flex flex-1 flex-col items-center justify-center gap-4">
       <h1 className="text-xl font-medium">Procurement &amp; asset platform</h1>
+      {error && <p className="max-w-sm text-center text-sm text-destructive">{error}</p>}
       <form action={handleSignIn}>
         <button type="submit" className={cn(buttonVariants())}>
           Sign in
