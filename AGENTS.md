@@ -19,7 +19,7 @@ Every change — feature, fix, chore — goes through a branch and a PR into `ma
 3. Merge to `main` triggers Vercel's production auto-deploy (`awa-platform-tau.vercel.app`) — there is no separate deploy step.
 4. Delete the branch after merge.
 
-This needs GitHub branch protection turned on for `main` (require the PR + require the CI check) — CI passing today doesn't actually block a merge or a direct push until that's configured in the repo settings.
+**Branch protection is deliberately NOT enforced yet — read this before assuming it's live.** Both classic branch protection and Rulesets return `403: Upgrade to GitHub Pro or make this repository public` on this repo (private, free plan) — confirmed via the GitHub API, not just undocumented. Until the plan changes or the repo goes public, nothing stops a direct push to `main` or an unreviewed merge; this section is a norm the humans (and agents) working in this repo agree to follow, not something GitHub is currently enforcing. Don't treat "PR merged" or "CI green" as proof a change went through review until this is actually turned on. Revisit by upgrading to GitHub Pro/Team or making the repo public — both are deliberate, human calls, not something to flip silently.
 
 ## CI gates (`.github/workflows/ci.yml`)
 
@@ -34,5 +34,5 @@ Carried forward from gaps already flagged in `README.md` / `SETUP.md` — not a 
 - [ ] Switch WorkOS credentials from test-mode (`sk_test_...`) to live/production in the WorkOS dashboard (`SETUP.md`).
 - [ ] Wire a real email provider — notifications currently log to console only (`db/notifications.ts`).
 - [ ] Decide role-based UI permission gating (flagged as a known gap in `README.md`).
-- [ ] Turn on GitHub branch protection on `main` (PR + passing CI required) per the shipping policy above.
+- [ ] Turn on GitHub branch protection on `main` (PR + passing CI required) per the shipping policy above — blocked on GitHub Pro/Team (or making the repo public); currently unavailable on the private free-plan repo.
 - [ ] Confirm `db/__tests__/rls-isolation.test.ts` is green — this is the test that actually proves tenant isolation holds; treat a failure here as a launch blocker, not a flaky test to skip.
