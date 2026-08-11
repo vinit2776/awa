@@ -74,15 +74,7 @@ afterAll(async () => {
 });
 
 describe("golden path: requisition through payment", () => {
-  // ~10 sequential round trips inside one withTenant() transaction —
-  // comfortably under the global 30s testTimeout locally, but CI's
-  // runner is further from the Supabase ap-south-1 database than local
-  // dev is, and the added per-round-trip latency pushed this specific
-  // test over 30s there. Everything else in the suite stayed well
-  // within the default; this is the one genuinely long, many-round-trip
-  // integration test, so it gets its own longer budget instead of
-  // raising the global default for everything.
-  it("completes every stage in order", { timeout: 60_000 }, async () => {
+  it("completes every stage in order", async () => {
     await withTenant(tenant.id, async (tx) => {
       const [directorRole] = await tx.insert(roles).values({ tenantId: tenant.id, key: "director", displayName: "Director" }).returning();
       await tx.insert(userRoles).values({ tenantId: tenant.id, userId: approver.id, roleId: directorRole.id, scopeType: "global" });
