@@ -19,6 +19,10 @@ export default async function VendorsPage() {
       <div>
         <h1 className="text-lg font-medium">Vendors</h1>
         <p className="text-sm text-muted-foreground">{vendors.length} in {tenant.name}</p>
+        <p className="mt-1 text-xs text-muted-foreground">
+          A vendor contact added below can sign in at <code>/vendor-portal</code> with a one-time email link to view
+          and confirm POs issued to their company — no password, no separate invite step needed here.
+        </p>
       </div>
 
       <section className="flex flex-col gap-3">
@@ -44,7 +48,7 @@ export default async function VendorsPage() {
                     {contacts
                       .filter((c) => c.vendorId === v.id)
                       .map((c) => (
-                        <li key={c.id}>{c.fullName} ({c.email})</li>
+                        <li key={c.id}>{c.fullName} ({c.email}) — {c.status}</li>
                       ))}
                   </ul>
                   <form action={addVendorContact} className="mt-1 flex items-end gap-1">

@@ -393,6 +393,11 @@ export const purchaseOrders = pgTable("purchase_orders", {
   qrToken: text("qr_token"),
   signedBy: uuid("signed_by").references(() => users.id),
   signedAt: timestamp("signed_at", { withTimezone: true }),
+  // Set once a vendor logs into the vendor portal (§05) and confirms this
+  // PO themselves — distinct from the public, anonymous /po-verify scan,
+  // which proves nothing about who looked at it.
+  vendorConfirmedAt: timestamp("vendor_confirmed_at", { withTimezone: true }),
+  vendorConfirmedBy: uuid("vendor_confirmed_by").references(() => vendorUsers.id),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [
   unique().on(t.tenantId, t.poNumber),

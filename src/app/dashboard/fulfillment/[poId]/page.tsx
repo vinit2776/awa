@@ -62,6 +62,11 @@ export default async function FulfillmentDetailPage({ params }: { params: Promis
         <p className="text-sm text-muted-foreground">
           {vendor?.name ?? "—"} · {po.totalAmount} {po.currency} · {po.status}
         </p>
+        <p className="mt-1 text-xs text-muted-foreground">
+          {po.vendorConfirmedAt
+            ? `Vendor confirmed via portal on ${po.vendorConfirmedAt.toISOString().slice(0, 10)}`
+            : "Not yet confirmed by the vendor in the vendor portal"}
+        </p>
       </div>
 
       {goodsLines.length > 0 && (

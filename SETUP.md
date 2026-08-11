@@ -66,3 +66,16 @@ WorkOS AuthKit is wired (`src/middleware.ts`, `src/app/callback/route.ts`). Ther
 2. A platform admin (or tenant admin, once that UI exists) pre-provisions a `users` row for each person, status `invited`, matched by email within that tenant.
 
 The first time that person signs in via WorkOS, `db/tenant.ts`'s `linkUserOnSignIn` matches their WorkOS organization to the tenant, matches their email to the pending `users` row, records their `workos_user_id`, and flips status to `active`. Signing in with an email that has no matching pre-provisioned row fails loudly (a real error, not a silent bounce) — that's intentional; it means an admin step is missing, not a bug to paper over.
+
+## Vendor portal (Sprint 16 / phase 2)
+
+`VENDOR_SESSION_SECRET` — generate with `openssl rand -base64 32`, a different value per environment (Production/Preview/Development each got their own, same discipline as `BANK_ACCOUNT_ENCRYPTION_KEY`). Signs the vendor-portal's magic-link and session tokens (`db/vendorAuth.ts`); rotating it invalidates every outstanding magic link and signed-in vendor session at once.
+
+Vendor auth is deliberately **not** WorkOS — `vendor_users` (an external company's contacts, distinct from `users`) has no `workos_user_id` or password column, by original schema design. WorkOS AuthKit is an organization-based B2B model built for this platform's own tenants signing in as employees; a vendor is an external company with no organization of its own in this system, so it gets a separate, lighter mechanism instead:
+
+1. A tenant adds a vendor contact (`/dashboard/admin/vendors`, status `invited`) — this already existed from earlier sprints, just had no login path wired to it.
+2. The contact requests a sign-in link at `/vendor-portal/login`. A signed, 15-minute-lived token is emailed — currently console-logged like every other notification in this app (`db/notifications.ts`), since no email provider is wired up yet.
+3. Clicking it (`/vendor-portal/verify/[token]`) sets a signed 30-day session cookie and flips status to `active` on first use, the same JIT-activation shape as `linkUserOnSignIn`. If the same email is a contact for more than one tenant (`vendor_users` is unique on tenant+vendor+email, not email alone — one vendor company can work with several of this platform's customers), a chooser page picks which one.
+4. From there, the vendor sees POs issued to them and can confirm one directly (`purchase_orders.vendor_confirmed_at/by`) — the portal, not the emailed PDF, is the source of truth per §05.
+
+`src/middleware.ts` excludes `/vendor-portal/:path*` from WorkOS's `unauthenticatedPaths` entirely — it isn't a WorkOS session with relaxed rules, it's a different auth system, so WorkOS's middleware should never intercept it at all. Each vendor-portal route checks its own session via `db/vendorSession.ts#getCurrentVendorUser`.

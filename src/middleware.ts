@@ -10,7 +10,14 @@ export default authkitProxy({
     // be reachable regardless of auth state, since sw.js precaches it on
     // install and there's no way to know a visitor's session state ahead
     // of that fetch.
-    unauthenticatedPaths: ["/", "/callback", "/po-verify/:path*", "/offline"],
+    // /vendor-portal is out of WorkOS auth entirely (S16), not merely
+    // unauthenticated — vendors sign in via their own magic-link session
+    // (db/vendorSession.ts), a wholly separate mechanism from WorkOS.
+    // Every route under it does its own auth check
+    // (getCurrentVendorUser), the same way WorkOS-gated dashboard routes
+    // call getCurrentUserAndTenant; this entry just keeps authkitProxy
+    // from intercepting first and redirecting to WorkOS sign-in instead.
+    unauthenticatedPaths: ["/", "/callback", "/po-verify/:path*", "/offline", "/vendor-portal/:path*"],
   },
 });
 
