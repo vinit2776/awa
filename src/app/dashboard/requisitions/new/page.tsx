@@ -7,6 +7,7 @@ import {
   catalogCategories as catalogCategoriesTable,
   catalogItems as catalogItemsTable,
 } from "@/db/schema";
+import { Breadcrumbs } from "@/components/ui/breadcrumbs";
 import { RequisitionForm } from "../RequisitionForm";
 
 export default async function NewRequisitionPage() {
@@ -25,9 +26,18 @@ export default async function NewRequisitionPage() {
 
   return (
     <div className="flex flex-col gap-6 p-8">
-      <div>
-        <h1 className="font-serif text-lg text-foreground">New requisition</h1>
-        <p className="text-sm text-muted-foreground">{tenant.name}</p>
+      <div className="flex flex-col gap-2">
+        <Breadcrumbs
+          items={[
+            { label: "Dashboard", href: "/dashboard" },
+            { label: "My requests", href: "/dashboard/requisitions" },
+            { label: "New requisition" },
+          ]}
+        />
+        <div>
+          <h1 className="font-serif text-lg text-foreground">New requisition</h1>
+          <p className="text-sm text-muted-foreground">{tenant.name}</p>
+        </div>
       </div>
       <RequisitionForm
         departments={departments}

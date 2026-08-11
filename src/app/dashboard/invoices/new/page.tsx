@@ -9,6 +9,7 @@ import {
   catalogItems as catalogItemsTable,
 } from "@/db/schema";
 import { buttonVariants } from "@/components/ui/button";
+import { Breadcrumbs } from "@/components/ui/breadcrumbs";
 import { cn } from "@/lib/utils";
 import { createInvoice } from "../actions";
 
@@ -28,7 +29,16 @@ export default async function NewInvoicePage({ searchParams }: { searchParams: P
   if (!poId) {
     return (
       <div className="flex flex-col gap-6 p-8">
-        <h1 className="font-serif text-lg text-foreground">Capture invoice</h1>
+        <div className="flex flex-col gap-2">
+          <Breadcrumbs
+            items={[
+              { label: "Dashboard", href: "/dashboard" },
+              { label: "Invoices", href: "/dashboard/invoices" },
+              { label: "Capture invoice" },
+            ]}
+          />
+          <h1 className="font-serif text-lg text-foreground">Capture invoice</h1>
+        </div>
         <form method="get" className="flex items-end gap-2">
           <div className="flex flex-col gap-1">
             <label className="text-xs text-muted-foreground">PO</label>
@@ -54,9 +64,18 @@ export default async function NewInvoicePage({ searchParams }: { searchParams: P
 
   return (
     <div className="flex flex-col gap-6 p-8">
-      <div>
-        <h1 className="font-serif text-lg text-foreground">Capture invoice</h1>
-        <p className="text-sm text-muted-foreground">{po?.poNumber} — {vendorName(po?.vendorId ?? "")}</p>
+      <div className="flex flex-col gap-2">
+        <Breadcrumbs
+          items={[
+            { label: "Dashboard", href: "/dashboard" },
+            { label: "Invoices", href: "/dashboard/invoices" },
+            { label: "Capture invoice" },
+          ]}
+        />
+        <div>
+          <h1 className="font-serif text-lg text-foreground">Capture invoice</h1>
+          <p className="text-sm text-muted-foreground">{po?.poNumber} — {vendorName(po?.vendorId ?? "")}</p>
+        </div>
       </div>
 
       {error && <p className="text-sm text-destructive">{error}</p>}

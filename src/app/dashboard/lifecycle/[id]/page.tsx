@@ -12,6 +12,7 @@ import {
   vendors as vendorsTable,
   users as usersTable,
 } from "@/db/schema";
+import { Breadcrumbs } from "@/components/ui/breadcrumbs";
 import { computeStage } from "../stage";
 
 export default async function LifecycleDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -53,9 +54,18 @@ export default async function LifecycleDetailPage({ params }: { params: Promise<
 
   return (
     <div className="flex flex-col gap-6 p-8">
-      <div>
-        <h1 className="font-serif text-lg text-foreground">Requisition lifecycle</h1>
-        <p className="text-sm text-muted-foreground">Current stage: {stage}</p>
+      <div className="flex flex-col gap-2">
+        <Breadcrumbs
+          items={[
+            { label: "Dashboard", href: "/dashboard" },
+            { label: "Lifecycle", href: "/dashboard/lifecycle" },
+            { label: "Requisition lifecycle" },
+          ]}
+        />
+        <div>
+          <h1 className="font-serif text-lg text-foreground">Requisition lifecycle</h1>
+          <p className="text-sm text-muted-foreground">Current stage: {stage}</p>
+        </div>
       </div>
 
       <ol className="flex flex-col gap-4">

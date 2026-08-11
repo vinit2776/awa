@@ -17,6 +17,7 @@ import {
 import { VENDOR_RETURN_STATUSES } from "@/db/vendorReturns";
 import { resolveMilestoneValue } from "@/db/serviceMilestones";
 import { buttonVariants } from "@/components/ui/button";
+import { Breadcrumbs } from "@/components/ui/breadcrumbs";
 import { cn } from "@/lib/utils";
 import { advanceReturn, defineMilestone, initiateReturn, submitGoodsReceipt, submitMilestoneAcceptance, submitServiceAcceptance } from "./actions";
 
@@ -95,16 +96,25 @@ export default async function FulfillmentDetailPage({
 
   return (
     <div className="flex flex-col gap-8 p-8">
-      <div>
-        <h1 className="font-serif text-lg text-foreground">{po.poNumber}</h1>
-        <p className="text-sm text-muted-foreground">
-          {vendor?.name ?? "—"} · {po.totalAmount} {po.currency} · {po.status}
-        </p>
-        <p className="mt-1 text-xs text-muted-foreground">
-          {po.vendorConfirmedAt
-            ? `Vendor confirmed via portal on ${po.vendorConfirmedAt.toISOString().slice(0, 10)}`
-            : "Not yet confirmed by the vendor in the vendor portal"}
-        </p>
+      <div className="flex flex-col gap-2">
+        <Breadcrumbs
+          items={[
+            { label: "Dashboard", href: "/dashboard" },
+            { label: "Fulfillment", href: "/dashboard/fulfillment" },
+            { label: po.poNumber },
+          ]}
+        />
+        <div>
+          <h1 className="font-serif text-lg text-foreground">{po.poNumber}</h1>
+          <p className="text-sm text-muted-foreground">
+            {vendor?.name ?? "—"} · {po.totalAmount} {po.currency} · {po.status}
+          </p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            {po.vendorConfirmedAt
+              ? `Vendor confirmed via portal on ${po.vendorConfirmedAt.toISOString().slice(0, 10)}`
+              : "Not yet confirmed by the vendor in the vendor portal"}
+          </p>
+        </div>
       </div>
 
       {error && <p className="text-sm text-destructive">{error}</p>}

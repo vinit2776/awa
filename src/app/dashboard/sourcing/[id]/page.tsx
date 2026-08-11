@@ -13,6 +13,7 @@ import {
   purchaseOrders as purchaseOrdersTable,
 } from "@/db/schema";
 import { buttonVariants } from "@/components/ui/button";
+import { Breadcrumbs } from "@/components/ui/breadcrumbs";
 import { cn } from "@/lib/utils";
 import { createRfq, inviteVendor, submitQuotation, selectQuotationAndIssuePo } from "./actions";
 
@@ -45,11 +46,20 @@ export default async function SourcingDetailPage({ params }: { params: Promise<{
 
   return (
     <div className="flex flex-col gap-8 p-8">
-      <div>
-        <h1 className="font-serif text-lg text-foreground">Source requisition</h1>
-        <p className="text-sm text-muted-foreground">
-          {requisition.totalEstimatedValue} {requisition.currency} · {requisition.status}
-        </p>
+      <div className="flex flex-col gap-2">
+        <Breadcrumbs
+          items={[
+            { label: "Dashboard", href: "/dashboard" },
+            { label: "Sourcing", href: "/dashboard/sourcing" },
+            { label: "Source requisition" },
+          ]}
+        />
+        <div>
+          <h1 className="font-serif text-lg text-foreground">Source requisition</h1>
+          <p className="text-sm text-muted-foreground">
+            {requisition.totalEstimatedValue} {requisition.currency} · {requisition.status}
+          </p>
+        </div>
       </div>
 
       <section className="flex flex-col gap-2">

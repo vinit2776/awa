@@ -13,6 +13,7 @@ import {
   costCenters as costCentersTable,
 } from "@/db/schema";
 import { buttonVariants } from "@/components/ui/button";
+import { Breadcrumbs } from "@/components/ui/breadcrumbs";
 import { cn } from "@/lib/utils";
 import { approveRequirement, requestRevision, rejectAndClose, addAdHocApprover } from "./actions";
 
@@ -80,9 +81,12 @@ export default async function ApprovalsInboxPage() {
 
   return (
     <div className="flex flex-col gap-8 p-8">
-      <div>
-        <h1 className="font-serif text-lg text-foreground">Approvals</h1>
-        <p className="text-sm text-muted-foreground">{myActionable.length} awaiting your decision</p>
+      <div className="flex flex-col gap-2">
+        <Breadcrumbs items={[{ label: "Dashboard", href: "/dashboard" }, { label: "Approvals" }]} />
+        <div>
+          <h1 className="font-serif text-lg text-foreground">Approvals</h1>
+          <p className="text-sm text-muted-foreground">{myActionable.length} awaiting your decision</p>
+        </div>
       </div>
 
       <div className="flex flex-col gap-6">

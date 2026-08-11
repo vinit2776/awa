@@ -4,6 +4,7 @@ import { getCurrentUserAndTenant } from "@/db/session";
 import { withTenant } from "@/db/withTenant";
 import { purchaseRequisitions as purchaseRequisitionsTable, users as usersTable, departments as departmentsTable } from "@/db/schema";
 import { buttonVariants } from "@/components/ui/button";
+import { Breadcrumbs } from "@/components/ui/breadcrumbs";
 import { cn } from "@/lib/utils";
 
 export default async function SourcingPage() {
@@ -20,9 +21,12 @@ export default async function SourcingPage() {
 
   return (
     <div className="flex flex-col gap-6 p-8">
-      <div>
-        <h1 className="font-serif text-lg text-foreground">Sourcing</h1>
-        <p className="text-sm text-muted-foreground">{requisitions.length} approved requisitions ready to source</p>
+      <div className="flex flex-col gap-2">
+        <Breadcrumbs items={[{ label: "Dashboard", href: "/dashboard" }, { label: "Sourcing" }]} />
+        <div>
+          <h1 className="font-serif text-lg text-foreground">Sourcing</h1>
+          <p className="text-sm text-muted-foreground">{requisitions.length} approved requisitions ready to source</p>
+        </div>
       </div>
 
       <table className="w-full text-sm">
