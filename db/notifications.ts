@@ -1,5 +1,6 @@
 import { eq } from "drizzle-orm";
 import type { db } from "./client";
+import { sendPushToUser } from "./push";
 import { users } from "./schema";
 
 export type NotificationType =
@@ -18,9 +19,16 @@ export type NotificationType =
  * upstream keeps working unmodified. Until then this logs so the
  * triggering logic is fully wired and testable, just not actually
  * emailing anyone.
+ *
+ * Web Push (S14) is wired here too, additively — real delivery, not a
+ * stub, whenever VAPID is configured and the target user (vendors have
+ * none) has at least one subscribed device.
  */
-async function deliver(params: { type: NotificationType; toEmail: string; subject: string; body: string }) {
+async function deliver(params: { type: NotificationType; toEmail: string; subject: string; body: string; userId?: string; tx?: typeof db }) {
   console.log(`[notification:${params.type}] to=${params.toEmail} subject="${params.subject}"\n${params.body}`);
+  if (params.userId && params.tx) {
+    await sendPushToUser(params.tx, params.userId, { title: params.subject, body: params.body });
+  }
 }
 
 export async function notifyUser(
@@ -32,12 +40,13 @@ export async function notifyUser(
 ) {
   const [user] = await tx.select({ email: users.email, fullName: users.fullName }).from(users).where(eq(users.id, userId));
   if (!user) return;
-  await deliver({ type, toEmail: user.email, subject, body });
+  await deliver({ type, toEmail: user.email, subject, body, userId, tx });
 }
 
 // Vendor contacts (vendor_users) have no auth of their own — no user_id
 // to look up, just an email captured at data entry — so this takes the
-// address directly rather than resolving it from a users row.
+// address directly rather than resolving it from a users row, and never
+// gets push (there's no subscription to look up without a user_id).
 export async function notifyVendor(toEmail: string | null, subject: string, body: string) {
   if (!toEmail) return;
   await deliver({ type: "vendor_po_issued", toEmail, subject, body });

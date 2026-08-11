@@ -5,6 +5,7 @@ import { withTenant } from "@/db/withTenant";
 import { users as usersTable } from "@/db/schema";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { PushNotifications } from "./PushNotifications";
 
 export default async function DashboardPage() {
   const { user, tenant } = await getCurrentUserAndTenant();
@@ -53,6 +54,7 @@ export default async function DashboardPage() {
           <Link href="/dashboard/admin/departments" className={cn(buttonVariants({ variant: "outline" }))}>
             Admin
           </Link>
+          <PushNotifications />
           <form action={handleSignOut}>
             <button type="submit" className={cn(buttonVariants({ variant: "outline" }))}>
               Sign out

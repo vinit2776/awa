@@ -33,6 +33,16 @@ All 7 environment variables (`DATABASE_URL`, `WORKOS_API_KEY`, `WORKOS_CLIENT_ID
 
 **Rotating this key makes every previously-encrypted account number permanently undecryptable** — treat it like a database credential, not a config toggle.
 
+## PWA v1 (Sprint 14 / phase 2)
+
+Web Push, an offline shell, and domain-restricted sign-in.
+
+- **Push** — `NEXT_PUBLIC_VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` / `VAPID_SUBJECT`, generated with `npx web-push generate-vapid-keys`. A different key pair per environment (Production/Preview/Development), same discipline as every other secret here — none typed or pasted into chat. `db/push.ts#sendPushToUser` is wired into the existing notification triggers from Sprint 6 (`db/notifications.ts`) additively — it sends real pushes when a user has a subscribed device, and quietly no-ops (not an error) when VAPID isn't configured, so local dev without these keys set still works normally. A subscription the push service reports as gone (404/410) gets deleted; other failures are left alone since the subscription might still be good.
+- **Offline shell** — `public/sw.js`, hand-written (no next-pwa/serwist dependency). Deliberately caches only immutable, content-hashed `/_next/static/*` assets, never page HTML — this app is multi-tenant, and a shared/kiosk device replaying a stale cached page for whoever's signed in now would be a real cross-user data leak, not just a staleness annoyance. Offline navigations fall back to `/offline`, a generic unauthenticated page, not a cached copy of wherever the user was.
+- **Domain restriction** — `tenants.allowed_email_domains` (migration 0008), configured per tenant in the platform console. Enforced in `db/tenant.ts#linkUserOnSignIn` as a second layer of defense on top of — not instead of — needing a pre-provisioned `users` row; empty list (the default) means unrestricted.
+
+`src/middleware.ts`'s matcher excludes `sw.js`, `manifest.webmanifest`, and `icon.svg` entirely (not just added to `unauthenticatedPaths`) — a browser fetching the service worker script has no session by definition, and a redirect response instead of the real file makes registration fail outright for every visitor, not just render something wrong. This was a real bug caught during local verification before it shipped, not a theoretical concern.
+
 ## CI/CD
 
 `.github/workflows/ci.yml` runs lint/typecheck/build on every PR and is live now that Sprint 0 added `package.json`. Deployment itself is handled by Vercel's GitHub integration (step 1 above), not by this workflow.

@@ -22,4 +22,13 @@ Next.js (App Router) + TypeScript, Postgres (Neon/Supabase) with RLS, Drizzle, W
 - Invoice capture, exact 3-way match against receipt/acceptance records, an exception queue, and a payment release queue
 - A coordinator-facing lifecycle tracker (`/dashboard/lifecycle`) and a golden-path integration test (`db/__tests__/golden-path.test.ts`) walking one requisition through every stage
 
-Known gaps carried forward deliberately, not silently: no email provider account exists yet (notifications are wired but stubbed to a console transport), no role-based UI permission gating, and the test suite isn't wired into CI (would need either a DB secret shared with the live dev database or an isolated test DB — a decision to make explicitly). Phase 2 (trust, mobile &amp; decision support — vendor portal, QR verification, bank-detail lock, fraud detection) is next per the roadmap.
+**Phase 2 (Trust, mobile & decision support) in progress:**
+
+- Public PO verification (`/po-verify/[token]`) and a signatory registry, closing the QR/hash trust anchors left open at PO issuance
+- Bank-detail lock: real AES-256-GCM encryption for account numbers, an out-of-band callback verification workflow, never a same-channel change
+- Approver decision-support panel: cost-center budget standing and per-item purchase history surfaced right in the approvals inbox
+- PWA v1: Web Push (wired into the existing notification triggers), an offline shell that deliberately caches only static assets — never page HTML, since a shared device replaying another tenant's cached page would be a real data leak — and per-tenant email-domain sign-in restriction
+
+Still to come in phase 2: the full vendor portal (needs an explicit decision on an external-user auth model, distinct from WorkOS's organization-based internal auth), partial delivery / quality rejection / vendor returns, and milestone-based service acceptance — both of the latter two touch the "one fulfillment record per PO line" assumption the invoice-matching engine relies on, so they're a bigger unit of work than what's shipped so far.
+
+Known gaps carried forward deliberately, not silently: no email provider account exists yet (notifications are wired but stubbed to a console transport, augmented by real Web Push where a device is subscribed), no role-based UI permission gating, no UI to actually provision/invite a new user (found while building domain restriction — `linkUserOnSignIn` requires a pre-existing `users` row, but nothing in the app creates one yet outside a direct script), and the test suite isn't wired into CI (would need either a DB secret shared with the live dev database or an isolated test DB — a decision to make explicitly).

@@ -73,6 +73,10 @@ export const tenants = pgTable("tenants", {
   // "Basic" flags for the platform console (§14 Sprint 2) — a per-tenant
   // toggle bag, not a targeting/rollout system.
   featureFlags: jsonb("feature_flags").notNull().default({}),
+  // Domain restriction (§09, phase 2) — empty = unrestricted. Enforced at
+  // JIT sign-in linking (db/tenant.ts) as a second layer of defense
+  // beyond "an admin pre-provisioned this users row with this email."
+  allowedEmailDomains: text("allowed_email_domains").array().notNull().default([]),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
@@ -231,6 +235,16 @@ export const signatories = pgTable("signatories", {
   active: boolean("active").notNull().default(true),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [unique().on(t.tenantId, t.userId)]);
+
+export const pushSubscriptions = pgTable("push_subscriptions", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  tenantId: uuid("tenant_id").notNull().references(() => tenants.id),
+  userId: uuid("user_id").notNull().references(() => users.id),
+  endpoint: text("endpoint").notNull(),
+  p256dh: text("p256dh").notNull(),
+  auth: text("auth").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [unique().on(t.endpoint)]);
 
 // =========================================================================
 // Requisition & approval engine (§04)

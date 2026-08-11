@@ -57,6 +57,22 @@ async function setFeatureFlags(formData: FormData) {
   revalidatePath("/platform");
 }
 
+async function setAllowedEmailDomains(formData: FormData) {
+  "use server";
+  await getCurrentPlatformAdmin();
+  const tenantId = String(formData.get("tenantId") ?? "");
+  const raw = String(formData.get("allowedEmailDomains") ?? "");
+  if (!tenantId) return;
+
+  const domains = raw
+    .split(",")
+    .map((d) => d.trim().toLowerCase())
+    .filter(Boolean);
+
+  await db.update(tenantsTable).set({ allowedEmailDomains: domains }).where(eq(tenantsTable.id, tenantId));
+  revalidatePath("/platform");
+}
+
 export default async function PlatformConsolePage() {
   const admin = await getCurrentPlatformAdmin();
   const tenants = await db.select().from(tenantsTable);
@@ -111,6 +127,31 @@ export default async function PlatformConsolePage() {
                 defaultValue={JSON.stringify(t.featureFlags)}
                 rows={1}
                 className="h-8 w-96 rounded-md border px-2 py-1 font-mono text-xs"
+              />
+            </div>
+            <button type="submit" className={cn(buttonVariants({ variant: "outline", size: "sm" }))}>
+              Save
+            </button>
+          </form>
+        ))}
+      </div>
+
+      <div className="flex flex-col gap-3">
+        <h2 className="text-sm font-medium text-muted-foreground">Domain restriction</h2>
+        <p className="max-w-2xl text-xs text-muted-foreground">
+          Comma-separated allowed email domains for sign-in (§09). Empty = unrestricted. Enforced at JIT
+          sign-in linking, on top of — not instead of — needing a pre-provisioned users row.
+        </p>
+        {tenants.map((t) => (
+          <form key={t.id} action={setAllowedEmailDomains} className="flex items-end gap-2">
+            <input type="hidden" name="tenantId" value={t.id} />
+            <div className="flex flex-col gap-1">
+              <label className="text-xs text-muted-foreground">{t.name}</label>
+              <input
+                name="allowedEmailDomains"
+                defaultValue={t.allowedEmailDomains.join(", ")}
+                placeholder="e.g. acme.com, acme.co.in"
+                className="h-8 w-96 rounded-md border px-2 text-sm"
               />
             </div>
             <button type="submit" className={cn(buttonVariants({ variant: "outline", size: "sm" }))}>

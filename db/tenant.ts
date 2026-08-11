@@ -45,6 +45,15 @@ export async function linkUserOnSignIn(params: {
     );
   }
 
+  if (tenant.allowedEmailDomains.length > 0) {
+    const domain = params.email.split("@")[1]?.toLowerCase();
+    if (!domain || !tenant.allowedEmailDomains.includes(domain)) {
+      throw new TenantLinkError(
+        `${params.email} isn't on an allowed domain for tenant ${tenant.slug}. This tenant restricts sign-in to: ${tenant.allowedEmailDomains.join(", ")}.`,
+      );
+    }
+  }
+
   const [pending] = await adminDb
     .select()
     .from(users)
