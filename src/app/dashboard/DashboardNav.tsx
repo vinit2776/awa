@@ -10,6 +10,7 @@ import {
   Receipt,
   Wallet,
   RefreshCw,
+  BarChart3,
   Settings,
   type LucideIcon,
 } from "lucide-react";
@@ -23,6 +24,7 @@ const NAV_ITEMS: { href: string; label: string; icon: LucideIcon }[] = [
   { href: "/dashboard/invoices", label: "Invoices", icon: Receipt },
   { href: "/dashboard/payments", label: "Payments", icon: Wallet },
   { href: "/dashboard/lifecycle", label: "Lifecycle", icon: RefreshCw },
+  { href: "/dashboard/reports", label: "Reports", icon: BarChart3 },
   { href: "/dashboard/admin/departments", label: "Admin", icon: Settings },
 ];
 
