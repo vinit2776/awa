@@ -1,9 +1,11 @@
 "use server";
 
+import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { getCurrentUserAndTenant } from "@/db/session";
 import { withTenant } from "@/db/withTenant";
 import { recordGoodsReceipt, recordServiceAcceptance, type GoodsLineInput, type ServiceLineInput } from "@/db/fulfillment";
+import { advanceVendorReturn, initiateVendorReturn, type VendorReturnStatus } from "@/db/vendorReturns";
 
 export async function submitGoodsReceipt(formData: FormData) {
   const poId = String(formData.get("poId") ?? "");
@@ -57,4 +59,36 @@ export async function submitServiceAcceptance(formData: FormData) {
 
   revalidatePath(`/dashboard/fulfillment/${poId}`);
   revalidatePath("/dashboard/fulfillment");
+}
+
+export async function initiateReturn(formData: FormData) {
+  const poId = String(formData.get("poId") ?? "");
+  const grnLineId = String(formData.get("grnLineId") ?? "");
+  const quantity = String(formData.get("quantity") ?? "");
+  const reason = String(formData.get("reason") ?? "");
+  if (!poId || !grnLineId) return;
+
+  const { user, tenant } = await getCurrentUserAndTenant();
+  const result = await withTenant(tenant.id, (tx) => initiateVendorReturn(tx, tenant.id, user.id, grnLineId, quantity, reason));
+  if (result.error) {
+    redirect(`/dashboard/fulfillment/${poId}?error=${encodeURIComponent(result.error)}`);
+  }
+
+  revalidatePath(`/dashboard/fulfillment/${poId}`);
+}
+
+export async function advanceReturn(formData: FormData) {
+  const poId = String(formData.get("poId") ?? "");
+  const returnId = String(formData.get("returnId") ?? "");
+  const nextStatus = String(formData.get("nextStatus") ?? "") as VendorReturnStatus;
+  const reference = String(formData.get("reference") ?? "").trim() || null;
+  if (!poId || !returnId || !nextStatus) return;
+
+  const { user, tenant } = await getCurrentUserAndTenant();
+  const result = await withTenant(tenant.id, (tx) => advanceVendorReturn(tx, tenant.id, user.id, returnId, nextStatus, reference));
+  if (result.error) {
+    redirect(`/dashboard/fulfillment/${poId}?error=${encodeURIComponent(result.error)}`);
+  }
+
+  revalidatePath(`/dashboard/fulfillment/${poId}`);
 }

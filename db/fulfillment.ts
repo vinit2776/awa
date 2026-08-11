@@ -21,11 +21,16 @@ export type GoodsLineInput = {
 };
 
 /**
- * "Full receipt only" (S8): one GRN event covers every open goods line
- * on the PO at once — no staged/partial delivery across multiple GRNs
- * per line. Per-line accept/reject quantities within that one event are
- * still supported (the schema carries them), that's a different axis
- * than partial delivery over time.
+ * Partial/staged delivery (S17): a PO line can be received across
+ * multiple GRN events over time — a short shipment now, the balance
+ * later — so this sums quantity_accepted across every goods_receipt_line
+ * recorded for a po_line so far (this event's rows plus any earlier
+ * ones), not just the rows from this call. A line only reaches
+ * 'fulfilled' once that running total meets the ordered quantity;
+ * otherwise it goes to 'partially_fulfilled' and stays visible for a
+ * follow-up receipt. This is also why db/invoiceMatch.ts has to sum
+ * across the same rows instead of reading a single one — see the
+ * comment there.
  *
  * receivedBy is checked against the requisition's requestor here too,
  * not just left to the DB trigger (app.enforce_receiver_not_requestor
@@ -71,7 +76,16 @@ export async function recordGoodsReceipt(
   );
 
   for (const l of lines) {
-    await tx.update(purchaseOrderLines).set({ status: "fulfilled" }).where(eq(purchaseOrderLines.id, l.poLineId));
+    const [poLine] = await tx.select().from(purchaseOrderLines).where(eq(purchaseOrderLines.id, l.poLineId));
+    if (!poLine) continue;
+
+    const priorReceipts = await tx
+      .select({ quantityAccepted: goodsReceiptLines.quantityAccepted })
+      .from(goodsReceiptLines)
+      .where(eq(goodsReceiptLines.poLineId, l.poLineId));
+    const totalAccepted = priorReceipts.reduce((sum, r) => sum + Number(r.quantityAccepted), 0);
+    const status = totalAccepted >= Number(poLine.quantity) ? "fulfilled" : "partially_fulfilled";
+    await tx.update(purchaseOrderLines).set({ status }).where(eq(purchaseOrderLines.id, l.poLineId));
   }
 
   await logAction(tx, {
@@ -98,6 +112,13 @@ export type ServiceLineInput = {
  * "Full completion only" (S8) — acceptance_type is always
  * full_completion; milestone-based partial billing (service_milestones
  * exists in the schema) is explicitly deferred per the roadmap.
+ *
+ * A rejected or partial line no longer gets marked 'fulfilled' (S17) —
+ * that was a real bug: it meant rework never had anywhere to go, and
+ * an unpaid, incomplete service line looked done. 'rejected' leaves the
+ * PO line status untouched so it keeps showing as open for resubmission
+ * once the vendor reworks it; 'partial' moves it to
+ * 'partially_fulfilled', consistent with the goods side.
  */
 export async function recordServiceAcceptance(
   tx: typeof db,
@@ -128,7 +149,11 @@ export async function recordServiceAcceptance(
   );
 
   for (const l of lines) {
-    await tx.update(purchaseOrderLines).set({ status: "fulfilled" }).where(eq(purchaseOrderLines.id, l.poLineId));
+    if (l.status === "accepted") {
+      await tx.update(purchaseOrderLines).set({ status: "fulfilled" }).where(eq(purchaseOrderLines.id, l.poLineId));
+    } else if (l.status === "partial") {
+      await tx.update(purchaseOrderLines).set({ status: "partially_fulfilled" }).where(eq(purchaseOrderLines.id, l.poLineId));
+    }
   }
 
   await logAction(tx, {

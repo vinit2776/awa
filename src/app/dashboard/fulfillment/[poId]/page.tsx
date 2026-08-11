@@ -11,18 +11,27 @@ import {
   catalogItems as catalogItemsTable,
   goodsReceiptLines as goodsReceiptLinesTable,
   serviceAcceptanceLines as serviceAcceptanceLinesTable,
+  vendorReturns as vendorReturnsTable,
 } from "@/db/schema";
+import { VENDOR_RETURN_STATUSES } from "@/db/vendorReturns";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { submitGoodsReceipt, submitServiceAcceptance } from "./actions";
+import { advanceReturn, initiateReturn, submitGoodsReceipt, submitServiceAcceptance } from "./actions";
 
-export default async function FulfillmentDetailPage({ params }: { params: Promise<{ poId: string }> }) {
+export default async function FulfillmentDetailPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ poId: string }>;
+  searchParams: Promise<{ error?: string }>;
+}) {
   const { poId } = await params;
+  const { error } = await searchParams;
   const { tenant } = await getCurrentUserAndTenant();
 
-  const [po, lines, catalogItems, users, grnLines, serviceLines] = await withTenant(tenant.id, async (tx) => {
+  const [po, lines, catalogItems, users, grnLines, serviceLines, returns] = await withTenant(tenant.id, async (tx) => {
     const [po] = await tx.select().from(purchaseOrdersTable).where(eq(purchaseOrdersTable.id, poId));
-    if (!po) return [null, [], [], [], [], []] as const;
+    if (!po) return [null, [], [], [], [], [], []] as const;
 
     const lines = await tx.select().from(purchaseOrderLinesTable).where(eq(purchaseOrderLinesTable.poId, poId));
     const catalogItems = await tx.select().from(catalogItemsTable);
@@ -35,8 +44,12 @@ export default async function FulfillmentDetailPage({ params }: { params: Promis
     const serviceLines = serviceLineIds.length
       ? (await tx.select().from(serviceAcceptanceLinesTable)).filter((s) => serviceLineIds.includes(s.poLineId))
       : [];
+    const grnLineIds = grnLines.map((g) => g.id);
+    const returns = grnLineIds.length
+      ? (await tx.select().from(vendorReturnsTable)).filter((r) => grnLineIds.includes(r.grnLineId))
+      : [];
 
-    return [po, lines, catalogItems, users, grnLines, serviceLines] as const;
+    return [po, lines, catalogItems, users, grnLines, serviceLines, returns] as const;
   });
 
   if (!po) notFound();
@@ -55,6 +68,15 @@ export default async function FulfillmentDetailPage({ params }: { params: Promis
   const serviceLinesOnPo = lines.filter((l) => l.fulfillmentType === "service");
   const openServiceLines = serviceLinesOnPo.filter((l) => l.status !== "fulfilled");
 
+  const receiptsFor = (lineId: string) => grnLines.filter((g) => g.poLineId === lineId);
+  const totalAccepted = (lineId: string) => receiptsFor(lineId).reduce((sum, g) => sum + Number(g.quantityAccepted), 0);
+  const returnsFor = (grnLineId: string) => returns.filter((r) => r.grnLineId === grnLineId);
+  const returnedQty = (grnLineId: string) => returnsFor(grnLineId).reduce((sum, r) => sum + Number(r.quantity), 0);
+  const nextReturnStep = (status: string) => {
+    const idx = VENDOR_RETURN_STATUSES.indexOf(status as (typeof VENDOR_RETURN_STATUSES)[number]);
+    return idx >= 0 && idx < VENDOR_RETURN_STATUSES.length - 1 ? VENDOR_RETURN_STATUSES[idx + 1] : null;
+  };
+
   return (
     <div className="flex flex-col gap-8 p-8">
       <div>
@@ -69,20 +91,89 @@ export default async function FulfillmentDetailPage({ params }: { params: Promis
         </p>
       </div>
 
+      {error && <p className="text-sm text-destructive">{error}</p>}
+
       {goodsLines.length > 0 && (
         <section className="flex flex-col gap-3">
           <h2 className="text-sm font-medium text-muted-foreground">Goods</h2>
-          <ul className="flex flex-col gap-1 text-sm">
+          <ul className="flex flex-col gap-3 text-sm">
             {goodsLines.map((l) => {
-              const receipt = grnLines.find((g) => g.poLineId === l.id);
+              const receipts = receiptsFor(l.id);
+              const accepted = totalAccepted(l.id);
               return (
                 <li key={l.id}>
-                  {itemName(l.itemId) ?? "Item"} — {l.quantity} {l.uom}
-                  {receipt && (
-                    <span className="text-muted-foreground">
-                      {" "}
-                      · received {receipt.quantityAccepted} accepted, {receipt.quantityRejected} rejected ({receipt.condition})
-                    </span>
+                  <div>
+                    {itemName(l.itemId) ?? "Item"} — {l.quantity} {l.uom} ordered
+                    {receipts.length > 0 && (
+                      <span className="text-muted-foreground"> · {accepted} accepted so far ({l.status})</span>
+                    )}
+                  </div>
+
+                  {receipts.length > 0 && (
+                    <ul className="ml-4 mt-1 flex flex-col gap-2 text-xs text-muted-foreground">
+                      {receipts.map((r) => {
+                        const alreadyReturned = returnedQty(r.id);
+                        const returnableQty = Number(r.quantityRejected) - alreadyReturned;
+                        return (
+                          <li key={r.id}>
+                            <div>
+                              received {r.quantityDelivered}, accepted {r.quantityAccepted}, rejected {r.quantityRejected} ({r.condition})
+                              {r.rejectionReason && ` — ${r.rejectionReason}`}
+                            </div>
+
+                            {returnsFor(r.id).map((ret) => {
+                              const step = nextReturnStep(ret.status);
+                              return (
+                                <div key={ret.id} className="mt-1 flex flex-wrap items-center gap-2">
+                                  <span>
+                                    return of {ret.quantity}: <strong>{ret.status}</strong>
+                                    {ret.returnShipmentRef && ` · shipment ${ret.returnShipmentRef}`}
+                                    {ret.creditNoteRef && ` · credit note ${ret.creditNoteRef}`}
+                                  </span>
+                                  {step && (
+                                    <form action={advanceReturn} className="flex items-center gap-1">
+                                      <input type="hidden" name="poId" value={po.id} />
+                                      <input type="hidden" name="returnId" value={ret.id} />
+                                      <input type="hidden" name="nextStatus" value={step} />
+                                      {(step === "shipped" || step === "credited") && (
+                                        <input
+                                          name="reference"
+                                          placeholder={step === "shipped" ? "shipment ref" : "credit note ref"}
+                                          required
+                                          className="h-7 w-32 rounded-md border px-1.5 text-xs"
+                                        />
+                                      )}
+                                      <button type="submit" className={cn(buttonVariants({ variant: "outline", size: "sm" }))}>
+                                        Mark {step}
+                                      </button>
+                                    </form>
+                                  )}
+                                </div>
+                              );
+                            })}
+
+                            {returnableQty > 1e-9 && (
+                              <form action={initiateReturn} className="mt-1 flex flex-wrap items-center gap-1">
+                                <input type="hidden" name="poId" value={po.id} />
+                                <input type="hidden" name="grnLineId" value={r.id} />
+                                <input
+                                  name="quantity"
+                                  type="number"
+                                  step="0.001"
+                                  defaultValue={returnableQty}
+                                  max={returnableQty}
+                                  className="h-7 w-16 rounded-md border px-1.5 text-xs"
+                                />
+                                <input name="reason" placeholder="return reason" required className="h-7 w-40 rounded-md border px-1.5 text-xs" />
+                                <button type="submit" className={cn(buttonVariants({ variant: "outline", size: "sm" }))}>
+                                  Initiate return
+                                </button>
+                              </form>
+                            )}
+                          </li>
+                        );
+                      })}
+                    </ul>
                   )}
                 </li>
               );
@@ -106,6 +197,10 @@ export default async function FulfillmentDetailPage({ params }: { params: Promis
                   <input name="deliveryNoteRef" className="h-8 rounded-md border px-2 text-sm" />
                 </div>
               </div>
+              <p className="text-xs text-muted-foreground">
+                Defaults below assume the full remaining balance arrives in this shipment — adjust for a partial or
+                short delivery, the line stays open for the rest either way.
+              </p>
 
               <table className="w-full text-sm">
                 <thead>
@@ -119,33 +214,36 @@ export default async function FulfillmentDetailPage({ params }: { params: Promis
                   </tr>
                 </thead>
                 <tbody>
-                  {openGoodsLines.map((l) => (
-                    <tr key={l.id} className="border-b">
-                      <td className="py-2">
-                        {itemName(l.itemId) ?? "Item"}
-                        <input type="hidden" name="poLineId" value={l.id} />
-                      </td>
-                      <td className="py-2">
-                        <input name="quantityDelivered" type="number" step="0.001" defaultValue={l.quantity} className="h-8 w-20 rounded-md border px-2 text-sm" />
-                      </td>
-                      <td className="py-2">
-                        <input name="quantityAccepted" type="number" step="0.001" defaultValue={l.quantity} className="h-8 w-20 rounded-md border px-2 text-sm" />
-                      </td>
-                      <td className="py-2">
-                        <input name="quantityRejected" type="number" step="0.001" defaultValue="0" className="h-8 w-20 rounded-md border px-2 text-sm" />
-                      </td>
-                      <td className="py-2">
-                        <select name="condition" defaultValue="good" className="h-8 rounded-md border px-2 text-sm">
-                          <option value="good">Good</option>
-                          <option value="damaged">Damaged</option>
-                          <option value="short">Short</option>
-                        </select>
-                      </td>
-                      <td className="py-2">
-                        <input name="rejectionReason" className="h-8 w-40 rounded-md border px-2 text-sm" />
-                      </td>
-                    </tr>
-                  ))}
+                  {openGoodsLines.map((l) => {
+                    const remaining = Math.max(Number(l.quantity) - totalAccepted(l.id), 0);
+                    return (
+                      <tr key={l.id} className="border-b">
+                        <td className="py-2">
+                          {itemName(l.itemId) ?? "Item"}
+                          <input type="hidden" name="poLineId" value={l.id} />
+                        </td>
+                        <td className="py-2">
+                          <input name="quantityDelivered" type="number" step="0.001" defaultValue={remaining} className="h-8 w-20 rounded-md border px-2 text-sm" />
+                        </td>
+                        <td className="py-2">
+                          <input name="quantityAccepted" type="number" step="0.001" defaultValue={remaining} className="h-8 w-20 rounded-md border px-2 text-sm" />
+                        </td>
+                        <td className="py-2">
+                          <input name="quantityRejected" type="number" step="0.001" defaultValue="0" className="h-8 w-20 rounded-md border px-2 text-sm" />
+                        </td>
+                        <td className="py-2">
+                          <select name="condition" defaultValue="good" className="h-8 rounded-md border px-2 text-sm">
+                            <option value="good">Good</option>
+                            <option value="damaged">Damaged</option>
+                            <option value="short">Short</option>
+                          </select>
+                        </td>
+                        <td className="py-2">
+                          <input name="rejectionReason" className="h-8 w-40 rounded-md border px-2 text-sm" />
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
 
