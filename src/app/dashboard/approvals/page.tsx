@@ -181,9 +181,11 @@ export default async function ApprovalsInboxPage() {
                 <form action={addAdHocApprover} className="mt-2 flex flex-wrap items-end gap-2">
                   <input type="hidden" name="requisitionId" value={req.requisitionId} />
                   <select name="assignedUserId" required className="h-8 rounded-md border px-2 text-sm">
-                    {users.map((u) => (
-                      <option key={u.id} value={u.id}>{u.fullName}</option>
-                    ))}
+                    {users
+                      .filter((u) => u.id !== requisition.requestorId)
+                      .map((u) => (
+                        <option key={u.id} value={u.id}>{u.fullName}</option>
+                      ))}
                   </select>
                   <input
                     name="reason"
