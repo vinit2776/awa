@@ -5,7 +5,7 @@ import { and, eq } from "drizzle-orm";
 import { getCurrentUserAndTenant } from "@/db/session";
 import { withTenant } from "@/db/withTenant";
 import { logAction } from "@/db/audit";
-import { isCurrentGroup, checkFullyApproved, rejectRequisition } from "@/db/approvals";
+import { isCurrentGroup, checkFullyApproved, rejectRequisition, addAdHocApprover as addAdHocApproverToRequisition } from "@/db/approvals";
 import { requisitionApprovalRequirements, approvalDecisionLog } from "@/db/schema";
 
 export async function approveRequirement(formData: FormData) {
@@ -82,54 +82,7 @@ export async function addAdHocApprover(formData: FormData) {
   if (!requisitionId || !assignedUserId || !reason) return;
 
   const { user, tenant } = await getCurrentUserAndTenant();
-
-  await withTenant(tenant.id, async (tx) => {
-    // Guardrail: only someone who currently has an actionable pending row
-    // on this requisition can pull in another approver.
-    const [actingRequirement] = await tx
-      .select()
-      .from(requisitionApprovalRequirements)
-      .where(
-        and(
-          eq(requisitionApprovalRequirements.requisitionId, requisitionId),
-          eq(requisitionApprovalRequirements.assignedUserId, user.id),
-          eq(requisitionApprovalRequirements.status, "pending"),
-        ),
-      );
-    if (!actingRequirement) return;
-    if (!(await isCurrentGroup(tx, requisitionId, actingRequirement.groupNo))) return;
-
-    const [created] = await tx
-      .insert(requisitionApprovalRequirements)
-      .values({
-        tenantId: tenant.id,
-        requisitionId,
-        source: "ad_hoc",
-        assignedUserId,
-        groupNo: actingRequirement.groupNo,
-        groupSequence: actingRequirement.groupSequence,
-        addedByUserId: user.id,
-        reason,
-        status: "pending",
-      })
-      .returning();
-
-    await tx.insert(approvalDecisionLog).values({
-      tenantId: tenant.id,
-      requisitionApprovalRequirementId: created.id,
-      actorUserId: user.id,
-      action: "approver_added",
-      comment: reason,
-    });
-    await logAction(tx, {
-      tenantId: tenant.id,
-      actorUserId: user.id,
-      action: "requisition_approval.ad_hoc_added",
-      entityType: "requisition_approval_requirement",
-      entityId: created.id,
-      metadata: { requisitionId, assignedUserId, reason },
-    });
-  });
+  await withTenant(tenant.id, (tx) => addAdHocApproverToRequisition(tx, tenant.id, user.id, requisitionId, assignedUserId, reason));
 
   revalidatePath("/dashboard/approvals");
 }

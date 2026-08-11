@@ -1,4 +1,4 @@
-import { and, eq, inArray, isNull, or, sql } from "drizzle-orm";
+import { and, eq, inArray, isNull, ne, or, sql } from "drizzle-orm";
 import type { db } from "./client";
 import { logAction } from "./audit";
 import { notifyUser } from "./notifications";
@@ -33,6 +33,19 @@ import {
  * partial-quorum-among-a-larger-pool model isn't reconstructable later;
  * assigning exactly N named approvers up front sidesteps that instead of
  * getting it wrong silently.
+ *
+ * Segregation of duties (§02): the requestor is never eligible to
+ * approve their own requisition, even if they hold a role that would
+ * otherwise qualify — found live, not in review: nothing stopped a
+ * requestor who also held an approver role for their own request's
+ * scope from approving themselves, unlike goods receipt's DB-trigger-
+ * enforced "receiver can't be requestor". Excluding them can genuinely
+ * drop a requirement to zero eligible people (a one-person tenant, or
+ * whoever holds that role scoped to this department/cost-center is
+ * exactly the requestor) — that's not a bug to special-case, it falls
+ * straight into the same "zero eligible approvers" auto-approve path
+ * below that already exists for the identical situation with no
+ * self-approval involved.
  *
  * No matching rule, or rules that resolve to zero eligible approvers,
  * auto-approves the requisition rather than leaving it stuck in
@@ -99,6 +112,7 @@ export async function resolveApprovals(tx: typeof db, tenantId: string, requisit
         .where(
           and(
             eq(userRoles.roleId, req.approverRoleId),
+            ne(userRoles.userId, requisition.requestorId),
             or(
               eq(userRoles.scopeType, "global"),
               and(eq(userRoles.scopeType, "department"), eq(userRoles.scopeId, requisition.departmentId ?? "")),
@@ -319,6 +333,76 @@ export async function rejectRequisition(
     closure === "closed" ? "Your requisition was rejected and closed" : "Your requisition needs revisions",
     `Reason: ${comment}`,
   );
+
+  return {};
+}
+
+/**
+ * Lets whoever currently has an actionable pending row pull in another
+ * approver mid-flight (§04). Same segregation-of-duties rule
+ * resolveApprovals enforces at submit time above — this is the other
+ * door into requisition_approval_requirements, and it had no equivalent
+ * check, so a requestor could still end up approving their own
+ * requisition through it even with that fix in place.
+ */
+export async function addAdHocApprover(
+  tx: typeof db,
+  tenantId: string,
+  actorUserId: string,
+  requisitionId: string,
+  assignedUserId: string,
+  reason: string,
+): Promise<{ error?: string }> {
+  const [actingRequirement] = await tx
+    .select()
+    .from(requisitionApprovalRequirements)
+    .where(
+      and(
+        eq(requisitionApprovalRequirements.requisitionId, requisitionId),
+        eq(requisitionApprovalRequirements.assignedUserId, actorUserId),
+        eq(requisitionApprovalRequirements.status, "pending"),
+      ),
+    );
+  if (!actingRequirement) return { error: "You don't have an actionable decision on this requisition." };
+  if (!(await isCurrentGroup(tx, requisitionId, actingRequirement.groupNo))) {
+    return { error: "It isn't your turn to decide on this requisition yet." };
+  }
+
+  const [requisition] = await tx.select().from(purchaseRequisitions).where(eq(purchaseRequisitions.id, requisitionId));
+  if (requisition?.requestorId === assignedUserId) {
+    return { error: "The requestor can't be added as an approver on their own requisition." };
+  }
+
+  const [created] = await tx
+    .insert(requisitionApprovalRequirements)
+    .values({
+      tenantId,
+      requisitionId,
+      source: "ad_hoc",
+      assignedUserId,
+      groupNo: actingRequirement.groupNo,
+      groupSequence: actingRequirement.groupSequence,
+      addedByUserId: actorUserId,
+      reason,
+      status: "pending",
+    })
+    .returning();
+
+  await tx.insert(approvalDecisionLog).values({
+    tenantId,
+    requisitionApprovalRequirementId: created.id,
+    actorUserId,
+    action: "approver_added",
+    comment: reason,
+  });
+  await logAction(tx, {
+    tenantId,
+    actorUserId,
+    action: "requisition_approval.ad_hoc_added",
+    entityType: "requisition_approval_requirement",
+    entityId: created.id,
+    metadata: { requisitionId, assignedUserId, reason },
+  });
 
   return {};
 }
