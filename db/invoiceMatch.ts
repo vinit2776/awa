@@ -15,8 +15,9 @@ const EPSILON = 0.005;
 /**
  * Exact 3-way match (phase 1 — no fuzzy tolerance yet, per the roadmap):
  * for each invoice line, compares what was ordered (the PO line) against
- * what was actually received/accepted (goods_receipt_line rows or a
- * service_acceptance_line) and what's being billed (the invoice line).
+ * what was actually received/accepted (goods_receipt_line or
+ * service_acceptance_lines rows) and what's being billed (the invoice
+ * line).
  *
  * Goods lines now sum quantity_accepted across every goods_receipt_line
  * recorded for the PO line (S17: partial/staged delivery over multiple
@@ -31,9 +32,15 @@ const EPSILON = 0.005;
  * matched_quantity/matched_value (those are the sums).
  *
  * Service lines have no quantity concept in service_acceptance_lines,
- * so only value is checked, and still read a single row — milestone-
- * based service acceptance (multiple acceptance events per line) is
- * explicitly deferred, so this hasn't hit the same bug yet.
+ * so only value is checked. They now sum acceptedValue across every
+ * 'accepted' or 'partial' service_acceptance_lines row for the PO line
+ * too (S18: milestone-based acceptance, db/fulfillment.ts — a milestone
+ * PO line collects one row per milestone across separate acceptance
+ * events, the same multi-row-per-line shape S17 already fixed on the
+ * goods side, for the identical reason). 'rejected' rows are excluded
+ * from the sum on purpose — their acceptedValue is expected to be 0 by
+ * convention, but nothing enforces that at the DB layer, so this
+ * doesn't lean on the convention holding.
  *
  * No fulfillment record at all (invoiced before receipt) is always an
  * exception. matched_fulfillment_id is NOT NULL with no FK (it's
@@ -88,11 +95,18 @@ export async function matchInvoice(tx: typeof db, tenantId: string, invoiceId: s
         status,
       });
     } else {
-      const [serviceLine] = await tx.select().from(serviceAcceptanceLines).where(eq(serviceAcceptanceLines.poLineId, poLine.id));
-      const expectedValue = serviceLine ? Number(serviceLine.acceptedValue) : null;
+      const serviceLines = await tx.select().from(serviceAcceptanceLines).where(eq(serviceAcceptanceLines.poLineId, poLine.id));
+      const billable = serviceLines.filter((s) => s.status !== "rejected");
+      const hasAcceptance = billable.length > 0;
+      const totalAcceptedValue = billable.reduce((sum, s) => sum + Number(s.acceptedValue), 0);
+      const expectedValue = hasAcceptance ? totalAcceptedValue : null;
       const valueMatches = expectedValue !== null && Math.abs(Number(line.lineTotal) - expectedValue) < EPSILON;
-      const status = serviceLine && valueMatches ? "matched" : "exception";
+      const status = valueMatches ? "matched" : "exception";
       const variance = expectedValue !== null ? Number(line.lineTotal) - expectedValue : Number(line.lineTotal);
+      const latestServiceLine = billable.reduce<typeof billable[number] | null>(
+        (latest, s) => (!latest || s.acceptedAt > latest.acceptedAt ? s : latest),
+        null,
+      );
 
       if (status === "exception") anyException = true;
 
@@ -101,7 +115,7 @@ export async function matchInvoice(tx: typeof db, tenantId: string, invoiceId: s
         invoiceLineId: line.id,
         poLineId: poLine.id,
         matchedFulfillmentType: "service_acceptance_line",
-        matchedFulfillmentId: serviceLine?.id ?? poLine.id,
+        matchedFulfillmentId: latestServiceLine?.id ?? poLine.id,
         matchedQuantity: null,
         matchedValue: expectedValue?.toFixed(2) ?? null,
         variance: variance.toFixed(2),
