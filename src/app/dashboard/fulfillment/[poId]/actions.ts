@@ -6,6 +6,7 @@ import { getCurrentUserAndTenant } from "@/db/session";
 import { withTenant } from "@/db/withTenant";
 import { recordGoodsReceipt, recordServiceAcceptance, type GoodsLineInput, type ServiceLineInput } from "@/db/fulfillment";
 import { advanceVendorReturn, initiateVendorReturn, type VendorReturnStatus } from "@/db/vendorReturns";
+import { createMilestone } from "@/db/serviceMilestones";
 
 export async function submitGoodsReceipt(formData: FormData) {
   const poId = String(formData.get("poId") ?? "");
@@ -59,6 +60,57 @@ export async function submitServiceAcceptance(formData: FormData) {
 
   revalidatePath(`/dashboard/fulfillment/${poId}`);
   revalidatePath("/dashboard/fulfillment");
+}
+
+export async function submitMilestoneAcceptance(formData: FormData) {
+  const poId = String(formData.get("poId") ?? "");
+  if (!poId) return;
+
+  const poLineIds = formData.getAll("poLineId").map(String);
+  const milestoneIds = formData.getAll("milestoneId").map(String);
+  const acceptedValues = formData.getAll("acceptedValue").map(String);
+  const statuses = formData.getAll("status").map(String) as ServiceLineInput["status"][];
+  const rejectionReasons = formData.getAll("rejectionReason").map(String);
+
+  const lines: ServiceLineInput[] = poLineIds.map((poLineId, i) => ({
+    poLineId,
+    milestoneId: milestoneIds[i] || null,
+    acceptedValue: acceptedValues[i] ?? "0",
+    status: statuses[i] ?? "accepted",
+    rejectionReason: rejectionReasons[i]?.trim() || null,
+  }));
+
+  const { user, tenant } = await getCurrentUserAndTenant();
+  await withTenant(tenant.id, (tx) => recordServiceAcceptance(tx, tenant.id, user.id, poId, lines));
+
+  revalidatePath(`/dashboard/fulfillment/${poId}`);
+  revalidatePath("/dashboard/fulfillment");
+}
+
+export async function defineMilestone(formData: FormData) {
+  const poId = String(formData.get("poId") ?? "");
+  const milestoneNo = Number(formData.get("milestoneNo") ?? "");
+  const description = String(formData.get("description") ?? "");
+  const valueType = String(formData.get("valueType") ?? "percent");
+  const value = String(formData.get("value") ?? "");
+  const dueDate = String(formData.get("dueDate") ?? "").trim() || null;
+  if (!poId) return;
+
+  const { user, tenant } = await getCurrentUserAndTenant();
+  const result = await withTenant(tenant.id, (tx) =>
+    createMilestone(tx, tenant.id, user.id, poId, {
+      milestoneNo,
+      description,
+      percentOfValue: valueType === "percent" ? value : null,
+      fixedValue: valueType === "fixed" ? value : null,
+      dueDate,
+    }),
+  );
+  if (result.error) {
+    redirect(`/dashboard/fulfillment/${poId}?error=${encodeURIComponent(result.error)}`);
+  }
+
+  revalidatePath(`/dashboard/fulfillment/${poId}`);
 }
 
 export async function initiateReturn(formData: FormData) {

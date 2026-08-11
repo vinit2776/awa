@@ -11,12 +11,14 @@ import {
   catalogItems as catalogItemsTable,
   goodsReceiptLines as goodsReceiptLinesTable,
   serviceAcceptanceLines as serviceAcceptanceLinesTable,
+  serviceMilestones as serviceMilestonesTable,
   vendorReturns as vendorReturnsTable,
 } from "@/db/schema";
 import { VENDOR_RETURN_STATUSES } from "@/db/vendorReturns";
+import { resolveMilestoneValue } from "@/db/serviceMilestones";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { advanceReturn, initiateReturn, submitGoodsReceipt, submitServiceAcceptance } from "./actions";
+import { advanceReturn, defineMilestone, initiateReturn, submitGoodsReceipt, submitMilestoneAcceptance, submitServiceAcceptance } from "./actions";
 
 export default async function FulfillmentDetailPage({
   params,
@@ -29,9 +31,9 @@ export default async function FulfillmentDetailPage({
   const { error } = await searchParams;
   const { tenant } = await getCurrentUserAndTenant();
 
-  const [po, lines, catalogItems, users, grnLines, serviceLines, returns] = await withTenant(tenant.id, async (tx) => {
+  const [po, lines, catalogItems, users, grnLines, serviceLines, returns, milestones] = await withTenant(tenant.id, async (tx) => {
     const [po] = await tx.select().from(purchaseOrdersTable).where(eq(purchaseOrdersTable.id, poId));
-    if (!po) return [null, [], [], [], [], [], []] as const;
+    if (!po) return [null, [], [], [], [], [], [], []] as const;
 
     const lines = await tx.select().from(purchaseOrderLinesTable).where(eq(purchaseOrderLinesTable.poId, poId));
     const catalogItems = await tx.select().from(catalogItemsTable);
@@ -48,8 +50,11 @@ export default async function FulfillmentDetailPage({
     const returns = grnLineIds.length
       ? (await tx.select().from(vendorReturnsTable)).filter((r) => grnLineIds.includes(r.grnLineId))
       : [];
+    const milestones = serviceLineIds.length
+      ? await tx.select().from(serviceMilestonesTable).where(eq(serviceMilestonesTable.poId, poId))
+      : [];
 
-    return [po, lines, catalogItems, users, grnLines, serviceLines, returns] as const;
+    return [po, lines, catalogItems, users, grnLines, serviceLines, returns, milestones] as const;
   });
 
   if (!po) notFound();
@@ -75,6 +80,17 @@ export default async function FulfillmentDetailPage({
   const nextReturnStep = (status: string) => {
     const idx = VENDOR_RETURN_STATUSES.indexOf(status as (typeof VENDOR_RETURN_STATUSES)[number]);
     return idx >= 0 && idx < VENDOR_RETURN_STATUSES.length - 1 ? VENDOR_RETURN_STATUSES[idx + 1] : null;
+  };
+  const milestonesForPo = [...milestones].sort((a, b) => a.milestoneNo - b.milestoneNo);
+  const acceptedMilestoneIdsFor = (lineId: string) =>
+    new Set(
+      serviceLines
+        .filter((s) => s.poLineId === lineId && s.status === "accepted" && s.milestoneId)
+        .map((s) => s.milestoneId!),
+    );
+  const openMilestonesFor = (lineId: string) => {
+    const accepted = acceptedMilestoneIdsFor(lineId);
+    return milestonesForPo.filter((m) => !accepted.has(m.id));
   };
 
   return (
@@ -258,56 +274,157 @@ export default async function FulfillmentDetailPage({
           <h2 className="text-sm font-medium text-muted-foreground">Services</h2>
           <ul className="flex flex-col gap-1 text-sm">
             {serviceLinesOnPo.map((l) => {
-              const acceptance = serviceLines.find((s) => s.poLineId === l.id);
+              const acceptance = serviceLines.filter((s) => s.poLineId === l.id).slice(-1)[0];
+              const acceptedCount = acceptedMilestoneIdsFor(l.id).size;
               return (
                 <li key={l.id}>
                   {l.serviceDescription ?? "Service"} — {l.lineTotal} {po.currency}
-                  {acceptance && <span className="text-muted-foreground"> · {acceptance.status}</span>}
+                  {milestonesForPo.length > 0 ? (
+                    <span className="text-muted-foreground"> · {acceptedCount}/{milestonesForPo.length} milestones accepted ({l.status})</span>
+                  ) : (
+                    acceptance && <span className="text-muted-foreground"> · {acceptance.status}</span>
+                  )}
                 </li>
               );
             })}
           </ul>
 
-          {openServiceLines.length > 0 && (
-            <form action={submitServiceAcceptance} className="flex flex-col gap-3 rounded-md border p-4">
-              <input type="hidden" name="poId" value={po.id} />
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b text-left text-xs text-muted-foreground">
-                    <th className="py-2 font-normal">Service</th>
-                    <th className="py-2 font-normal">Accepted value</th>
-                    <th className="py-2 font-normal">Status</th>
-                    <th className="py-2 font-normal">Rejection reason</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {openServiceLines.map((l) => (
-                    <tr key={l.id} className="border-b">
-                      <td className="py-2">
-                        {l.serviceDescription ?? "Service"}
-                        <input type="hidden" name="poLineId" value={l.id} />
-                      </td>
-                      <td className="py-2">
-                        <input name="acceptedValue" type="number" step="0.01" defaultValue={l.lineTotal} className="h-8 w-24 rounded-md border px-2 text-sm" />
-                      </td>
-                      <td className="py-2">
-                        <select name="status" defaultValue="accepted" className="h-8 rounded-md border px-2 text-sm">
-                          <option value="accepted">Accepted</option>
-                          <option value="rejected">Rejected</option>
-                          <option value="partial">Partial</option>
-                        </select>
-                      </td>
-                      <td className="py-2">
-                        <input name="rejectionReason" className="h-8 w-40 rounded-md border px-2 text-sm" />
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-
-              <button type="submit" className={cn(buttonVariants(), "w-fit")}>Record acceptance</button>
-            </form>
+          {milestonesForPo.length > 0 && (
+            <ul className="flex flex-col gap-1 rounded-md border p-3 text-xs text-muted-foreground">
+              {milestonesForPo.map((m) => (
+                <li key={m.id}>
+                  #{m.milestoneNo} {m.description} — {resolveMilestoneValue(m, po.totalAmount).toFixed(2)} {po.currency}
+                  {m.percentOfValue !== null && ` (${m.percentOfValue}% of PO)`}
+                  {m.dueDate && ` · due ${m.dueDate}`}
+                </li>
+              ))}
+            </ul>
           )}
+
+          {milestonesForPo.length > 0 ? (
+            openServiceLines.some((l) => openMilestonesFor(l.id).length > 0) && (
+              <form action={submitMilestoneAcceptance} className="flex flex-col gap-3 rounded-md border p-4">
+                <input type="hidden" name="poId" value={po.id} />
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b text-left text-xs text-muted-foreground">
+                      <th className="py-2 font-normal">Service</th>
+                      <th className="py-2 font-normal">Milestone</th>
+                      <th className="py-2 font-normal">Accepted value</th>
+                      <th className="py-2 font-normal">Status</th>
+                      <th className="py-2 font-normal">Rejection reason</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {openServiceLines.flatMap((l) =>
+                      openMilestonesFor(l.id).map((m) => (
+                        <tr key={`${l.id}-${m.id}`} className="border-b">
+                          <td className="py-2">
+                            {l.serviceDescription ?? "Service"}
+                            <input type="hidden" name="poLineId" value={l.id} />
+                          </td>
+                          <td className="py-2">
+                            #{m.milestoneNo} {m.description}
+                            <input type="hidden" name="milestoneId" value={m.id} />
+                          </td>
+                          <td className="py-2">
+                            <input
+                              name="acceptedValue"
+                              type="number"
+                              step="0.01"
+                              defaultValue={resolveMilestoneValue(m, po.totalAmount).toFixed(2)}
+                              className="h-8 w-24 rounded-md border px-2 text-sm"
+                            />
+                          </td>
+                          <td className="py-2">
+                            <select name="status" defaultValue="accepted" className="h-8 rounded-md border px-2 text-sm">
+                              <option value="accepted">Accepted</option>
+                              <option value="rejected">Rejected</option>
+                              <option value="partial">Partial</option>
+                            </select>
+                          </td>
+                          <td className="py-2">
+                            <input name="rejectionReason" className="h-8 w-40 rounded-md border px-2 text-sm" />
+                          </td>
+                        </tr>
+                      )),
+                    )}
+                  </tbody>
+                </table>
+
+                <button type="submit" className={cn(buttonVariants(), "w-fit")}>Record milestone acceptance</button>
+              </form>
+            )
+          ) : (
+            openServiceLines.length > 0 && (
+              <form action={submitServiceAcceptance} className="flex flex-col gap-3 rounded-md border p-4">
+                <input type="hidden" name="poId" value={po.id} />
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b text-left text-xs text-muted-foreground">
+                      <th className="py-2 font-normal">Service</th>
+                      <th className="py-2 font-normal">Accepted value</th>
+                      <th className="py-2 font-normal">Status</th>
+                      <th className="py-2 font-normal">Rejection reason</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {openServiceLines.map((l) => (
+                      <tr key={l.id} className="border-b">
+                        <td className="py-2">
+                          {l.serviceDescription ?? "Service"}
+                          <input type="hidden" name="poLineId" value={l.id} />
+                        </td>
+                        <td className="py-2">
+                          <input name="acceptedValue" type="number" step="0.01" defaultValue={l.lineTotal} className="h-8 w-24 rounded-md border px-2 text-sm" />
+                        </td>
+                        <td className="py-2">
+                          <select name="status" defaultValue="accepted" className="h-8 rounded-md border px-2 text-sm">
+                            <option value="accepted">Accepted</option>
+                            <option value="rejected">Rejected</option>
+                            <option value="partial">Partial</option>
+                          </select>
+                        </td>
+                        <td className="py-2">
+                          <input name="rejectionReason" className="h-8 w-40 rounded-md border px-2 text-sm" />
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+
+                <button type="submit" className={cn(buttonVariants(), "w-fit")}>Record acceptance</button>
+              </form>
+            )
+          )}
+
+          <form action={defineMilestone} className="flex flex-wrap items-end gap-2 rounded-md border border-dashed p-3">
+            <input type="hidden" name="poId" value={po.id} />
+            <div className="flex flex-col gap-1">
+              <label className="text-xs text-muted-foreground">No.</label>
+              <input name="milestoneNo" type="number" min="1" required className="h-8 w-16 rounded-md border px-2 text-sm" />
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-xs text-muted-foreground">Description</label>
+              <input name="description" required className="h-8 w-48 rounded-md border px-2 text-sm" placeholder="e.g. Design sign-off" />
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-xs text-muted-foreground">Value type</label>
+              <select name="valueType" defaultValue="percent" className="h-8 rounded-md border px-2 text-sm">
+                <option value="percent">% of PO</option>
+                <option value="fixed">Fixed amount</option>
+              </select>
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-xs text-muted-foreground">Value</label>
+              <input name="value" type="number" step="0.01" required className="h-8 w-24 rounded-md border px-2 text-sm" />
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-xs text-muted-foreground">Due date</label>
+              <input name="dueDate" type="date" className="h-8 rounded-md border px-2 text-sm" />
+            </div>
+            <button type="submit" className={cn(buttonVariants({ variant: "outline" }))}>Add milestone</button>
+          </form>
         </section>
       )}
     </div>

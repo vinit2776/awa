@@ -9,6 +9,7 @@ import {
   goodsReceiptLines,
   serviceAcceptances,
   serviceAcceptanceLines,
+  serviceMilestones,
 } from "./schema";
 
 export type GoodsLineInput = {
@@ -106,12 +107,17 @@ export type ServiceLineInput = {
   acceptedValue: string;
   status: "accepted" | "rejected" | "partial";
   rejectionReason: string | null;
+  // Set only for milestone-based acceptance (S18) — omitted/undefined
+  // means the original full_completion path, unchanged.
+  milestoneId?: string | null;
 };
 
 /**
- * "Full completion only" (S8) — acceptance_type is always
- * full_completion; milestone-based partial billing (service_milestones
- * exists in the schema) is explicitly deferred per the roadmap.
+ * Two acceptance modes, decided per line by whether milestoneId is set —
+ * a PO either bills on full_completion or against service_milestones
+ * rows, not a mix within one line, but a batch submitted from the
+ * fulfillment page can still cover lines of both kinds if a PO somehow
+ * had more than one service line in different modes.
  *
  * A rejected or partial line no longer gets marked 'fulfilled' (S17) —
  * that was a real bug: it meant rework never had anywhere to go, and
@@ -119,6 +125,15 @@ export type ServiceLineInput = {
  * PO line status untouched so it keeps showing as open for resubmission
  * once the vendor reworks it; 'partial' moves it to
  * 'partially_fulfilled', consistent with the goods side.
+ *
+ * Milestone-based (S18): service_milestones is scoped to the PO, not a
+ * specific line — for the common case of one service line per PO this
+ * is unambiguous. A line only reaches 'fulfilled' once every milestone
+ * defined for the PO has an 'accepted' service_acceptance_lines row
+ * recorded against *that line* — checked by summing across every past
+ * acceptance event for the line, the same "sum across events" shape
+ * S17 established for goods receipts, for the same reason: a milestone
+ * PO is accepted across more than one submission over time.
  */
 export async function recordServiceAcceptance(
   tx: typeof db,
@@ -131,9 +146,10 @@ export async function recordServiceAcceptance(
   if (!po || po.status === "cancelled") return { error: "This PO isn't open for acceptance." };
   if (lines.length === 0) return { error: "Nothing to accept." };
 
+  const acceptanceType = lines.some((l) => l.milestoneId) ? "milestone" : "full_completion";
   const [acceptance] = await tx
     .insert(serviceAcceptances)
-    .values({ tenantId, poId, acceptanceType: "full_completion", status: "completed" })
+    .values({ tenantId, poId, acceptanceType, status: "completed" })
     .returning();
 
   await tx.insert(serviceAcceptanceLines).values(
@@ -141,6 +157,7 @@ export async function recordServiceAcceptance(
       tenantId,
       serviceAcceptanceId: acceptance.id,
       poLineId: l.poLineId,
+      milestoneId: l.milestoneId ?? null,
       acceptedValue: l.acceptedValue,
       status: l.status,
       rejectionReason: l.rejectionReason,
@@ -149,7 +166,28 @@ export async function recordServiceAcceptance(
   );
 
   for (const l of lines) {
-    if (l.status === "accepted") {
+    if (l.milestoneId) {
+      if (l.status === "accepted") {
+        const poMilestones = await tx.select().from(serviceMilestones).where(eq(serviceMilestones.poId, poId));
+        const priorAccepted = await tx
+          .select({ milestoneId: serviceAcceptanceLines.milestoneId })
+          .from(serviceAcceptanceLines)
+          .innerJoin(serviceAcceptances, eq(serviceAcceptanceLines.serviceAcceptanceId, serviceAcceptances.id))
+          .where(
+            and(
+              eq(serviceAcceptances.poId, poId),
+              eq(serviceAcceptanceLines.poLineId, l.poLineId),
+              eq(serviceAcceptanceLines.status, "accepted"),
+            ),
+          );
+        const acceptedMilestoneIds = new Set(priorAccepted.map((p) => p.milestoneId).filter((id): id is string => id !== null));
+        const status = poMilestones.length > 0 && acceptedMilestoneIds.size >= poMilestones.length ? "fulfilled" : "partially_fulfilled";
+        await tx.update(purchaseOrderLines).set({ status }).where(eq(purchaseOrderLines.id, l.poLineId));
+      } else if (l.status === "partial") {
+        await tx.update(purchaseOrderLines).set({ status: "partially_fulfilled" }).where(eq(purchaseOrderLines.id, l.poLineId));
+      }
+      // rejected: leave untouched — that specific milestone can be resubmitted.
+    } else if (l.status === "accepted") {
       await tx.update(purchaseOrderLines).set({ status: "fulfilled" }).where(eq(purchaseOrderLines.id, l.poLineId));
     } else if (l.status === "partial") {
       await tx.update(purchaseOrderLines).set({ status: "partially_fulfilled" }).where(eq(purchaseOrderLines.id, l.poLineId));
