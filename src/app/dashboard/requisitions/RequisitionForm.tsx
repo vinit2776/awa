@@ -2,7 +2,13 @@
 
 import { useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { createRequisition, reviseAndResubmitRequisition, extractRequisitionFromDocument, type LineInput } from "./actions";
+import {
+  createRequisition,
+  reviseAndResubmitRequisition,
+  getRequisitionDocumentUploadUrl,
+  extractRequisitionFromDocument,
+  type LineInput,
+} from "./actions";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -72,9 +78,30 @@ export function RequisitionForm({
     if (!file) return;
     setExtractMessage(null);
     startExtracting(async () => {
-      const formData = new FormData();
-      formData.set("file", file);
-      const result = await extractRequisitionFromDocument(formData);
+      // Uploaded directly to R2 from the browser, not through a Server
+      // Action — Vercel Functions cap request bodies at 4.5MB, well
+      // under what a real scanned invoice can be.
+      const presigned = await getRequisitionDocumentUploadUrl({
+        fileName: file.name,
+        mimeType: file.type,
+        fileSize: file.size,
+      });
+      if (presigned.error || !presigned.uploadUrl || !presigned.key) {
+        setExtractMessage(presigned.error ?? "Upload failed.");
+        return;
+      }
+
+      const putResponse = await fetch(presigned.uploadUrl, {
+        method: "PUT",
+        headers: { "Content-Type": file.type },
+        body: file,
+      });
+      if (!putResponse.ok) {
+        setExtractMessage("Upload failed. Please try again.");
+        return;
+      }
+
+      const result = await extractRequisitionFromDocument({ key: presigned.key });
 
       if (result.sourceDocumentKey) setSourceDocumentKey(result.sourceDocumentKey);
       if (result.vendorName) setExtractedVendorName(result.vendorName);
