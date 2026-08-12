@@ -51,6 +51,20 @@ describe("resolveSignInTargets", () => {
     expect(result.tenants[0].organizationId).toBe(tenantA.workosOrganizationId);
   });
 
+  it("reports workosUserId as null for a never-signed-in invitee, and populated once linked", async () => {
+    await withTenant(tenantA.id, (tx) =>
+      tx.insert(users).values({ tenantId: tenantA.id, email: "pending@example.com", fullName: "Pending Invite" }),
+    );
+    const beforeLink = await resolveSignInTargets("pending@example.com");
+    expect(beforeLink.tenants[0].workosUserId).toBeNull();
+
+    await withTenant(tenantA.id, (tx) =>
+      tx.update(users).set({ workosUserId: "user_pending_123" }).where(eq(users.email, "pending@example.com")),
+    );
+    const afterLink = await resolveSignInTargets("pending@example.com");
+    expect(afterLink.tenants[0].workosUserId).toBe("user_pending_123");
+  });
+
   it("resolves every tenant when the same email is pre-provisioned under more than one", async () => {
     await withTenant(tenantA.id, (tx) =>
       tx.insert(users).values({ tenantId: tenantA.id, email: "shared@example.com", fullName: "Shared" }),

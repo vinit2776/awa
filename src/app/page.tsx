@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { getSignInUrl } from "@workos-inc/authkit-nextjs";
 import { resolveSignInTargets } from "@/db/signInLookup";
+import { getSignUrlForTarget } from "@/lib/authRedirect";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -31,7 +32,7 @@ async function handleSignIn(formData: FormData) {
   }
 
   if (tenants.length === 1) {
-    redirect(await getSignInUrl({ organizationId: tenants[0].organizationId, loginHint: email }));
+    redirect(await getSignUrlForTarget(tenants[0], email));
   }
 
   redirect(`/choose-tenant?email=${encodeURIComponent(email)}`);

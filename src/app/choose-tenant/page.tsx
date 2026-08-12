@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
-import { getSignInUrl } from "@workos-inc/authkit-nextjs";
 import { resolveSignInTargets } from "@/db/signInLookup";
+import { getSignUrlForTarget } from "@/lib/authRedirect";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -18,7 +18,7 @@ async function chooseTenant(formData: FormData) {
   const match = tenants.find((t) => t.organizationId === organizationId);
   if (!match) redirect("/");
 
-  redirect(await getSignInUrl({ organizationId: match.organizationId, loginHint: email }));
+  redirect(await getSignUrlForTarget(match, email));
 }
 
 /**
@@ -34,7 +34,7 @@ export default async function ChooseTenantPage({ searchParams }: { searchParams:
   const { tenants } = await resolveSignInTargets(email);
   if (tenants.length === 0) redirect("/");
   if (tenants.length === 1) {
-    redirect(await getSignInUrl({ organizationId: tenants[0].organizationId, loginHint: email }));
+    redirect(await getSignUrlForTarget(tenants[0], email));
   }
 
   return (
