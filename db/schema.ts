@@ -260,6 +260,10 @@ export const purchaseRequisitions = pgTable("purchase_requisitions", {
   totalEstimatedValue: numeric("total_estimated_value", { precision: 14, scale: 2 }).notNull().default("0"),
   currency: text("currency").notNull().default("INR"),
   justification: text("justification"),
+  // R2 object key (private bucket) for an uploaded quotation/proforma/GST
+  // invoice this requisition's lines were extracted from, if any — see
+  // db/documentStorage.ts and db/documentExtraction.ts.
+  sourceDocumentKey: text("source_document_key"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   submittedAt: timestamp("submitted_at", { withTimezone: true }),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),

@@ -1,8 +1,8 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { createRequisition, reviseAndResubmitRequisition, type LineInput } from "./actions";
+import { createRequisition, reviseAndResubmitRequisition, extractRequisitionFromDocument, type LineInput } from "./actions";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -61,6 +61,31 @@ export function RequisitionForm({
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [sourceDocumentKey, setSourceDocumentKey] = useState<string | null>(null);
+  const [extractedVendorName, setExtractedVendorName] = useState<string | null>(null);
+  const [extractMessage, setExtractMessage] = useState<string | null>(null);
+  const [isExtracting, startExtracting] = useTransition();
+
+  const extractFromDocument = () => {
+    const file = fileInputRef.current?.files?.[0];
+    if (!file) return;
+    setExtractMessage(null);
+    startExtracting(async () => {
+      const formData = new FormData();
+      formData.set("file", file);
+      const result = await extractRequisitionFromDocument(formData);
+
+      if (result.sourceDocumentKey) setSourceDocumentKey(result.sourceDocumentKey);
+      if (result.vendorName) setExtractedVendorName(result.vendorName);
+      if (result.error) setExtractMessage(result.error);
+
+      if (result.lines && result.lines.length > 0) {
+        setLines(result.lines.map((l) => ({ ...l, key: crypto.randomUUID() })));
+      }
+    });
+  };
+
   const updateLine = (key: string, patch: Partial<Line>) => {
     setLines((prev) => prev.map((l) => (l.key === key ? { ...l, ...patch } : l)));
   };
@@ -102,6 +127,7 @@ export function RequisitionForm({
             justification,
             lines: cleanLines,
             submit: shouldSubmit,
+            sourceDocumentKey,
           });
 
       if (result.error) {
@@ -171,6 +197,32 @@ export function RequisitionForm({
           className="w-full max-w-2xl rounded-md border px-2 py-1 text-sm"
         />
       </div>
+
+      {!revision && (
+        <div className="flex flex-col gap-2 rounded-md border p-3">
+          <label className="text-xs text-muted-foreground">
+            Upload a quotation, proforma, or GST invoice to fill in the line items below — or skip this and enter them manually.
+          </label>
+          <div className="flex flex-wrap items-center gap-2">
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="application/pdf,image/jpeg,image/png,image/webp"
+              className="text-sm"
+            />
+            <button
+              type="button"
+              disabled={isExtracting}
+              onClick={extractFromDocument}
+              className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
+            >
+              {isExtracting ? "Extracting…" : "Extract line items"}
+            </button>
+            {sourceDocumentKey && <span className="text-xs text-muted-foreground">Document attached{extractedVendorName ? ` — ${extractedVendorName}` : ""}</span>}
+          </div>
+          {extractMessage && <p className="text-xs text-muted-foreground">{extractMessage}</p>}
+        </div>
+      )}
 
       <div className="flex flex-col gap-3">
         <h2 className="text-sm font-medium text-muted-foreground">Line items</h2>
