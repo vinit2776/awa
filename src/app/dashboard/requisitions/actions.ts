@@ -7,7 +7,7 @@ import { withTenant } from "@/db/withTenant";
 import { logAction } from "@/db/audit";
 import { resolveApprovals } from "@/db/approvals";
 import { notifyUser } from "@/db/notifications";
-import { uploadRequisitionDocument } from "@/db/documentStorage";
+import { getRequisitionUploadUrl, getRequisitionDocumentBytes } from "@/db/documentStorage";
 import { extractLineItemsFromDocument } from "@/db/documentExtraction";
 import { purchaseRequisitions, purchaseRequisitionLines } from "@/db/schema";
 
@@ -225,27 +225,45 @@ export type ExtractedRequisitionDraft = {
 };
 
 /**
- * Uploads a quotation/proforma/GST invoice to R2 and attempts to
- * extract line items from it. Always returns the uploaded key (so it
- * can still be attached to the requisition even when extraction fails
- * or isn't configured) plus whatever lines were extracted — empty when
+ * Step 1 of the upload flow: returns a short-lived presigned R2 URL so
+ * the browser can PUT the file directly to R2, bypassing this Server
+ * Action entirely for the actual bytes. Vercel Functions cap request
+ * bodies at 4.5MB regardless of Next's own serverActions.bodySizeLimit
+ * — routing a real scanned document through a Server Action hits that
+ * ceiling with a 413 that surfaces to the user as a garbled, page-looks-
+ * broken error rather than a clear message. Only this small JSON
+ * request/response crosses the action boundary.
+ */
+export async function getRequisitionDocumentUploadUrl(input: {
+  fileName: string;
+  mimeType: string;
+  fileSize: number;
+}): Promise<{ key?: string; uploadUrl?: string; error?: string }> {
+  const { tenant } = await getCurrentUserAndTenant();
+  return getRequisitionUploadUrl(tenant.id, input.fileName, input.mimeType, input.fileSize);
+}
+
+/**
+ * Step 2: after the browser has PUT the file directly to R2 (see
+ * getRequisitionDocumentUploadUrl above), reads it back server-side and
+ * attempts to extract line items. Always returns the key (so it can
+ * still be attached to the requisition even when extraction fails or
+ * isn't configured) plus whatever lines were extracted — empty when
  * extraction isn't available, with `error` explaining why. The caller
  * shows the extracted lines pre-filled into the same editable table
  * manual entry uses; nothing here submits a requisition.
  */
-export async function extractRequisitionFromDocument(formData: FormData): Promise<{ error?: string } & Partial<ExtractedRequisitionDraft>> {
+export async function extractRequisitionFromDocument(input: { key: string }): Promise<{ error?: string } & Partial<ExtractedRequisitionDraft>> {
   const { tenant } = await getCurrentUserAndTenant();
-  const file = formData.get("file");
-  if (!(file instanceof File)) return { error: "No file was selected." };
+  if (!input.key.startsWith(`requisitions/${tenant.id}/`)) return { error: "Invalid document reference." };
 
-  const upload = await uploadRequisitionDocument(tenant.id, file);
-  if (upload.error || !upload.key) return { error: upload.error ?? "Upload failed." };
+  const { bytes, mimeType, error } = await getRequisitionDocumentBytes(input.key);
+  if (error || !bytes) return { error };
 
-  const bytes = new Uint8Array(await file.arrayBuffer());
-  const extraction = await extractLineItemsFromDocument({ bytes, mimeType: file.type });
+  const extraction = await extractLineItemsFromDocument({ bytes, mimeType: mimeType ?? "application/octet-stream" });
 
   return {
-    sourceDocumentKey: upload.key,
+    sourceDocumentKey: input.key,
     vendorName: extraction.vendorName,
     error: extraction.error,
     lines: extraction.lines.map((l) => ({

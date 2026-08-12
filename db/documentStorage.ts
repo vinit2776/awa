@@ -25,38 +25,59 @@ function bucketName() {
   return bucket;
 }
 
-const MAX_UPLOAD_BYTES = 10 * 1024 * 1024; // matches next.config.ts's serverActions.bodySizeLimit
+const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
 const ALLOWED_MIME_TYPES = new Set(["application/pdf", "image/jpeg", "image/png", "image/webp"]);
 
 /**
- * Uploads a requisition's source document (quotation/proforma/GST
- * invoice) and returns the R2 object key to store on the requisition
- * row. Tenant-scoped path so one tenant's documents are never listable
- * or guessable from another's key.
+ * Returns a short-lived presigned PUT URL so the browser uploads a
+ * requisition's source document (quotation/proforma/GST invoice)
+ * directly to R2, not through a Next.js Server Action. Vercel Functions
+ * cap request bodies at 4.5MB regardless of Next's own
+ * serverActions.bodySizeLimit — routing real scanned documents through
+ * one hit that ceiling with a 413 that Next.js then reports as a
+ * garbled "unexpected response" client error (found live: looked like
+ * the page itself had 404'd). Only the small JSON request/response
+ * (filename, MIME type, the resulting key) touches a Server Action;
+ * the file bytes never do.
+ *
+ * fileSize is checked here as a courtesy — it can't be enforced against
+ * the presigned PUT itself (a plain presigned URL has no size
+ * condition, only a presigned POST policy does, which isn't worth the
+ * extra complexity for an internal, authenticated, tenant-scoped
+ * upload). A user could still PUT more bytes than they declared; that's
+ * an acceptable trust boundary for this app's internal-tool threat
+ * model, same as line-item quantities and prices aren't independently
+ * re-validated server-side elsewhere in this codebase.
  */
-export async function uploadRequisitionDocument(
+export async function getRequisitionUploadUrl(
   tenantId: string,
-  file: File,
-): Promise<{ key?: string; error?: string }> {
-  if (file.size === 0) return { error: "The file is empty." };
-  if (file.size > MAX_UPLOAD_BYTES) return { error: "The file is too large (max 10MB)." };
-  if (!ALLOWED_MIME_TYPES.has(file.type)) {
+  fileName: string,
+  mimeType: string,
+  fileSize: number,
+): Promise<{ key?: string; uploadUrl?: string; error?: string }> {
+  if (fileSize <= 0) return { error: "The file is empty." };
+  if (fileSize > MAX_UPLOAD_BYTES) return { error: "The file is too large (max 10MB)." };
+  if (!ALLOWED_MIME_TYPES.has(mimeType)) {
     return { error: "Only PDF, JPEG, PNG, or WebP files are supported." };
   }
 
-  const key = `requisitions/${tenantId}/${crypto.randomUUID()}-${file.name}`;
-  const bytes = new Uint8Array(await file.arrayBuffer());
+  const key = `requisitions/${tenantId}/${crypto.randomUUID()}-${fileName}`;
+  const command = new PutObjectCommand({ Bucket: bucketName(), Key: key, ContentType: mimeType });
+  const uploadUrl = await getSignedUrl(r2Client(), command, { expiresIn: 300 });
 
-  await r2Client().send(
-    new PutObjectCommand({
-      Bucket: bucketName(),
-      Key: key,
-      Body: bytes,
-      ContentType: file.type,
-    }),
-  );
+  return { key, uploadUrl };
+}
 
-  return { key };
+/** Reads back an uploaded document's bytes, e.g. to hand to an extraction provider server-side. */
+export async function getRequisitionDocumentBytes(key: string): Promise<{ bytes?: Uint8Array; mimeType?: string; error?: string }> {
+  try {
+    const result = await r2Client().send(new GetObjectCommand({ Bucket: bucketName(), Key: key }));
+    if (!result.Body) return { error: "The document could not be read." };
+    const bytes = await result.Body.transformToByteArray();
+    return { bytes, mimeType: result.ContentType };
+  } catch {
+    return { error: "The document could not be found." };
+  }
 }
 
 /** Short-lived signed URL so an uploaded document can be viewed later without making the bucket public. */

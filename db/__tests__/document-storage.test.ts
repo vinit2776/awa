@@ -1,6 +1,6 @@
 import { DeleteObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { afterAll, describe, expect, it } from "vitest";
-import { uploadRequisitionDocument, getRequisitionDocumentUrl } from "../documentStorage";
+import { getRequisitionUploadUrl, getRequisitionDocumentBytes, getRequisitionDocumentUrl } from "../documentStorage";
 
 const TEST_TENANT_ID = "doc-storage-test-tenant";
 const uploadedKeys: string[] = [];
@@ -17,52 +17,74 @@ afterAll(async () => {
   }
 });
 
-function makeFile(name: string, type: string, sizeBytes: number): File {
-  return new File([new Uint8Array(sizeBytes)], name, { type });
+async function uploadViaPresignedUrl(name: string, type: string, sizeBytes: number) {
+  const bytes = new Uint8Array(sizeBytes);
+  const presigned = await getRequisitionUploadUrl(TEST_TENANT_ID, name, type, sizeBytes);
+  if (presigned.error || !presigned.uploadUrl || !presigned.key) return presigned;
+
+  const putResponse = await fetch(presigned.uploadUrl, { method: "PUT", headers: { "Content-Type": type }, body: bytes });
+  if (!putResponse.ok) throw new Error(`PUT failed: ${putResponse.status}`);
+  uploadedKeys.push(presigned.key);
+  return presigned;
 }
 
-describe("uploadRequisitionDocument", () => {
-  it("uploads a real file to R2 and returns a tenant-scoped key", async () => {
-    const file = makeFile("quote.pdf", "application/pdf", 1024);
-    const result = await uploadRequisitionDocument(TEST_TENANT_ID, file);
+describe("getRequisitionUploadUrl", () => {
+  it("returns a tenant-scoped key and a presigned URL that actually accepts an upload", async () => {
+    const presigned = await uploadViaPresignedUrl("quote.pdf", "application/pdf", 1024);
 
-    expect(result.error).toBeUndefined();
-    expect(result.key).toBeDefined();
-    expect(result.key).toContain(TEST_TENANT_ID);
-    expect(result.key).toContain("quote.pdf");
-    uploadedKeys.push(result.key!);
+    expect(presigned.error).toBeUndefined();
+    expect(presigned.key).toBeDefined();
+    expect(presigned.key).toContain(TEST_TENANT_ID);
+    expect(presigned.key).toContain("quote.pdf");
   });
 
-  it("round-trips through a signed URL that actually fetches the uploaded bytes", async () => {
-    const file = makeFile("proforma.pdf", "application/pdf", 512);
-    const { key } = await uploadRequisitionDocument(TEST_TENANT_ID, file);
-    uploadedKeys.push(key!);
+  it("round-trips: uploaded bytes are readable back via getRequisitionDocumentBytes and a signed URL", async () => {
+    const presigned = await uploadViaPresignedUrl("proforma.pdf", "application/pdf", 512);
 
-    const url = await getRequisitionDocumentUrl(key!);
+    const read = await getRequisitionDocumentBytes(presigned.key!);
+    expect(read.error).toBeUndefined();
+    expect(read.bytes?.length).toBe(512);
+    expect(read.mimeType).toBe("application/pdf");
+
+    const url = await getRequisitionDocumentUrl(presigned.key!);
     const response = await fetch(url);
     expect(response.ok).toBe(true);
     const bytes = new Uint8Array(await response.arrayBuffer());
     expect(bytes.length).toBe(512);
   });
 
-  it("rejects a file over the size limit without uploading anything", async () => {
-    const file = makeFile("huge.pdf", "application/pdf", 11 * 1024 * 1024);
-    const result = await uploadRequisitionDocument(TEST_TENANT_ID, file);
+  it("accepts a file larger than a Vercel Function's 4.5MB body limit, since it never passes through one", async () => {
+    // The whole point of the presigned-URL flow: this is well over what
+    // a Server Action could ever carry, and it still uploads cleanly
+    // because the bytes go straight from this test to R2.
+    const presigned = await uploadViaPresignedUrl("large-scan.pdf", "application/pdf", 6 * 1024 * 1024);
+    expect(presigned.error).toBeUndefined();
+    expect(presigned.key).toBeDefined();
+  });
+
+  it("rejects a file over the app's own size limit without generating a URL", async () => {
+    const result = await getRequisitionUploadUrl(TEST_TENANT_ID, "huge.pdf", "application/pdf", 11 * 1024 * 1024);
     expect(result.error).toBeDefined();
-    expect(result.key).toBeUndefined();
+    expect(result.uploadUrl).toBeUndefined();
   });
 
   it("rejects an unsupported file type", async () => {
-    const file = makeFile("notes.txt", "text/plain", 10);
-    const result = await uploadRequisitionDocument(TEST_TENANT_ID, file);
+    const result = await getRequisitionUploadUrl(TEST_TENANT_ID, "notes.txt", "text/plain", 10);
     expect(result.error).toBeDefined();
-    expect(result.key).toBeUndefined();
+    expect(result.uploadUrl).toBeUndefined();
   });
 
   it("rejects an empty file", async () => {
-    const file = makeFile("empty.pdf", "application/pdf", 0);
-    const result = await uploadRequisitionDocument(TEST_TENANT_ID, file);
+    const result = await getRequisitionUploadUrl(TEST_TENANT_ID, "empty.pdf", "application/pdf", 0);
     expect(result.error).toBeDefined();
-    expect(result.key).toBeUndefined();
+    expect(result.uploadUrl).toBeUndefined();
+  });
+});
+
+describe("getRequisitionDocumentBytes", () => {
+  it("returns an error for a key that doesn't exist", async () => {
+    const result = await getRequisitionDocumentBytes(`requisitions/${TEST_TENANT_ID}/does-not-exist.pdf`);
+    expect(result.error).toBeDefined();
+    expect(result.bytes).toBeUndefined();
   });
 });
