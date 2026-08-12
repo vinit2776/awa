@@ -3,7 +3,11 @@ import { adminDb } from "./adminClient";
 import { isPlatformAdminEmail } from "./platformAdmins";
 import { tenants, users } from "./schema";
 
-export type SignInTarget = { tenantId: string; tenantName: string; organizationId: string };
+// workosUserId is null until db/tenant.ts#linkUserOnSignIn's first
+// successful callback — the caller uses it to send a never-signed-in
+// invitee to WorkOS's sign-up screen instead of sign-in, which otherwise
+// asks for a password they've never had a chance to set.
+export type SignInTarget = { tenantId: string; tenantName: string; organizationId: string; workosUserId: string | null };
 
 /**
  * getSignInUrl() needs an explicit organizationId up front to produce an
@@ -27,7 +31,12 @@ export async function resolveSignInTargets(email: string): Promise<{ isPlatformA
   const isPlatformAdmin = await isPlatformAdminEmail(normalized);
 
   const rows = await adminDb
-    .select({ tenantId: tenants.id, tenantName: tenants.name, organizationId: tenants.workosOrganizationId })
+    .select({
+      tenantId: tenants.id,
+      tenantName: tenants.name,
+      organizationId: tenants.workosOrganizationId,
+      workosUserId: users.workosUserId,
+    })
     .from(users)
     .innerJoin(tenants, eq(users.tenantId, tenants.id))
     .where(eq(users.email, normalized));
