@@ -1,6 +1,7 @@
 import { revalidatePath } from "next/cache";
 import { eq } from "drizzle-orm";
-import { getCurrentPlatformAdmin } from "@/db/platformSession";
+import { signOut } from "@workos-inc/authkit-nextjs";
+import { getCurrentPlatformAdmin, PlatformAdminAccessError } from "@/db/platformSession";
 import { db } from "@/db/client";
 import { withTenant } from "@/db/withTenant";
 import { seedDefaultRoles } from "@/db/seedDefaultRoles";
@@ -74,7 +75,16 @@ async function setAllowedEmailDomains(formData: FormData) {
 }
 
 export default async function PlatformConsolePage() {
-  const admin = await getCurrentPlatformAdmin();
+  let admin;
+  try {
+    admin = await getCurrentPlatformAdmin();
+  } catch (error) {
+    if (error instanceof PlatformAdminAccessError) {
+      return <AccessDenied email={error.email} />;
+    }
+    throw error;
+  }
+
   const tenants = await db.select().from(tenantsTable);
 
   return (
@@ -175,6 +185,28 @@ export default async function PlatformConsolePage() {
           <input id="workosOrganizationId" name="workosOrganizationId" className="h-8 rounded-md border px-2 text-sm" placeholder="org_..." />
         </div>
         <button type="submit" className={cn(buttonVariants())}>Create tenant</button>
+      </form>
+    </div>
+  );
+}
+
+async function handleAccessDeniedSignOut() {
+  "use server";
+  await signOut({ returnTo: "/" });
+}
+
+function AccessDenied({ email }: { email: string }) {
+  return (
+    <div className="flex flex-1 flex-col items-center justify-center gap-3 p-8 text-center">
+      <h1 className="text-xl font-medium">Access denied</h1>
+      <p className="max-w-md text-sm text-muted-foreground">
+        {email} is signed in but isn&apos;t a platform admin. This console is restricted to accounts listed in
+        platform_admins — ask an existing platform admin to add you, or sign in with a different account.
+      </p>
+      <form action={handleAccessDeniedSignOut}>
+        <button type="submit" className={cn(buttonVariants({ variant: "outline", size: "sm" }))}>
+          Sign out
+        </button>
       </form>
     </div>
   );
