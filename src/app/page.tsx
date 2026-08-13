@@ -1,41 +1,33 @@
 import { redirect } from "next/navigation";
-import { getSignInUrl } from "@workos-inc/authkit-nextjs";
-import { resolveSignInTargets } from "@/db/signInLookup";
-import { getSignUrlForTarget } from "@/lib/authRedirect";
+import { authenticateUser, makeTenantChoiceToken, makeUserSessionToken } from "@/db/userAuth";
+import { setAppSessionCookie } from "@/db/userSession";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
-// getSignInUrl() sets a cookie internally (PKCE state) — Next.js only
-// allows cookie writes inside a Server Action or Route Handler, not a
-// plain Server Component render. Computing it at page-render time threw
-// a 500 on every load; this defers the call to the form submit.
-//
-// Needs the email up front — not just a bare "Sign in" button — to
-// resolve which WorkOS Organization (tenant) to scope the session to
-// before calling getSignInUrl(). Without an explicit organizationId,
-// WorkOS has no way to know which of this app's many tenant
-// organizations a signing-in email belongs to, and the callback fails
-// with "This WorkOS session has no organization."
 async function handleSignIn(formData: FormData) {
   "use server";
   const email = String(formData.get("email") ?? "").trim();
-  if (!email) redirect(`/?error=${encodeURIComponent("Enter your email to sign in.")}`);
-
-  const { isPlatformAdmin, tenants } = await resolveSignInTargets(email);
-
-  if (isPlatformAdmin) {
-    redirect(await getSignInUrl({ loginHint: email }));
+  const password = String(formData.get("password") ?? "");
+  if (!email || !password) {
+    redirect(`/?error=${encodeURIComponent("Enter your email and password.")}`);
   }
 
-  if (tenants.length === 0) {
-    redirect(`/?error=${encodeURIComponent("No account found for that email. Ask your admin to invite you first.")}`);
+  const matches = await authenticateUser(email, password);
+  if (matches.length === 0) {
+    // Generic message on purpose — "no account" vs "wrong password" would
+    // let this form be used to enumerate which emails are provisioned.
+    redirect(`/?error=${encodeURIComponent("Invalid email or password.")}`);
   }
 
-  if (tenants.length === 1) {
-    redirect(await getSignUrlForTarget(tenants[0], email));
+  if (matches.length > 1) {
+    // The password itself never goes in the URL — this token just proves
+    // "these userIds already passed a password check", not the password.
+    const token = makeTenantChoiceToken(matches.map((m) => m.userId));
+    redirect(`/choose-tenant?token=${encodeURIComponent(token)}`);
   }
 
-  redirect(`/choose-tenant?email=${encodeURIComponent(email)}`);
+  await setAppSessionCookie(makeUserSessionToken(matches[0].userId));
+  redirect("/dashboard");
 }
 
 export default async function Home({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
@@ -51,6 +43,13 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ e
           type="email"
           required
           placeholder="you@company.com"
+          className="h-9 w-64 rounded-md border px-2 text-sm"
+        />
+        <input
+          name="password"
+          type="password"
+          required
+          placeholder="Password"
           className="h-9 w-64 rounded-md border px-2 text-sm"
         />
         <button type="submit" className={cn(buttonVariants())}>

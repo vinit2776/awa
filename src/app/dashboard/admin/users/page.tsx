@@ -4,6 +4,8 @@ import { eq } from "drizzle-orm";
 import { getCurrentUserAndTenant } from "@/db/session";
 import { withTenant } from "@/db/withTenant";
 import { inviteUser, setUserStatus, assignUserRole } from "@/db/userInvite";
+import { makeUserSetPasswordToken } from "@/db/userAuth";
+import { getAppOrigin } from "@/lib/appOrigin";
 import {
   users as usersTable,
   roles as rolesTable,
@@ -27,6 +29,18 @@ async function inviteUserAction(formData: FormData) {
   }
 
   revalidatePath("/dashboard/admin/users");
+  // Show the set-password link immediately — there's no email delivery
+  // wired up (db/notifications.ts), so this is the only way the inviting
+  // admin actually gets a link to hand to the new person.
+  redirect(`/dashboard/admin/users?linkForUserId=${result.userId}`);
+}
+
+async function generateSetPasswordLinkAction(formData: FormData) {
+  "use server";
+  await getCurrentUserAndTenant();
+  const userId = String(formData.get("userId") ?? "");
+  if (!userId) return;
+  redirect(`/dashboard/admin/users?linkForUserId=${encodeURIComponent(userId)}`);
 }
 
 async function toggleUserStatusAction(formData: FormData) {
@@ -57,8 +71,12 @@ async function assignRole(formData: FormData) {
   revalidatePath("/dashboard/admin/users");
 }
 
-export default async function UsersPage({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
-  const { error } = await searchParams;
+export default async function UsersPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ error?: string; linkForUserId?: string }>;
+}) {
+  const { error, linkForUserId } = await searchParams;
   const { tenant } = await getCurrentUserAndTenant();
 
   const [tenantUsers, roles, departments, costCenters, assignments] = await withTenant(
@@ -71,6 +89,13 @@ export default async function UsersPage({ searchParams }: { searchParams: Promis
       await tx.select().from(userRolesTable).where(eq(userRolesTable.tenantId, tenant.id)),
     ],
   );
+
+  // Recomputed on every render rather than stored — a set-password token
+  // is only ever the current one for this user, so "generate" and
+  // "regenerate after it expired" are the same action, no separate state
+  // to track.
+  const linkForUser = linkForUserId ? tenantUsers.find((u) => u.id === linkForUserId) : undefined;
+  const setPasswordLink = linkForUser ? `${await getAppOrigin()}/set-password/${makeUserSetPasswordToken(linkForUser.id)}` : null;
 
   const nameFor = {
     user: (id: string) => tenantUsers.find((u) => u.id === id)?.fullName ?? id,
@@ -99,6 +124,16 @@ export default async function UsersPage({ searchParams }: { searchParams: Promis
       </div>
 
       <section className="flex flex-col gap-3">
+        {setPasswordLink && linkForUser && (
+          <div className="rounded-md border bg-muted/40 p-3 text-sm">
+            <p className="font-medium">Set-password link for {linkForUser.fullName}</p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              There&apos;s no email delivery wired up yet — copy this and send it to them yourself. Valid for 24 hours.
+            </p>
+            <input readOnly value={setPasswordLink} className="mt-2 w-full rounded-md border bg-background px-2 py-1.5 font-mono text-xs" />
+          </div>
+        )}
+
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b text-left text-xs text-muted-foreground">
@@ -115,23 +150,31 @@ export default async function UsersPage({ searchParams }: { searchParams: Promis
                 <td className="py-2 text-muted-foreground">{u.email}</td>
                 <td className="py-2">{u.status}</td>
                 <td className="py-2">
-                  {u.status === "disabled" ? (
-                    <form action={toggleUserStatusAction}>
+                  <div className="flex justify-end gap-2">
+                    <form action={generateSetPasswordLinkAction}>
                       <input type="hidden" name="userId" value={u.id} />
-                      <input type="hidden" name="status" value="active" />
                       <button type="submit" className={cn(buttonVariants({ variant: "outline", size: "sm" }))}>
-                        Re-enable
+                        {u.status === "invited" ? "Get set-password link" : "Reset password"}
                       </button>
                     </form>
-                  ) : (
-                    <form action={toggleUserStatusAction}>
-                      <input type="hidden" name="userId" value={u.id} />
-                      <input type="hidden" name="status" value="disabled" />
-                      <button type="submit" className={cn(buttonVariants({ variant: "outline", size: "sm" }))}>
-                        Disable
-                      </button>
-                    </form>
-                  )}
+                    {u.status === "disabled" ? (
+                      <form action={toggleUserStatusAction}>
+                        <input type="hidden" name="userId" value={u.id} />
+                        <input type="hidden" name="status" value="active" />
+                        <button type="submit" className={cn(buttonVariants({ variant: "outline", size: "sm" }))}>
+                          Re-enable
+                        </button>
+                      </form>
+                    ) : (
+                      <form action={toggleUserStatusAction}>
+                        <input type="hidden" name="userId" value={u.id} />
+                        <input type="hidden" name="status" value="disabled" />
+                        <button type="submit" className={cn(buttonVariants({ variant: "outline", size: "sm" }))}>
+                          Disable
+                        </button>
+                      </form>
+                    )}
+                  </div>
                 </td>
               </tr>
             ))}
@@ -152,8 +195,8 @@ export default async function UsersPage({ searchParams }: { searchParams: Promis
           <button type="submit" className={cn(buttonVariants())}>Invite</button>
         </form>
         <p className="text-xs text-muted-foreground max-w-xl">
-          Invited users show as &quot;invited&quot; until they sign in via WorkOS with this exact email — there&apos;s no
-          self-serve signup, this is what makes them eligible to.
+          Invited users show as &quot;invited&quot; until they open their set-password link and choose a password — copy
+          it from the button above and send it to them yourself, there&apos;s no email delivery wired up yet.
         </p>
       </section>
 
