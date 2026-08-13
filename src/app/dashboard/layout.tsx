@@ -1,5 +1,6 @@
-import { signOut } from "@workos-inc/authkit-nextjs";
+import { redirect } from "next/navigation";
 import { getCurrentUserAndTenant } from "@/db/session";
+import { clearAppSessionCookie } from "@/db/userSession";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { DashboardNav } from "./DashboardNav";
@@ -11,7 +12,8 @@ export default async function DashboardLayout({ children }: LayoutProps<"/dashbo
 
   async function handleSignOut() {
     "use server";
-    await signOut({ returnTo: "/" });
+    await clearAppSessionCookie();
+    redirect("/");
   }
 
   return (

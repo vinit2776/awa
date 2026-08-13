@@ -1,13 +1,38 @@
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { eq } from "drizzle-orm";
-import { signOut } from "@workos-inc/authkit-nextjs";
 import { getCurrentPlatformAdmin, PlatformAdminAccessError } from "@/db/platformSession";
+import { authenticatePlatformAdmin, makePlatformAdminSessionToken } from "@/db/userAuth";
+import { clearPlatformSessionCookie, setPlatformSessionCookie } from "@/db/userSession";
 import { db } from "@/db/client";
 import { withTenant } from "@/db/withTenant";
 import { seedDefaultRoles } from "@/db/seedDefaultRoles";
 import { tenants as tenantsTable } from "@/db/schema";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+
+async function platformSignIn(formData: FormData) {
+  "use server";
+  const email = String(formData.get("email") ?? "").trim();
+  const password = String(formData.get("password") ?? "");
+  if (!email || !password) {
+    redirect(`/platform?error=${encodeURIComponent("Enter your email and password.")}`);
+  }
+
+  const adminId = await authenticatePlatformAdmin(email, password);
+  if (!adminId) {
+    redirect(`/platform?error=${encodeURIComponent("Invalid email or password.")}`);
+  }
+
+  await setPlatformSessionCookie(makePlatformAdminSessionToken(adminId));
+  redirect("/platform");
+}
+
+async function handleSignOut() {
+  "use server";
+  await clearPlatformSessionCookie();
+  redirect("/platform");
+}
 
 async function createTenant(formData: FormData) {
   "use server";
@@ -74,13 +99,15 @@ async function setAllowedEmailDomains(formData: FormData) {
   revalidatePath("/platform");
 }
 
-export default async function PlatformConsolePage() {
+export default async function PlatformConsolePage({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
+  const { error: signInError } = await searchParams;
+
   let admin;
   try {
     admin = await getCurrentPlatformAdmin();
   } catch (error) {
     if (error instanceof PlatformAdminAccessError) {
-      return <AccessDenied email={error.email} />;
+      return <PlatformSignIn error={signInError} />;
     }
     throw error;
   }
@@ -89,9 +116,16 @@ export default async function PlatformConsolePage() {
 
   return (
     <div className="flex flex-1 flex-col gap-6 p-8">
-      <div>
-        <h1 className="text-xl font-medium">Platform console</h1>
-        <p className="text-sm text-muted-foreground">Signed in as {admin.email} ({admin.role})</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-xl font-medium">Platform console</h1>
+          <p className="text-sm text-muted-foreground">Signed in as {admin.email} ({admin.role})</p>
+        </div>
+        <form action={handleSignOut}>
+          <button type="submit" className={cn(buttonVariants({ variant: "outline", size: "sm" }))}>
+            Sign out
+          </button>
+        </form>
       </div>
 
       <table className="w-full text-sm">
@@ -190,24 +224,21 @@ export default async function PlatformConsolePage() {
   );
 }
 
-async function handleAccessDeniedSignOut() {
-  "use server";
-  await signOut({ returnTo: "/" });
-}
-
-function AccessDenied({ email }: { email: string }) {
+function PlatformSignIn({ error }: { error?: string }) {
   return (
-    <div className="flex flex-1 flex-col items-center justify-center gap-3 p-8 text-center">
-      <h1 className="text-xl font-medium">Access denied</h1>
-      <p className="max-w-md text-sm text-muted-foreground">
-        {email} is signed in but isn&apos;t a platform admin. This console is restricted to accounts listed in
-        platform_admins — ask an existing platform admin to add you, or sign in with a different account.
-      </p>
-      <form action={handleAccessDeniedSignOut}>
-        <button type="submit" className={cn(buttonVariants({ variant: "outline", size: "sm" }))}>
-          Sign out
-        </button>
-      </form>
+    <div className="flex flex-1 flex-col items-center justify-center gap-4">
+      <div className="w-full max-w-sm rounded-lg border p-6">
+        <h1 className="text-lg font-medium">Platform console</h1>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Restricted to accounts listed in platform_admins.
+        </p>
+        {error && <p className="mt-2 text-sm text-destructive">{error}</p>}
+        <form action={platformSignIn} className="mt-4 flex flex-col gap-2">
+          <input name="email" type="email" required placeholder="you@company.com" className="h-9 rounded-md border px-2 text-sm" />
+          <input name="password" type="password" required placeholder="Password" className="h-9 rounded-md border px-2 text-sm" />
+          <button type="submit" className={cn(buttonVariants())}>Sign in</button>
+        </form>
+      </div>
     </div>
   );
 }

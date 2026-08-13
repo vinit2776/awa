@@ -86,6 +86,9 @@ export const platformAdmins = pgTable("platform_admins", {
   email: text("email").notNull().unique(),
   fullName: text("full_name").notNull(),
   role: platformAdminRole("role").notNull(),
+  // Null until db/userAuth.ts#hashPassword is set via the set-password
+  // link flow — same "invited but not yet activated" shape as users.
+  passwordHash: text("password_hash"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
@@ -96,8 +99,13 @@ export const users = pgTable("users", {
   fullName: text("full_name").notNull(),
   status: userStatus("status").notNull().default("invited"),
   // Set on first successful WorkOS sign-in (JIT linking, app-side) once a
-  // row already exists for this email within a matching tenant.
+  // row already exists for this email within a matching tenant. Unused
+  // while app-managed auth (db/userAuth.ts) is active — kept, not
+  // dropped, so WorkOS can be reconnected later without a migration.
   workosUserId: text("workos_user_id").unique(),
+  // Null until the set-password link flow completes (db/userAuth.ts) —
+  // this is what app-managed sign-in actually checks now.
+  passwordHash: text("password_hash"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [unique().on(t.tenantId, t.email)]);
