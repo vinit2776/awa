@@ -9,6 +9,7 @@ dist/
 .DS_Store
 .vercel
 coverage/
+.claude/settings.local.json
 .env*
 *.local
 supabase/.temp
