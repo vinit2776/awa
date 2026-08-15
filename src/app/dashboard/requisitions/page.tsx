@@ -17,7 +17,7 @@ import {
 import { buttonVariants } from "@/components/ui/button";
 import { Breadcrumbs } from "@/components/ui/breadcrumbs";
 import { cn } from "@/lib/utils";
-import { computeStage } from "@/app/dashboard/lifecycle/stage";
+import { computeStage, approvalStepDetail } from "@/app/dashboard/lifecycle/stage";
 import { LifecycleStatus } from "@/app/dashboard/lifecycle/LifecycleStatus";
 import { submitRequisition } from "./actions";
 
@@ -75,19 +75,15 @@ export default async function RequisitionsPage({
   }).toString()}`;
   const clearFilterHref = sort ? `?${new URLSearchParams({ sort }).toString()}` : "/dashboard/requisitions";
 
-  const rejectedIds = requisitions.filter((r) => r.status === "rejected_revisable" || r.status === "rejected_closed").map((r) => r.id);
-  const rejectionReasons = rejectedIds.length
-    ? await withTenant(tenant.id, (tx) =>
-        tx
-          .select({ requisitionId: requirementsTable.requisitionId, comment: requirementsTable.decisionComment, decidedAt: requirementsTable.decidedAt })
-          .from(requirementsTable)
-          .where(inArray(requirementsTable.requisitionId, rejectedIds)),
-      )
+  const allRequisitionIds = requisitions.map((r) => r.id);
+  const requirementRows = allRequisitionIds.length
+    ? await withTenant(tenant.id, (tx) => tx.select().from(requirementsTable).where(inArray(requirementsTable.requisitionId, allRequisitionIds)))
     : [];
   const reasonFor = (requisitionId: string) =>
-    rejectionReasons
-      .filter((r) => r.requisitionId === requisitionId && r.comment)
-      .sort((a, b) => (b.decidedAt?.getTime() ?? 0) - (a.decidedAt?.getTime() ?? 0))[0]?.comment ?? null;
+    requirementRows
+      .filter((r) => r.requisitionId === requisitionId && r.status === "rejected" && r.decisionComment)
+      .sort((a, b) => (b.decidedAt?.getTime() ?? 0) - (a.decidedAt?.getTime() ?? 0))[0]?.decisionComment ?? null;
+  const stepDetailFor = (requisitionId: string) => approvalStepDetail(requirementRows.filter((r) => r.requisitionId === requisitionId));
 
   const documentUrls = new Map(
     await Promise.all(
@@ -200,7 +196,7 @@ export default async function RequisitionsPage({
                 <td className="py-2">{costCenterName(r.costCenterId)}</td>
                 <td className="py-2">{r.totalEstimatedValue} {r.currency}</td>
                 <td className="py-2">
-                  <LifecycleStatus stage={stage} />
+                  <LifecycleStatus stage={stage} detail={stage === "Pending approval" ? stepDetailFor(r.id) : undefined} />
                   {showPending && <span className="text-muted-foreground">{days} day{days === 1 ? "" : "s"} pending</span>}
                   {reason && <p className="mt-0.5 max-w-xs text-xs text-muted-foreground">{reason}</p>}
                 </td>

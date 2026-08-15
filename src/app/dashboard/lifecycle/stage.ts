@@ -39,6 +39,24 @@ export function sourcingStage(hasOpenRfq: boolean): string {
 }
 
 /**
+ * "Step X of Y" for a requisition sitting in Pending approval — the
+ * detail nextAction() can't express, since which rule matched and how
+ * many groups it has is data, not a fixed stage string. Needs every
+ * requirement row for the requisition (every group, any status), not
+ * just the pending ones, to know the true step count. Returns null for
+ * a single-step chain (group 1 of 1) — not worth saying.
+ */
+export function approvalStepDetail(requirementRows: { groupNo: number; status: string }[]): string | null {
+  if (requirementRows.length === 0) return null;
+  const totalSteps = new Set(requirementRows.map((r) => r.groupNo)).size;
+  if (totalSteps <= 1) return null;
+  const pendingGroups = requirementRows.filter((r) => r.status === "pending").map((r) => r.groupNo);
+  if (pendingGroups.length === 0) return null;
+  const currentStep = Math.min(...pendingGroups);
+  return `Step ${currentStep} of ${totalSteps}`;
+}
+
+/**
  * Stage label from PO issuance onward. Standalone (not just inlined in
  * computeStage) so Fulfillment pages — which load a PO without walking
  * back through the requisition — can show the exact same label.
