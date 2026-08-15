@@ -48,3 +48,31 @@ export function computeStage(
   if (!paymentForInvoice) return "Approved for payment";
   return paymentForInvoice.status === "released" ? "Paid" : "Payment queued";
 }
+
+const STAGE_VARIANTS: Record<string, "neutral" | "info" | "warning" | "success" | "destructive"> = {
+  "Draft": "neutral",
+  "Cancelled": "neutral",
+  "Submitted": "info",
+  "Pending approval": "info",
+  "Approved — awaiting sourcing": "info",
+  "Sourcing": "info",
+  "Converted to PO": "info",
+  "PO issued — awaiting fulfillment": "info",
+  "Partially fulfilled": "info",
+  "Fulfilled — awaiting invoice": "info",
+  "Invoice submitted": "info",
+  "Invoice matched — awaiting payment approval": "info",
+  "Approved for payment": "info",
+  "Payment queued": "info",
+  "Rejected — needs revision": "warning",
+  "Invoice exception — needs review": "warning",
+  "Rejected — closed": "destructive",
+  "PO cancelled": "destructive",
+  "Invoice disputed": "destructive",
+  "Paid": "success",
+};
+
+/** Badge color for a stage string returned by computeStage(). Falls back to neutral for anything unrecognized. */
+export function stageBadgeVariant(stage: string): "neutral" | "info" | "warning" | "success" | "destructive" {
+  return STAGE_VARIANTS[stage] ?? "neutral";
+}
