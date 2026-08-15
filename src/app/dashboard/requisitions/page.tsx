@@ -2,6 +2,7 @@ import Link from "next/link";
 import { and, asc, desc, eq, inArray } from "drizzle-orm";
 import { getCurrentUserAndTenant } from "@/db/session";
 import { withTenant } from "@/db/withTenant";
+import { getRequisitionDocumentUrl } from "@/db/documentStorage";
 import {
   purchaseRequisitions as purchaseRequisitionsTable,
   requisitionApprovalRequirements as requirementsTable,
@@ -81,6 +82,14 @@ export default async function RequisitionsPage({
     rejectionReasons
       .filter((r) => r.requisitionId === requisitionId && r.comment)
       .sort((a, b) => (b.decidedAt?.getTime() ?? 0) - (a.decidedAt?.getTime() ?? 0))[0]?.comment ?? null;
+
+  const documentUrls = new Map(
+    await Promise.all(
+      requisitions
+        .filter((r) => r.sourceDocumentKey)
+        .map(async (r) => [r.id, await getRequisitionDocumentUrl(r.sourceDocumentKey!)] as const),
+    ),
+  );
 
   const departmentName = (id: string | null) => departments.find((d) => d.id === id)?.name ?? "—";
   const costCenterName = (id: string | null) => costCenters.find((c) => c.id === id)?.name ?? "—";
@@ -177,6 +186,16 @@ export default async function RequisitionsPage({
                     <Link href={`/dashboard/requisitions/${r.id}/edit`} className={cn(buttonVariants({ variant: "outline", size: "sm" }))}>
                       Revise
                     </Link>
+                  )}
+                  {documentUrls.has(r.id) && (
+                    <a
+                      href={documentUrls.get(r.id)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="ml-2 text-xs text-muted-foreground underline"
+                    >
+                      View document
+                    </a>
                   )}
                 </td>
               </tr>

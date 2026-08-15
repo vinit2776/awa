@@ -3,6 +3,7 @@ import { getCurrentUserAndTenant } from "@/db/session";
 import { withTenant } from "@/db/withTenant";
 import { getCommittedByCostCenter } from "@/db/budget";
 import { getItemPurchaseHistory, type ItemPurchaseHistoryEntry } from "@/db/itemHistory";
+import { getRequisitionDocumentUrl } from "@/db/documentStorage";
 import {
   requisitionApprovalRequirements as requirementsTable,
   purchaseRequisitions as purchaseRequisitionsTable,
@@ -79,6 +80,15 @@ export default async function ApprovalsInboxPage() {
 
   const itemName = (id: string | null) => catalogItems.find((i) => i.id === id)?.name ?? null;
 
+  const documentUrls = new Map(
+    await Promise.all(
+      myActionable
+        .map((req) => requisitionById.get(req.requisitionId)!)
+        .filter((requisition) => requisition.sourceDocumentKey)
+        .map(async (requisition) => [requisition.id, await getRequisitionDocumentUrl(requisition.sourceDocumentKey!)] as const),
+    ),
+  );
+
   return (
     <div className="flex flex-col gap-8 p-8">
       <div className="flex flex-col gap-2">
@@ -113,6 +123,16 @@ export default async function ApprovalsInboxPage() {
                   </p>
                   {requisition.justification && (
                     <p className="mt-1 text-xs text-muted-foreground">&quot;{requisition.justification}&quot;</p>
+                  )}
+                  {documentUrls.has(requisition.id) && (
+                    <a
+                      href={documentUrls.get(requisition.id)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="mt-1 inline-block text-xs text-muted-foreground underline"
+                    >
+                      View source document
+                    </a>
                   )}
                 </div>
               </div>
