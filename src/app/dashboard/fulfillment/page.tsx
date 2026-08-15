@@ -6,6 +6,8 @@ import { purchaseOrders as purchaseOrdersTable, vendors as vendorsTable } from "
 import { buttonVariants } from "@/components/ui/button";
 import { Breadcrumbs } from "@/components/ui/breadcrumbs";
 import { cn } from "@/lib/utils";
+import { poStage } from "@/app/dashboard/lifecycle/stage";
+import { LifecycleStatus } from "@/app/dashboard/lifecycle/LifecycleStatus";
 
 export default async function FulfillmentPage() {
   const { tenant } = await getCurrentUserAndTenant();
@@ -43,7 +45,7 @@ export default async function FulfillmentPage() {
               <td className="py-2">{po.poNumber}</td>
               <td className="py-2">{vendorName(po.vendorId)}</td>
               <td className="py-2">{po.totalAmount} {po.currency}</td>
-              <td className="py-2">{po.status}</td>
+              <td className="py-2"><LifecycleStatus stage={poStage(po)} /></td>
               <td className="py-2">
                 <Link href={`/dashboard/fulfillment/${po.id}`} className={cn(buttonVariants({ variant: "outline", size: "sm" }))}>
                   Open

@@ -5,6 +5,7 @@ import { paymentInstructions as paymentInstructionsTable, invoices as invoicesTa
 import { buttonVariants } from "@/components/ui/button";
 import { Breadcrumbs } from "@/components/ui/breadcrumbs";
 import { cn } from "@/lib/utils";
+import { LifecycleStatus } from "@/app/dashboard/lifecycle/LifecycleStatus";
 import { releasePayment } from "./actions";
 
 export default async function PaymentsPage() {
@@ -35,6 +36,7 @@ export default async function PaymentsPage() {
             <th className="py-2 font-normal">Invoice</th>
             <th className="py-2 font-normal">Vendor</th>
             <th className="py-2 font-normal">Amount</th>
+            <th className="py-2 font-normal">Status</th>
             <th></th>
           </tr>
         </thead>
@@ -46,6 +48,7 @@ export default async function PaymentsPage() {
                 <td className="py-2">{invoice?.invoiceNumber ?? "—"}</td>
                 <td className="py-2">{invoice ? vendorName(invoice.vendorId) : "—"}</td>
                 <td className="py-2">{p.amount} {p.currency}</td>
+                <td className="py-2"><LifecycleStatus stage="Payment queued" /></td>
                 <td className="py-2">
                   <form action={releasePayment}>
                     <input type="hidden" name="paymentId" value={p.id} />

@@ -16,6 +16,7 @@ import {
 import { buttonVariants } from "@/components/ui/button";
 import { Breadcrumbs } from "@/components/ui/breadcrumbs";
 import { cn } from "@/lib/utils";
+import { LifecycleStatus } from "@/app/dashboard/lifecycle/LifecycleStatus";
 import { approveRequirement, requestRevision, rejectAndClose, addAdHocApprover } from "./actions";
 
 function pendingDays(submittedAt: Date | null): number | null {
@@ -109,7 +110,7 @@ export default async function ApprovalsInboxPage() {
 
           return (
             <div key={req.id} className="flex flex-col gap-3 rounded-md border p-4">
-              <div className="flex items-center justify-between">
+              <div className="flex items-start justify-between gap-3">
                 <div>
                   <p className="text-sm font-medium">
                     {userName(requisition.requestorId)} — {requisition.totalEstimatedValue} {requisition.currency}
@@ -135,6 +136,7 @@ export default async function ApprovalsInboxPage() {
                     </a>
                   )}
                 </div>
+                <LifecycleStatus stage="Pending approval" className="shrink-0 items-end text-right" />
               </div>
 
               {budget !== null && (

@@ -15,10 +15,10 @@ import {
   requisitionStatus,
 } from "@/db/schema";
 import { buttonVariants } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Breadcrumbs } from "@/components/ui/breadcrumbs";
 import { cn } from "@/lib/utils";
-import { computeStage, stageBadgeVariant } from "@/app/dashboard/lifecycle/stage";
+import { computeStage } from "@/app/dashboard/lifecycle/stage";
+import { LifecycleStatus } from "@/app/dashboard/lifecycle/LifecycleStatus";
 import { submitRequisition } from "./actions";
 
 function pendingDays(submittedAt: Date | null): number | null {
@@ -200,8 +200,8 @@ export default async function RequisitionsPage({
                 <td className="py-2">{costCenterName(r.costCenterId)}</td>
                 <td className="py-2">{r.totalEstimatedValue} {r.currency}</td>
                 <td className="py-2">
-                  <Badge variant={stageBadgeVariant(stage)}>{stage}</Badge>
-                  {showPending && <span className="ml-1.5 text-muted-foreground">{days} day{days === 1 ? "" : "s"}</span>}
+                  <LifecycleStatus stage={stage} />
+                  {showPending && <span className="text-muted-foreground">{days} day{days === 1 ? "" : "s"} pending</span>}
                   {reason && <p className="mt-0.5 max-w-xs text-xs text-muted-foreground">{reason}</p>}
                 </td>
                 <td className="py-2">

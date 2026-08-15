@@ -8,19 +8,22 @@ import {
   invoiceLineMatches as matchesTable,
   vendors as vendorsTable,
   purchaseOrders as purchaseOrdersTable,
+  paymentInstructions as paymentInstructionsTable,
 } from "@/db/schema";
 import { buttonVariants } from "@/components/ui/button";
 import { Breadcrumbs } from "@/components/ui/breadcrumbs";
 import { cn } from "@/lib/utils";
+import { invoiceStage } from "@/app/dashboard/lifecycle/stage";
+import { LifecycleStatus } from "@/app/dashboard/lifecycle/LifecycleStatus";
 import { approveForPayment, overrideException, disputeInvoice } from "../actions";
 
 export default async function InvoiceDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const { tenant } = await getCurrentUserAndTenant();
 
-  const [invoice, lines, matches, vendor, po] = await withTenant(tenant.id, async (tx) => {
+  const [invoice, lines, matches, vendor, po, payment] = await withTenant(tenant.id, async (tx) => {
     const [invoice] = await tx.select().from(invoicesTable).where(eq(invoicesTable.id, id));
-    if (!invoice) return [null, [], [], null, null] as const;
+    if (!invoice) return [null, [], [], null, null, undefined] as const;
 
     const lines = await tx.select().from(invoiceLinesTable).where(eq(invoiceLinesTable.invoiceId, id));
     const allMatches = lines.length
@@ -28,8 +31,9 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
       : [];
     const [vendor] = await tx.select().from(vendorsTable).where(eq(vendorsTable.id, invoice.vendorId));
     const [po] = invoice.poId ? await tx.select().from(purchaseOrdersTable).where(eq(purchaseOrdersTable.id, invoice.poId)) : [null];
+    const [payment] = await tx.select().from(paymentInstructionsTable).where(eq(paymentInstructionsTable.invoiceId, id));
 
-    return [invoice, lines, allMatches, vendor ?? null, po ?? null] as const;
+    return [invoice, lines, allMatches, vendor ?? null, po ?? null, payment ?? undefined] as const;
   });
 
   if (!invoice) notFound();
@@ -46,12 +50,14 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
             { label: invoice.invoiceNumber },
           ]}
         />
-        <div>
-          <h1 className="font-serif text-lg text-foreground">{invoice.invoiceNumber}</h1>
-          <p className="text-sm text-muted-foreground">
-            {vendor?.name ?? "—"} · {po?.poNumber ?? "—"} · {invoice.totalAmount} {invoice.currency} ·{" "}
-            <span className={invoice.status === "exception" ? "text-amber-600" : undefined}>{invoice.status}</span>
-          </p>
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <h1 className="font-serif text-lg text-foreground">{invoice.invoiceNumber}</h1>
+            <p className="text-sm text-muted-foreground">
+              {vendor?.name ?? "—"} · {po?.poNumber ?? "—"} · {invoice.totalAmount} {invoice.currency}
+            </p>
+          </div>
+          <LifecycleStatus stage={invoiceStage(invoice, payment)} className="shrink-0 items-end text-right" />
         </div>
       </div>
 

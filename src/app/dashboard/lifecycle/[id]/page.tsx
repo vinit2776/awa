@@ -14,6 +14,7 @@ import {
 } from "@/db/schema";
 import { Breadcrumbs } from "@/components/ui/breadcrumbs";
 import { computeStage } from "../stage";
+import { LifecycleStatus } from "../LifecycleStatus";
 
 export default async function LifecycleDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -62,9 +63,9 @@ export default async function LifecycleDetailPage({ params }: { params: Promise<
             { label: "Requisition lifecycle" },
           ]}
         />
-        <div>
+        <div className="flex items-start justify-between gap-3">
           <h1 className="font-serif text-lg text-foreground">Requisition lifecycle</h1>
-          <p className="text-sm text-muted-foreground">Current stage: {stage}</p>
+          <LifecycleStatus stage={stage} className="shrink-0 items-end text-right" />
         </div>
       </div>
 

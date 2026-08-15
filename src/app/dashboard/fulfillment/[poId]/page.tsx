@@ -13,12 +13,16 @@ import {
   serviceAcceptanceLines as serviceAcceptanceLinesTable,
   serviceMilestones as serviceMilestonesTable,
   vendorReturns as vendorReturnsTable,
+  invoices as invoicesTable,
+  paymentInstructions as paymentInstructionsTable,
 } from "@/db/schema";
 import { VENDOR_RETURN_STATUSES } from "@/db/vendorReturns";
 import { resolveMilestoneValue } from "@/db/serviceMilestones";
 import { buttonVariants } from "@/components/ui/button";
 import { Breadcrumbs } from "@/components/ui/breadcrumbs";
 import { cn } from "@/lib/utils";
+import { poStage } from "@/app/dashboard/lifecycle/stage";
+import { LifecycleStatus } from "@/app/dashboard/lifecycle/LifecycleStatus";
 import { advanceReturn, defineMilestone, initiateReturn, submitGoodsReceipt, submitMilestoneAcceptance, submitServiceAcceptance } from "./actions";
 
 export default async function FulfillmentDetailPage({
@@ -60,10 +64,12 @@ export default async function FulfillmentDetailPage({
 
   if (!po) notFound();
 
-  const [vendor, requisition] = await withTenant(tenant.id, async (tx) => {
+  const [vendor, requisition, invoice, payment] = await withTenant(tenant.id, async (tx) => {
     const [vendor] = await tx.select().from(vendorsTable).where(eq(vendorsTable.id, po.vendorId));
     const [requisition] = await tx.select().from(purchaseRequisitionsTable).where(eq(purchaseRequisitionsTable.id, po.requisitionId));
-    return [vendor ?? null, requisition ?? null];
+    const [invoice] = await tx.select().from(invoicesTable).where(eq(invoicesTable.poId, po.id));
+    const [payment] = invoice ? await tx.select().from(paymentInstructionsTable).where(eq(paymentInstructionsTable.invoiceId, invoice.id)) : [];
+    return [vendor ?? null, requisition ?? null, invoice ?? undefined, payment ?? undefined];
   });
 
   const itemName = (l: { itemId: string | null; serviceDescription: string | null }) =>
@@ -105,16 +111,19 @@ export default async function FulfillmentDetailPage({
             { label: po.poNumber },
           ]}
         />
-        <div>
-          <h1 className="font-serif text-lg text-foreground">{po.poNumber}</h1>
-          <p className="text-sm text-muted-foreground">
-            {vendor?.name ?? "—"} · {po.totalAmount} {po.currency} · {po.status}
-          </p>
-          <p className="mt-1 text-xs text-muted-foreground">
-            {po.vendorConfirmedAt
-              ? `Vendor confirmed via portal on ${po.vendorConfirmedAt.toISOString().slice(0, 10)}`
-              : "Not yet confirmed by the vendor in the vendor portal"}
-          </p>
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <h1 className="font-serif text-lg text-foreground">{po.poNumber}</h1>
+            <p className="text-sm text-muted-foreground">
+              {vendor?.name ?? "—"} · {po.totalAmount} {po.currency}
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              {po.vendorConfirmedAt
+                ? `Vendor confirmed via portal on ${po.vendorConfirmedAt.toISOString().slice(0, 10)}`
+                : "Not yet confirmed by the vendor in the vendor portal"}
+            </p>
+          </div>
+          <LifecycleStatus stage={poStage(po, invoice, payment)} className="shrink-0 items-end text-right" />
         </div>
       </div>
 
