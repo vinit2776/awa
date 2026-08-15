@@ -1,11 +1,13 @@
 import Link from "next/link";
-import { desc } from "drizzle-orm";
+import { desc, inArray } from "drizzle-orm";
 import { getCurrentUserAndTenant } from "@/db/session";
 import { withTenant } from "@/db/withTenant";
-import { invoices as invoicesTable, vendors as vendorsTable } from "@/db/schema";
+import { invoices as invoicesTable, vendors as vendorsTable, paymentInstructions as paymentInstructionsTable } from "@/db/schema";
 import { buttonVariants } from "@/components/ui/button";
 import { Breadcrumbs } from "@/components/ui/breadcrumbs";
 import { cn } from "@/lib/utils";
+import { invoiceStage } from "@/app/dashboard/lifecycle/stage";
+import { LifecycleStatus } from "@/app/dashboard/lifecycle/LifecycleStatus";
 
 export default async function InvoicesPage() {
   const { tenant } = await getCurrentUserAndTenant();
@@ -14,6 +16,12 @@ export default async function InvoicesPage() {
     await tx.select().from(invoicesTable).orderBy(desc(invoicesTable.createdAt)),
     await tx.select().from(vendorsTable),
   ]);
+
+  const invoiceIdsAwaitingPayment = invoiceRows.filter((i) => i.status === "approved_for_payment").map((i) => i.id);
+  const paymentRows = invoiceIdsAwaitingPayment.length
+    ? await withTenant(tenant.id, (tx) => tx.select().from(paymentInstructionsTable).where(inArray(paymentInstructionsTable.invoiceId, invoiceIdsAwaitingPayment)))
+    : [];
+  const paymentFor = (invoiceId: string) => paymentRows.find((p) => p.invoiceId === invoiceId);
 
   const vendorName = (id: string) => vendors.find((v) => v.id === id)?.name ?? "—";
   const exceptionCount = invoiceRows.filter((i) => i.status === "exception").length;
@@ -55,7 +63,7 @@ export default async function InvoicesPage() {
               <td className="py-2">{i.invoiceDate}</td>
               <td className="py-2">{i.totalAmount} {i.currency}</td>
               <td className="py-2">
-                <span className={i.status === "exception" ? "text-amber-600" : undefined}>{i.status}</span>
+                <LifecycleStatus stage={invoiceStage(i, paymentFor(i.id))} />
               </td>
               <td className="py-2">
                 <Link href={`/dashboard/invoices/${i.id}`} className={cn(buttonVariants({ variant: "outline", size: "sm" }))}>

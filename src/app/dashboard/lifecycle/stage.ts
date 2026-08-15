@@ -26,25 +26,42 @@ export function computeStage(
   if (requisition.status === "rejected_closed") return "Rejected — closed";
   if (requisition.status === "cancelled") return "Cancelled";
 
-  if (requisition.status === "approved") {
-    return rfqsForReq.length > 0 ? "Sourcing" : "Approved — awaiting sourcing";
-  }
+  if (requisition.status === "approved") return sourcingStage(rfqsForReq.length > 0);
 
   // converted_to_po from here on — walk PO -> invoice -> payment.
   if (!poForReq) return "Converted to PO";
-  if (poForReq.status === "issued") return "PO issued — awaiting fulfillment";
-  if (poForReq.status === "partially_fulfilled") return "Partially fulfilled";
-  if (poForReq.status === "cancelled") return "PO cancelled";
+  return poStage(poForReq, invoiceForPo, paymentForInvoice);
+}
 
-  // poForReq.status === "fulfilled" from here on.
+/** Stage label for the approved-but-not-yet-converted-to-PO window. Standalone so the Sourcing list can show it per row without walking the whole chain. */
+export function sourcingStage(hasOpenRfq: boolean): string {
+  return hasOpenRfq ? "Sourcing" : "Approved — awaiting sourcing";
+}
+
+/**
+ * Stage label from PO issuance onward. Standalone (not just inlined in
+ * computeStage) so Fulfillment pages — which load a PO without walking
+ * back through the requisition — can show the exact same label.
+ */
+export function poStage(po: Po, invoiceForPo?: Invoice, paymentForInvoice?: Payment): string {
+  if (po.status === "issued") return "PO issued — awaiting fulfillment";
+  if (po.status === "partially_fulfilled") return "Partially fulfilled";
+  if (po.status === "cancelled") return "PO cancelled";
+
+  // po.status === "fulfilled" from here on.
   if (!invoiceForPo) return "Fulfilled — awaiting invoice";
-  if (invoiceForPo.status === "submitted") return "Invoice submitted";
-  if (invoiceForPo.status === "matched") return "Invoice matched — awaiting payment approval";
-  if (invoiceForPo.status === "exception") return "Invoice exception — needs review";
-  if (invoiceForPo.status === "disputed") return "Invoice disputed";
-  if (invoiceForPo.status === "paid") return "Paid";
+  return invoiceStage(invoiceForPo, paymentForInvoice);
+}
 
-  // invoiceForPo.status === "approved_for_payment" from here on.
+/** Stage label from invoice submission onward. Standalone so Invoices pages can show it without loading the PO. */
+export function invoiceStage(invoice: Invoice, paymentForInvoice?: Payment): string {
+  if (invoice.status === "submitted") return "Invoice submitted";
+  if (invoice.status === "matched") return "Invoice matched — awaiting payment approval";
+  if (invoice.status === "exception") return "Invoice exception — needs review";
+  if (invoice.status === "disputed") return "Invoice disputed";
+  if (invoice.status === "paid") return "Paid";
+
+  // invoice.status === "approved_for_payment" from here on.
   if (!paymentForInvoice) return "Approved for payment";
   return paymentForInvoice.status === "released" ? "Paid" : "Payment queued";
 }
@@ -75,4 +92,32 @@ const STAGE_VARIANTS: Record<string, "neutral" | "info" | "warning" | "success" 
 /** Badge color for a stage string returned by computeStage(). Falls back to neutral for anything unrecognized. */
 export function stageBadgeVariant(stage: string): "neutral" | "info" | "warning" | "success" | "destructive" {
   return STAGE_VARIANTS[stage] ?? "neutral";
+}
+
+const NEXT_ACTIONS: Record<string, string> = {
+  "Draft": "Submit for approval when ready.",
+  "Submitted": "Awaiting the approval queue to pick this up.",
+  "Pending approval": "Awaiting an approver's decision.",
+  "Approved — awaiting sourcing": "Awaiting sourcing to invite vendors or issue a PO directly.",
+  "Sourcing": "Awaiting vendor quotations — compare and select to issue a PO.",
+  "Converted to PO": "PO issuance in progress.",
+  "PO issued — awaiting fulfillment": "Awaiting goods receipt or service acceptance.",
+  "Partially fulfilled": "Awaiting the remaining goods or services.",
+  "Fulfilled — awaiting invoice": "Awaiting the vendor's invoice.",
+  "Invoice submitted": "Awaiting three-way match against the PO and receipt.",
+  "Invoice matched — awaiting payment approval": "Awaiting finance approval for payment.",
+  "Approved for payment": "Awaiting the payment to be queued.",
+  "Payment queued": "Awaiting release to the vendor.",
+  "Rejected — needs revision": "Revise and resubmit.",
+  "Invoice exception — needs review": "Needs review — approve anyway or dispute.",
+  "Rejected — closed": "Closed — no further action.",
+  "PO cancelled": "No further action.",
+  "Invoice disputed": "Disputed with the vendor — no resolution path yet.",
+  "Paid": "Complete — nothing further to do.",
+  "Cancelled": "No further action.",
+};
+
+/** What happens next for a stage string returned by computeStage(). Falls back to an em dash for anything unrecognized. */
+export function nextAction(stage: string): string {
+  return NEXT_ACTIONS[stage] ?? "—";
 }
