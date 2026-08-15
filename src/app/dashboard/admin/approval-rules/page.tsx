@@ -14,7 +14,7 @@ import { Breadcrumbs } from "@/components/ui/breadcrumbs";
 import { cn } from "@/lib/utils";
 import { describeRule } from "./describeRule";
 import { RuleWizard } from "./RuleWizard";
-import { toggleRuleActive } from "./actions";
+import { toggleRuleActive, updateEscalationSla } from "./actions";
 
 export default async function ApprovalRulesPage() {
   const { tenant } = await getCurrentUserAndTenant();
@@ -46,6 +46,28 @@ export default async function ApprovalRulesPage() {
           <p className="text-sm text-muted-foreground">{rules.length} rules in {tenant.name}</p>
         </div>
       </div>
+
+      <section className="flex flex-col gap-3">
+        <h2 className="text-sm font-medium text-muted-foreground">Escalation</h2>
+        <form action={updateEscalationSla} className="flex flex-wrap items-end gap-2">
+          <div className="flex flex-col gap-1">
+            <label className="text-xs text-muted-foreground">Escalate a pending approval after (hours)</label>
+            <input
+              name="escalationSlaHours"
+              type="number"
+              min="0"
+              defaultValue={tenant.escalationSlaHours}
+              className="h-8 w-24 rounded-md border px-2 text-sm"
+            />
+          </div>
+          <button type="submit" className={cn(buttonVariants({ variant: "outline" }))}>Save</button>
+          <p className="text-xs text-muted-foreground">
+            {tenant.escalationSlaHours > 0
+              ? `Tenant admins are notified once an approval has been actionable for more than ${tenant.escalationSlaHours} hours. 0 disables this.`
+              : "Escalation is off for this tenant — set a value above 0 to enable it."}
+          </p>
+        </form>
+      </section>
 
       <section className="flex flex-col gap-3">
         <div className="flex items-center justify-between">

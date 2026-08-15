@@ -5,7 +5,26 @@ import { eq } from "drizzle-orm";
 import { getCurrentUserAndTenant } from "@/db/session";
 import { withTenant } from "@/db/withTenant";
 import { logAction } from "@/db/audit";
-import { approvalRules, approvalRuleRequirements } from "@/db/schema";
+import { approvalRules, approvalRuleRequirements, tenants } from "@/db/schema";
+
+export async function updateEscalationSla(formData: FormData) {
+  const { user, tenant } = await getCurrentUserAndTenant();
+  const escalationSlaHours = Math.max(0, Number(formData.get("escalationSlaHours") ?? 48) || 0);
+
+  await withTenant(tenant.id, async (tx) => {
+    await tx.update(tenants).set({ escalationSlaHours, updatedAt: new Date() }).where(eq(tenants.id, tenant.id));
+    await logAction(tx, {
+      tenantId: tenant.id,
+      actorUserId: user.id,
+      action: "tenant.escalation_sla_updated",
+      entityType: "tenant",
+      entityId: tenant.id,
+      metadata: { escalationSlaHours },
+    });
+  });
+
+  revalidatePath("/dashboard/admin/approval-rules");
+}
 
 export type WizardStepInput = { approverRoleId: string; minApprovalsInGroup: number }[];
 

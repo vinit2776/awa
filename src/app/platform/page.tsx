@@ -36,7 +36,10 @@ async function handleSignOut() {
 
 async function createTenant(formData: FormData) {
   "use server";
-  await getCurrentPlatformAdmin();
+  const admin = await getCurrentPlatformAdmin();
+  if (admin.role !== "super_admin") {
+    redirect(`/platform?error=${encodeURIComponent("Only super admins can create tenants.")}`);
+  }
 
   const name = String(formData.get("name") ?? "").trim();
   const slug = String(formData.get("slug") ?? "").trim();
@@ -100,19 +103,20 @@ async function setAllowedEmailDomains(formData: FormData) {
 }
 
 export default async function PlatformConsolePage({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
-  const { error: signInError } = await searchParams;
+  const { error } = await searchParams;
 
   let admin;
   try {
     admin = await getCurrentPlatformAdmin();
-  } catch (error) {
-    if (error instanceof PlatformAdminAccessError) {
-      return <PlatformSignIn error={signInError} />;
+  } catch (e) {
+    if (e instanceof PlatformAdminAccessError) {
+      return <PlatformSignIn error={error} />;
     }
-    throw error;
+    throw e;
   }
 
   const tenants = await db.select().from(tenantsTable);
+  const isSuperAdmin = admin.role === "super_admin";
 
   return (
     <div className="flex flex-1 flex-col gap-6 p-8">
@@ -127,6 +131,8 @@ export default async function PlatformConsolePage({ searchParams }: { searchPara
           </button>
         </form>
       </div>
+
+      {error && <p className="text-sm text-destructive">{error}</p>}
 
       <table className="w-full text-sm">
         <thead>
@@ -205,21 +211,25 @@ export default async function PlatformConsolePage({ searchParams }: { searchPara
         ))}
       </div>
 
-      <form action={createTenant} className="flex flex-wrap items-end gap-2">
-        <div className="flex flex-col gap-1">
-          <label htmlFor="name" className="text-xs text-muted-foreground">Name</label>
-          <input id="name" name="name" required className="h-8 rounded-md border px-2 text-sm" placeholder="Oil Extraction Co Ltd" />
-        </div>
-        <div className="flex flex-col gap-1">
-          <label htmlFor="slug" className="text-xs text-muted-foreground">Slug</label>
-          <input id="slug" name="slug" required className="h-8 rounded-md border px-2 text-sm" placeholder="oil-extraction-co" />
-        </div>
-        <div className="flex flex-col gap-1">
-          <label htmlFor="workosOrganizationId" className="text-xs text-muted-foreground">WorkOS org ID (optional)</label>
-          <input id="workosOrganizationId" name="workosOrganizationId" className="h-8 rounded-md border px-2 text-sm" placeholder="org_..." />
-        </div>
-        <button type="submit" className={cn(buttonVariants())}>Create tenant</button>
-      </form>
+      {isSuperAdmin ? (
+        <form action={createTenant} className="flex flex-wrap items-end gap-2">
+          <div className="flex flex-col gap-1">
+            <label htmlFor="name" className="text-xs text-muted-foreground">Name</label>
+            <input id="name" name="name" required className="h-8 rounded-md border px-2 text-sm" placeholder="Oil Extraction Co Ltd" />
+          </div>
+          <div className="flex flex-col gap-1">
+            <label htmlFor="slug" className="text-xs text-muted-foreground">Slug</label>
+            <input id="slug" name="slug" required className="h-8 rounded-md border px-2 text-sm" placeholder="oil-extraction-co" />
+          </div>
+          <div className="flex flex-col gap-1">
+            <label htmlFor="workosOrganizationId" className="text-xs text-muted-foreground">WorkOS org ID (optional)</label>
+            <input id="workosOrganizationId" name="workosOrganizationId" className="h-8 rounded-md border px-2 text-sm" placeholder="org_..." />
+          </div>
+          <button type="submit" className={cn(buttonVariants())}>Create tenant</button>
+        </form>
+      ) : (
+        <p className="text-xs text-muted-foreground">Only super admins can create tenants.</p>
+      )}
     </div>
   );
 }
