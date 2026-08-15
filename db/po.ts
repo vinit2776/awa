@@ -14,14 +14,61 @@ import {
 } from "./schema";
 
 /**
+ * Lines are copied from the requisition's lines, not the quotation —
+ * vendor_quotations only carries a single total_amount (no per-line
+ * pricing in this schema) — but their prices are rescaled so the lines
+ * actually sum to what was agreed. Leaving PO line prices at the
+ * requisition's estimates while the PO header carries the real quoted
+ * total made every line "wrong" by construction whenever a quote didn't
+ * match the estimate exactly (the normal case), and invoice 3-way
+ * matching (db/invoiceMatch.ts) compares invoice lines against
+ * poLine.unitPrice — so a correctly-priced invoice would always come
+ * back a false "exception". Proportional allocation (by each line's
+ * share of the estimated total) is the best available answer given the
+ * schema has no per-line vendor pricing: it's exact for the common
+ * single-line RFQ and a reasonable split for multi-line ones. Each
+ * line's own unitPrice/lineTotal are always kept internally consistent
+ * (see below) — the tradeoff is that the sum of lines can be off from
+ * targetTotal by a cent or two on some multi-line quantities, which is
+ * far less harmful than a blocking false exception on every invoice.
+ */
+function prorateLinesToTotal<T extends { quantity: string; estimatedUnitPrice: string; lineTotal: string }>(
+  lines: T[],
+  targetTotal: string,
+): Array<T & { issuedUnitPrice: string; issuedLineTotal: string }> {
+  const target = Number(targetTotal);
+  const estimatedTotal = lines.reduce((sum, l) => sum + Number(l.lineTotal), 0);
+
+  // unitPrice is rounded first and lineTotal is always derived from that
+  // rounded value (quantity * issuedUnitPrice), never rounded
+  // independently — invoice 3-way matching recomputes quantity *
+  // poLine.unitPrice to compare against the invoice line, so a PO line
+  // whose own lineTotal doesn't equal quantity * unitPrice reads as a
+  // false variance against itself, before an invoice is even involved.
+  // allocatedSoFar tracks the actually-stored (rounded) line totals, not
+  // the raw shares, so the last line's remainder is computed against
+  // what was really allocated — minimizing (not eliminating; 2-decimal
+  // prices can't always divide a target evenly across quantities) drift
+  // between the sum of lines and targetTotal.
+  let allocatedSoFar = 0;
+  return lines.map((line, i) => {
+    const isLast = i === lines.length - 1;
+    const quantity = Number(line.quantity);
+    const lineTarget = isLast
+      ? target - allocatedSoFar
+      : target * (estimatedTotal > 0 ? Number(line.lineTotal) / estimatedTotal : 1 / lines.length);
+
+    const issuedUnitPrice = (quantity > 0 ? lineTarget / quantity : 0).toFixed(2);
+    const issuedLineTotal = (Number(issuedUnitPrice) * quantity).toFixed(2);
+    allocatedSoFar += Number(issuedLineTotal);
+
+    return { ...line, issuedUnitPrice, issuedLineTotal };
+  });
+}
+
+/**
  * Issues a PO from an approved requisition and a quotation already
- * entered for it. Lines are copied from the requisition's lines, not
- * the quotation — vendor_quotations only carries a single total_amount
- * (no per-line pricing in this schema), so PO line unit prices are the
- * requisition's estimated prices while purchase_orders.total_amount is
- * the vendor's actual quoted total. The two can differ; that's expected,
- * not a bug — the total is what was actually agreed, the lines are what
- * was actually ordered.
+ * entered for it.
  *
  * document_hash is computed once, here, from canonical PO content and
  * stored — never recomputed on each PDF download, so it can't drift.
@@ -50,11 +97,13 @@ export async function issuePurchaseOrder(
     .where(and(eq(vendorQuotations.id, quotationId), eq(vendorQuotations.vendorId, vendorId), eq(vendorQuotations.status, "submitted")));
   if (!quotation) return { error: "That quotation isn't available to select." };
 
-  const lines = await tx
+  const requisitionLines = await tx
     .select()
     .from(purchaseRequisitionLines)
     .where(eq(purchaseRequisitionLines.requisitionId, requisitionId));
-  if (lines.length === 0) return { error: "This requisition has no lines to issue a PO for." };
+  if (requisitionLines.length === 0) return { error: "This requisition has no lines to issue a PO for." };
+
+  const lines = prorateLinesToTotal(requisitionLines, quotation.totalAmount);
 
   const [{ value: existingCount }] = await tx
     .select({ value: count() })
@@ -70,7 +119,7 @@ export async function issuePurchaseOrder(
     totalAmount: quotation.totalAmount,
     currency: quotation.currency,
     lines: lines
-      .map((l) => ({ itemId: l.catalogItemId, service: l.freeTextDescription, qty: l.quantity, unitPrice: l.estimatedUnitPrice }))
+      .map((l) => ({ itemId: l.catalogItemId, service: l.freeTextDescription, qty: l.quantity, unitPrice: l.issuedUnitPrice }))
       .sort((a, b) => (a.itemId ?? a.service ?? "").localeCompare(b.itemId ?? b.service ?? "")),
   });
   const documentHash = createHash("sha256").update(canonicalContent).digest("hex");
@@ -102,8 +151,8 @@ export async function issuePurchaseOrder(
       serviceDescription: l.freeTextDescription,
       quantity: l.quantity,
       uom: l.uom,
-      unitPrice: l.estimatedUnitPrice,
-      lineTotal: l.lineTotal,
+      unitPrice: l.issuedUnitPrice,
+      lineTotal: l.issuedLineTotal,
       status: "issued" as const,
     })),
   );
