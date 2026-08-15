@@ -113,6 +113,9 @@ export function RuleWizard({
   function addStep() {
     setSteps((s) => [...s, { key: nextKey(), roles: [] }]);
   }
+  function removeStep(stepKey: string) {
+    setSteps((s) => (s.length > 1 ? s.filter((st) => st.key !== stepKey) : s));
+  }
   function addRoleToStep(stepKey: string) {
     const firstAvailable = roles[0]?.id ?? "";
     setSteps((s) => s.map((st) => (st.key === stepKey ? { ...st, roles: [...st.roles, { key: nextKey(), approverRoleId: firstAvailable, minApprovalsInGroup: 1 }] } : st)));
@@ -130,7 +133,10 @@ export function RuleWizard({
     );
   }
 
-  const step2Valid = steps.some((s) => s.roles.length > 0);
+  // Every step present must have at least one role — an empty step
+  // used to pass validation silently (steps.some, not steps.every) and
+  // get dropped at save time with no indication anything was lost.
+  const step2Valid = steps.length > 0 && steps.every((s) => s.roles.length > 0);
   const step3Valid = !hasConflicts || conflictChoice !== null;
 
   async function handleSave() {
@@ -242,7 +248,14 @@ export function RuleWizard({
           </div>
           {steps.map((s, i) => (
             <div key={s.key} className="rounded-md border p-3">
-              <p className="mb-2 font-mono text-[10px] font-bold uppercase tracking-wide" style={{ color: "var(--primary)" }}>Step {i + 1}</p>
+              <div className="mb-2 flex items-center justify-between">
+                <p className="font-mono text-[10px] font-bold uppercase tracking-wide" style={{ color: "var(--primary)" }}>Step {i + 1}</p>
+                {steps.length > 1 && (
+                  <button type="button" onClick={() => removeStep(s.key)} className="text-xs text-muted-foreground hover:text-destructive">
+                    Remove step
+                  </button>
+                )}
+              </div>
               <div className="flex flex-wrap items-center gap-2">
                 {s.roles.map((r) => (
                   <span key={r.key} className="inline-flex items-center gap-2 rounded-full px-2.5 py-1 text-xs" style={{ background: "var(--accent)" }}>
@@ -264,6 +277,9 @@ export function RuleWizard({
                   + Add another role to this step
                 </button>
               </div>
+              {s.roles.length === 0 && (
+                <p className="mt-2 text-xs text-destructive">Add a role to this step, or remove it — an empty step can&apos;t be saved.</p>
+              )}
               {s.roles.length > 0 && (
                 <details className="mt-2 text-xs text-muted-foreground">
                   <summary className="cursor-pointer">Advanced: require more than one approver for a role</summary>
