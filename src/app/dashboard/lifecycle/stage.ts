@@ -63,7 +63,9 @@ export function invoiceStage(invoice: Invoice, paymentForInvoice?: Payment): str
 
   // invoice.status === "approved_for_payment" from here on.
   if (!paymentForInvoice) return "Approved for payment";
-  return paymentForInvoice.status === "released" ? "Paid" : "Payment queued";
+  if (paymentForInvoice.status === "released") return "Paid";
+  if (paymentForInvoice.status === "failed") return "Payment failed";
+  return "Payment queued";
 }
 
 const STAGE_VARIANTS: Record<string, "neutral" | "info" | "warning" | "success" | "destructive"> = {
@@ -81,6 +83,7 @@ const STAGE_VARIANTS: Record<string, "neutral" | "info" | "warning" | "success" 
   "Invoice matched — awaiting payment approval": "info",
   "Approved for payment": "info",
   "Payment queued": "info",
+  "Payment failed": "destructive",
   "Rejected — needs revision": "warning",
   "Invoice exception — needs review": "warning",
   "Rejected — closed": "destructive",
@@ -107,7 +110,8 @@ const NEXT_ACTIONS: Record<string, string> = {
   "Invoice submitted": "Awaiting three-way match against the PO and receipt.",
   "Invoice matched — awaiting payment approval": "Awaiting finance approval for payment.",
   "Approved for payment": "Awaiting the payment to be queued.",
-  "Payment queued": "Awaiting release to the vendor.",
+  "Payment queued": "Awaiting confirmation the payment was sent.",
+  "Payment failed": "Retry with a corrected reference or payment method.",
   "Rejected — needs revision": "Revise and resubmit.",
   "Invoice exception — needs review": "Needs review — approve anyway or dispute.",
   "Rejected — closed": "Closed — no further action.",
