@@ -26,47 +26,78 @@ export async function updateEscalationSla(formData: FormData) {
   revalidatePath("/dashboard/admin/approval-rules");
 }
 
-export async function createRule(formData: FormData) {
-  const { user, tenant } = await getCurrentUserAndTenant();
-  const name = String(formData.get("name") ?? "").trim();
-  if (!name) return;
+export type WizardStepInput = { approverRoleId: string; minApprovalsInGroup: number }[];
 
-  const categoryId = String(formData.get("categoryId") ?? "").trim() || null;
-  const departmentId = String(formData.get("departmentId") ?? "").trim() || null;
-  const costCenterId = String(formData.get("costCenterId") ?? "").trim() || null;
-  const minValue = String(formData.get("minValue") ?? "0").trim() || "0";
-  const maxValue = String(formData.get("maxValue") ?? "").trim() || null;
-  const combinationMode = String(formData.get("combinationMode") ?? "additive") as "additive" | "exclusive";
-  const priority = Number(formData.get("priority") ?? 0) || 0;
+export type CreateRuleWithRequirementsInput = {
+  name: string;
+  categoryId: string | null;
+  departmentId: string | null;
+  costCenterId: string | null;
+  minValue: string;
+  maxValue: string | null;
+  combinationMode: "additive" | "exclusive";
+  priority: number;
+  steps: WizardStepInput[];
+};
+
+/**
+ * The wizard's single save point (§08 rule creator). Creates the rule
+ * and every requirement row in one transaction — the two-separate-forms
+ * flow it replaces let a rule exist with no requirements at all,
+ * silently approving nothing. Called directly from the client wizard
+ * (not a <form action>), since its payload is nested, not flat fields.
+ */
+export async function createRuleWithRequirements(input: CreateRuleWithRequirementsInput): Promise<{ error?: string }> {
+  const { user, tenant } = await getCurrentUserAndTenant();
+
+  const name = input.name.trim();
+  if (!name) return { error: "Give this rule a name." };
+  const steps = input.steps.filter((step) => step.length > 0);
+  if (steps.length === 0) return { error: "Add at least one approval step." };
 
   await withTenant(tenant.id, async (tx) => {
-    const [created] = await tx
+    const [rule] = await tx
       .insert(approvalRules)
       .values({
         tenantId: tenant.id,
         name,
-        categoryId,
-        departmentId,
-        costCenterId,
-        minValue,
-        maxValue,
-        combinationMode,
-        priority,
+        categoryId: input.categoryId,
+        departmentId: input.departmentId,
+        costCenterId: input.costCenterId,
+        minValue: input.minValue || "0",
+        maxValue: input.maxValue,
+        combinationMode: input.combinationMode,
+        priority: input.priority,
         createdBy: user.id,
         updatedBy: user.id,
       })
       .returning();
+
+    await tx.insert(approvalRuleRequirements).values(
+      steps.flatMap((step, i) =>
+        step.map((req) => ({
+          tenantId: tenant.id,
+          ruleId: rule.id,
+          approverRoleId: req.approverRoleId,
+          groupNo: i + 1,
+          groupSequence: i + 1,
+          minApprovalsInGroup: req.minApprovalsInGroup,
+        })),
+      ),
+    );
+
     await logAction(tx, {
       tenantId: tenant.id,
       actorUserId: user.id,
       action: "approval_rule.created",
       entityType: "approval_rule",
-      entityId: created.id,
-      metadata: { name },
+      entityId: rule.id,
+      metadata: { name, stepCount: steps.length, combinationMode: input.combinationMode, priority: input.priority },
     });
   });
 
   revalidatePath("/dashboard/admin/approval-rules");
+  return {};
 }
 
 export async function toggleRuleActive(formData: FormData) {
@@ -87,33 +118,6 @@ export async function toggleRuleActive(formData: FormData) {
       entityType: "approval_rule",
       entityId: ruleId,
       metadata: {},
-    });
-  });
-
-  revalidatePath("/dashboard/admin/approval-rules");
-}
-
-export async function createRuleRequirement(formData: FormData) {
-  const { user, tenant } = await getCurrentUserAndTenant();
-  const ruleId = String(formData.get("ruleId") ?? "");
-  const approverRoleId = String(formData.get("approverRoleId") ?? "");
-  const groupNo = Number(formData.get("groupNo") ?? 1) || 1;
-  const groupSequence = Number(formData.get("groupSequence") ?? groupNo) || groupNo;
-  const minApprovalsInGroup = Number(formData.get("minApprovalsInGroup") ?? 1) || 1;
-  if (!ruleId || !approverRoleId) return;
-
-  await withTenant(tenant.id, async (tx) => {
-    const [created] = await tx
-      .insert(approvalRuleRequirements)
-      .values({ tenantId: tenant.id, ruleId, approverRoleId, groupNo, groupSequence, minApprovalsInGroup })
-      .returning();
-    await logAction(tx, {
-      tenantId: tenant.id,
-      actorUserId: user.id,
-      action: "approval_rule_requirement.created",
-      entityType: "approval_rule_requirement",
-      entityId: created.id,
-      metadata: { ruleId, approverRoleId, groupNo },
     });
   });
 
