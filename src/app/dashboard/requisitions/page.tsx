@@ -8,11 +8,17 @@ import {
   requisitionApprovalRequirements as requirementsTable,
   departments as departmentsTable,
   costCenters as costCentersTable,
+  rfqs as rfqsTable,
+  purchaseOrders as purchaseOrdersTable,
+  invoices as invoicesTable,
+  paymentInstructions as paymentInstructionsTable,
   requisitionStatus,
 } from "@/db/schema";
 import { buttonVariants } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Breadcrumbs } from "@/components/ui/breadcrumbs";
 import { cn } from "@/lib/utils";
+import { computeStage, stageBadgeVariant } from "@/app/dashboard/lifecycle/stage";
 import { submitRequisition } from "./actions";
 
 function pendingDays(submittedAt: Date | null): number | null {
@@ -91,6 +97,30 @@ export default async function RequisitionsPage({
     ),
   );
 
+  const requisitionIds = requisitions.map((r) => r.id);
+  const [rfqRows, poRows] = requisitionIds.length
+    ? await withTenant(tenant.id, async (tx) => [
+        await tx.select().from(rfqsTable).where(inArray(rfqsTable.requisitionId, requisitionIds)),
+        await tx.select().from(purchaseOrdersTable).where(inArray(purchaseOrdersTable.requisitionId, requisitionIds)),
+      ])
+    : [[], []];
+  const poIds = poRows.map((p) => p.id);
+  const invoiceRows = poIds.length
+    ? await withTenant(tenant.id, (tx) => tx.select().from(invoicesTable).where(inArray(invoicesTable.poId, poIds)))
+    : [];
+  const invoiceIds = invoiceRows.map((i) => i.id);
+  const paymentRows = invoiceIds.length
+    ? await withTenant(tenant.id, (tx) => tx.select().from(paymentInstructionsTable).where(inArray(paymentInstructionsTable.invoiceId, invoiceIds)))
+    : [];
+
+  const stageFor = (r: (typeof requisitions)[number]) => {
+    const rfqsForReq = rfqRows.filter((x) => x.requisitionId === r.id);
+    const po = poRows.find((x) => x.requisitionId === r.id);
+    const invoice = po ? invoiceRows.find((x) => x.poId === po.id) : undefined;
+    const payment = invoice ? paymentRows.find((x) => x.invoiceId === invoice.id) : undefined;
+    return computeStage(r, rfqsForReq, po, invoice, payment);
+  };
+
   const departmentName = (id: string | null) => departments.find((d) => d.id === id)?.name ?? "—";
   const costCenterName = (id: string | null) => costCenters.find((c) => c.id === id)?.name ?? "—";
 
@@ -162,6 +192,7 @@ export default async function RequisitionsPage({
             const days = pendingDays(r.submittedAt);
             const showPending = days !== null && (r.status === "submitted" || r.status === "pending_approval");
             const reason = r.status === "rejected_revisable" || r.status === "rejected_closed" ? reasonFor(r.id) : null;
+            const stage = stageFor(r);
             return (
               <tr key={r.id} className="border-b align-top">
                 <td className="py-2">{r.createdAt.toISOString().slice(0, 10)}</td>
@@ -169,8 +200,8 @@ export default async function RequisitionsPage({
                 <td className="py-2">{costCenterName(r.costCenterId)}</td>
                 <td className="py-2">{r.totalEstimatedValue} {r.currency}</td>
                 <td className="py-2">
-                  {r.status}
-                  {showPending && <span className="text-muted-foreground"> · {days} day{days === 1 ? "" : "s"}</span>}
+                  <Badge variant={stageBadgeVariant(stage)}>{stage}</Badge>
+                  {showPending && <span className="ml-1.5 text-muted-foreground">{days} day{days === 1 ? "" : "s"}</span>}
                   {reason && <p className="mt-0.5 max-w-xs text-xs text-muted-foreground">{reason}</p>}
                 </td>
                 <td className="py-2">
