@@ -224,6 +224,21 @@ async function notifyCurrentGroup(tx: typeof db, requisitionId: string) {
     );
   if (pending.length === 0) return;
   const currentGroup = Math.min(...pending.map((p) => p.groupNo));
+
+  // Starts the escalation SLA clock for this group — coalesce so a
+  // repeat call (another still-pending member of the same group) never
+  // resets a timer that's already running.
+  await tx
+    .update(requisitionApprovalRequirements)
+    .set({ actionableAt: sql`coalesce(${requisitionApprovalRequirements.actionableAt}, now())` })
+    .where(
+      and(
+        eq(requisitionApprovalRequirements.requisitionId, requisitionId),
+        eq(requisitionApprovalRequirements.status, "pending"),
+        eq(requisitionApprovalRequirements.groupNo, currentGroup),
+      ),
+    );
+
   for (const p of pending.filter((p) => p.groupNo === currentGroup)) {
     await notifyUser(tx, p.assignedUserId, "approval_needed", "A requisition needs your approval", "Open your approvals inbox to review it.");
   }
@@ -385,6 +400,10 @@ export async function addAdHocApprover(
       addedByUserId: actorUserId,
       reason,
       status: "pending",
+      // Inserted directly into the current group (isCurrentGroup checked
+      // above) — it's immediately actionable, not waiting on an earlier
+      // group to clear.
+      actionableAt: new Date(),
     })
     .returning();
 

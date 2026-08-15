@@ -77,6 +77,12 @@ export const tenants = pgTable("tenants", {
   // JIT sign-in linking (db/tenant.ts) as a second layer of defense
   // beyond "an admin pre-provisioned this users row with this email."
   allowedEmailDomains: text("allowed_email_domains").array().notNull().default([]),
+  // Escalation (lifecycle audit, §08): how long a pending approval can
+  // sit actionable before the escalation cron notifies tenant_admin
+  // holders. Per-tenant, not a global constant — 0 disables escalation
+  // for this tenant entirely, same "off by default is a valid choice"
+  // shape as feature_flags above.
+  escalationSlaHours: integer("escalation_sla_hours").notNull().default(48),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
@@ -337,6 +343,16 @@ export const requisitionApprovalRequirements = pgTable("requisition_approval_req
   decidedAt: timestamp("decided_at", { withTimezone: true }),
   decisionComment: text("decision_comment"),
   delegateOfUserId: uuid("delegate_of_user_id").references(() => users.id),
+  // Set once this row's group becomes the current/actionable group (see
+  // notifyCurrentGroup in db/approvals.ts) — NOT the same as createdAt,
+  // which for a later group is stamped at submission time, before that
+  // group is actually waiting on anyone. The escalation SLA clock runs
+  // from here, not from createdAt, so a multi-group approval doesn't
+  // read as already overdue the moment group 2 opens up.
+  actionableAt: timestamp("actionable_at", { withTimezone: true }),
+  // Set once the escalation cron has notified tenant_admin holders about
+  // this row, so a re-run doesn't re-notify the same breach every tick.
+  escalatedAt: timestamp("escalated_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [
   index().on(t.tenantId, t.requisitionId, t.status),
