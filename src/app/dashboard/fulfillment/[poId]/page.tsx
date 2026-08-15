@@ -66,7 +66,8 @@ export default async function FulfillmentDetailPage({
     return [vendor ?? null, requisition ?? null];
   });
 
-  const itemName = (itemId: string | null) => catalogItems.find((i) => i.id === itemId)?.name ?? null;
+  const itemName = (l: { itemId: string | null; serviceDescription: string | null }) =>
+    catalogItems.find((i) => i.id === l.itemId)?.name ?? l.serviceDescription ?? "Item";
   const receiverOptions = users.filter((u) => u.id !== requisition?.requestorId);
 
   const goodsLines = lines.filter((l) => l.fulfillmentType === "goods");
@@ -129,7 +130,7 @@ export default async function FulfillmentDetailPage({
               return (
                 <li key={l.id}>
                   <div>
-                    {itemName(l.itemId) ?? "Item"} — {l.quantity} {l.uom} ordered
+                    {itemName(l)} — {l.quantity} {l.uom} ordered
                     {receipts.length > 0 && (
                       <span className="text-muted-foreground"> · {accepted} accepted so far ({l.status})</span>
                     )}
@@ -245,7 +246,7 @@ export default async function FulfillmentDetailPage({
                     return (
                       <tr key={l.id} className="border-b">
                         <td className="py-2">
-                          {itemName(l.itemId) ?? "Item"}
+                          {itemName(l)}
                           <input type="hidden" name="poLineId" value={l.id} />
                         </td>
                         <td className="py-2">
