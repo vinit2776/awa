@@ -8,7 +8,8 @@ export type NotificationType =
   | "approval_needed"
   | "requisition_approved"
   | "requisition_rejected"
-  | "vendor_po_issued";
+  | "vendor_po_issued"
+  | "approval_escalated";
 
 /**
  * Transactional email has no provider account wired yet (Resend, SES,
