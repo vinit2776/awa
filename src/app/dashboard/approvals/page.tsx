@@ -12,12 +12,14 @@ import {
   users as usersTable,
   departments as departmentsTable,
   costCenters as costCentersTable,
+  approvalRules as approvalRulesTable,
 } from "@/db/schema";
 import { buttonVariants } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Breadcrumbs } from "@/components/ui/breadcrumbs";
 import { cn } from "@/lib/utils";
 import { LifecycleStatus } from "@/app/dashboard/lifecycle/LifecycleStatus";
+import { approvalStepDetail } from "@/app/dashboard/lifecycle/stage";
 import { approveRequirement, requestRevision, rejectAndClose, addAdHocApprover } from "./actions";
 
 function pendingDays(submittedAt: Date | null): number | null {
@@ -69,6 +71,22 @@ export default async function ApprovalsInboxPage() {
         await tx.select().from(catalogItemsTable),
       ])
     : [[], []];
+
+  // All requirement rows (any status, every group) for the requisitions
+  // in front of this approver — not just the pending ones already
+  // fetched above — so approvalStepDetail() can see the true step
+  // count, including groups that already cleared.
+  const [allRequirementRows, approvalRules] = requisitionIds.length
+    ? await withTenant(tenant.id, async (tx) => [
+        await tx.select().from(requirementsTable).where(inArray(requirementsTable.requisitionId, requisitionIds)),
+        await tx.select().from(approvalRulesTable),
+      ])
+    : [[], []];
+  const stepDetailFor = (requisitionId: string) => approvalStepDetail(allRequirementRows.filter((r) => r.requisitionId === requisitionId));
+  const matchedRuleNames = (requisitionId: string) => {
+    const ruleIds = [...new Set(allRequirementRows.filter((r) => r.requisitionId === requisitionId && r.sourceRuleId).map((r) => r.sourceRuleId!))];
+    return ruleIds.map((id) => approvalRules.find((rule) => rule.id === id)?.name).filter((name): name is string => !!name);
+  };
 
   const catalogItemIds = [...new Set(lines.map((l) => l.catalogItemId).filter((id): id is string => id !== null))];
   const itemHistoryById = new Map<string, ItemPurchaseHistoryEntry[]>();
@@ -126,6 +144,11 @@ export default async function ApprovalsInboxPage() {
                   {requisition.justification && (
                     <p className="mt-1 text-xs text-muted-foreground">&quot;{requisition.justification}&quot;</p>
                   )}
+                  {matchedRuleNames(req.requisitionId).length > 0 && (
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Via {matchedRuleNames(req.requisitionId).map((n) => `"${n}"`).join(", ")}
+                    </p>
+                  )}
                   {documentUrls.has(requisition.id) && (
                     <a
                       href={documentUrls.get(requisition.id)}
@@ -138,7 +161,7 @@ export default async function ApprovalsInboxPage() {
                   )}
                 </div>
                 <div className="flex shrink-0 flex-col items-end gap-1 text-right">
-                  <LifecycleStatus stage="Pending approval" />
+                  <LifecycleStatus stage="Pending approval" detail={stepDetailFor(req.requisitionId)} />
                   {req.escalatedAt && <Badge variant="destructive">Escalated</Badge>}
                 </div>
               </div>
