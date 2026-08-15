@@ -14,6 +14,7 @@ import {
   costCenters as costCentersTable,
 } from "@/db/schema";
 import { buttonVariants } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Breadcrumbs } from "@/components/ui/breadcrumbs";
 import { cn } from "@/lib/utils";
 import { LifecycleStatus } from "@/app/dashboard/lifecycle/LifecycleStatus";
@@ -136,7 +137,10 @@ export default async function ApprovalsInboxPage() {
                     </a>
                   )}
                 </div>
-                <LifecycleStatus stage="Pending approval" className="shrink-0 items-end text-right" />
+                <div className="flex shrink-0 flex-col items-end gap-1 text-right">
+                  <LifecycleStatus stage="Pending approval" />
+                  {req.escalatedAt && <Badge variant="destructive">Escalated</Badge>}
+                </div>
               </div>
 
               {budget !== null && (
