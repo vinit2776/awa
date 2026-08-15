@@ -563,5 +563,11 @@ export const paymentInstructions = pgTable("payment_instructions", {
   // The deliberate human step (§05) — never automated.
   releasedBy: uuid("released_by").references(() => users.id),
   releasedAt: timestamp("released_at", { withTimezone: true }),
+  // Set on release — the bank/UTR reference to reconcile against, not
+  // just an internal "we clicked release" record.
+  referenceNumber: text("reference_number"),
+  // Set when a release attempt fails, so the payment stays visible
+  // (and retryable) instead of disappearing from the queue.
+  failureReason: text("failure_reason"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
