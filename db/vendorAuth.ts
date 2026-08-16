@@ -2,6 +2,7 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 import { and, eq } from "drizzle-orm";
 import { adminDb } from "./adminClient";
 import { tenants, vendors, vendorUsers } from "./schema";
+import { logEmailResult, sendEmail } from "./email";
 
 const MAGIC_LINK_TTL_MS = 15 * 60 * 1000;
 const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
@@ -54,11 +55,18 @@ export function verifyMagicLinkToken(token: string): string | null {
 }
 
 /**
- * Same "no email provider account exists yet" stub as
- * db/notifications.ts#deliver — console.log until one is picked and
- * wired in. Silently no-ops on an email with no vendor_users match at
- * all, same as any login-by-email flow should: telling an unauthenticated
- * caller "no account with that email" is a user-enumeration leak.
+ * Silently no-ops on an email with no vendor_users match at all, same as any
+ * login-by-email flow should: telling an unauthenticated caller "no account
+ * with that email" is a user-enumeration leak.
+ *
+ * Delivery goes through db/email.ts, which logs the link instead of sending
+ * when no provider is configured — so the portal stays usable locally without
+ * an account, exactly as it did before.
+ *
+ * The result is deliberately not returned to the caller. The sign-in page must
+ * render the same "check your inbox" response whether or not the address
+ * matched and whether or not the send succeeded; surfacing a delivery failure
+ * here would reintroduce the enumeration leak the early return avoids.
  */
 export async function sendVendorMagicLink(email: string, baseUrl: string) {
   const matches = await findVendorLoginMatches(email);
@@ -66,7 +74,16 @@ export async function sendVendorMagicLink(email: string, baseUrl: string) {
 
   const token = makeMagicLinkToken(email);
   const link = `${baseUrl}/vendor-portal/verify/${token}`;
-  console.log(`[vendor-magic-link] to=${email}\n${link}`);
+  const body = [
+    "Sign in to the AWA vendor portal using the link below. It expires in 15 minutes.",
+    "",
+    link,
+    "",
+    "If you didn't request this, you can ignore this email.",
+  ].join("\n");
+
+  const result = await sendEmail({ to: email, subject: "Your AWA vendor portal sign-in link", text: body });
+  logEmailResult("vendor-magic-link", email, "Your AWA vendor portal sign-in link", body, result);
 }
 
 export function makeVendorSessionToken(vendorUserId: string): string {

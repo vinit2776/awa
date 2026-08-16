@@ -1,6 +1,7 @@
 import { eq } from "drizzle-orm";
 import type { db } from "./client";
 import { sendPushToUser } from "./push";
+import { logEmailResult, sendEmail } from "./email";
 import { users } from "./schema";
 
 export type NotificationType =
@@ -23,23 +24,33 @@ export type NotificationType =
   | "clarification_resolved";
 
 /**
- * Transactional email has no provider account wired yet (Resend, SES,
- * Postmark — whichever gets picked needs a real account created, which
- * isn't something to do unprompted). Every call site in this file is
- * final; only `deliver`'s body needs to change once a provider exists —
- * swap the console.log for the provider's send call and everything
- * upstream keeps working unmodified. Until then this logs so the
- * triggering logic is fully wired and testable, just not actually
- * emailing anyone.
+ * Transactional email now goes through db/email.ts (Resend). When that isn't
+ * configured it logs exactly as this stub always did, so nothing here depends
+ * on an account existing — the triggering logic stays testable either way.
+ *
+ * Email is sent before push, and neither can fail the caller: sendEmail()
+ * never throws, and the push send is caught below. This matters because
+ * deliver() runs inside the caller's withTenant transaction, so an exception
+ * escaping here would roll back the approval or ticket that prompted the
+ * notification. A notification failing must never undo the thing it was
+ * notifying about.
  *
  * Web Push (S14) is wired here too, additively — real delivery, not a
  * stub, whenever VAPID is configured and the target user (vendors have
  * none) has at least one subscribed device.
  */
 async function deliver(params: { type: NotificationType; toEmail: string; subject: string; body: string; userId?: string; tx?: typeof db }) {
-  console.log(`[notification:${params.type}] to=${params.toEmail} subject="${params.subject}"\n${params.body}`);
+  const result = await sendEmail({ to: params.toEmail, subject: params.subject, text: params.body });
+  logEmailResult(`notification:${params.type}`, params.toEmail, params.subject, params.body, result);
+
   if (params.userId && params.tx) {
-    await sendPushToUser(params.tx, params.userId, { title: params.subject, body: params.body });
+    try {
+      await sendPushToUser(params.tx, params.userId, { title: params.subject, body: params.body });
+    } catch (error) {
+      // Same reasoning as the email path: a dead push subscription must not
+      // roll back the caller's transaction.
+      console.error(`[notification:${params.type}] push failed for user=${params.userId} —`, error);
+    }
   }
 }
 
