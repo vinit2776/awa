@@ -5,8 +5,10 @@ import { isTenantAdmin } from "@/db/permissions";
 import { withTenant } from "@/db/withTenant";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { isStorageConfigured } from "@/db/storage";
 import { DashboardNav } from "./DashboardNav";
 import { PushNotifications } from "./PushNotifications";
+import { ReportWidget } from "./ReportWidget";
 
 
 export default async function DashboardLayout({ children }: LayoutProps<"/dashboard">) {
@@ -38,6 +40,10 @@ export default async function DashboardLayout({ children }: LayoutProps<"/dashbo
             <p className="truncate text-xs text-sidebar-foreground/60">{user.fullName}</p>
           </div>
           <PushNotifications />
+          {/* Mounted in the shell, not on a page: reporting has to be possible
+              from wherever the problem is, and the slide-over keeps that page
+              on screen and in state behind it. */}
+          <ReportWidget storageEnabled={isStorageConfigured()} />
           <form action={handleSignOut}>
             <button type="submit" className={cn(buttonVariants({ variant: "outline", size: "sm" }), "w-full")}>
               Sign out

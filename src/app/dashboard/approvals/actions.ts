@@ -6,6 +6,7 @@ import { getCurrentUserAndTenant } from "@/db/session";
 import { withTenant } from "@/db/withTenant";
 import { logAction } from "@/db/audit";
 import { isCurrentGroup, checkFullyApproved, rejectRequisition, addAdHocApprover as addAdHocApproverToRequisition } from "@/db/approvals";
+import { isBlocked } from "@/db/clarificationRules";
 import { requisitionApprovalRequirements, approvalDecisionLog } from "@/db/schema";
 
 export async function approveRequirement(formData: FormData) {
@@ -28,6 +29,12 @@ export async function approveRequirement(formData: FormData) {
       );
     if (!requirement) return;
     if (!(await isCurrentGroup(tx, requirement.requisitionId, requirement.groupNo))) return;
+    // The disabled fieldset on the approvals page is the courtesy; this is the
+    // enforcement. A server action is reachable by direct POST, so a held
+    // requisition has to be re-checked here or the block means nothing.
+    if (await isBlocked(tx, "requisition", requirement.requisitionId)) {
+      throw new Error("This requisition has an open query on it. It can be approved once that query is resolved.");
+    }
 
     await tx
       .update(requisitionApprovalRequirements)
@@ -62,7 +69,26 @@ async function reject(formData: FormData, closure: "revisable" | "closed") {
   if (!requirementId || !comment) return;
 
   const { user, tenant } = await getCurrentUserAndTenant();
-  await withTenant(tenant.id, (tx) => rejectRequisition(tx, tenant.id, user.id, requirementId, closure, comment));
+  await withTenant(tenant.id, async (tx) => {
+    const [requirement] = await tx
+      .select({ requisitionId: requisitionApprovalRequirements.requisitionId })
+      .from(requisitionApprovalRequirements)
+      .where(
+        and(
+          eq(requisitionApprovalRequirements.id, requirementId),
+          eq(requisitionApprovalRequirements.assignedUserId, user.id),
+          eq(requisitionApprovalRequirements.status, "pending"),
+        ),
+      );
+    if (!requirement) return;
+    // Same enforcement as approve. Rejecting around an open query would let an
+    // approver sidestep their own question rather than answer it.
+    if (await isBlocked(tx, "requisition", requirement.requisitionId)) {
+      throw new Error("This requisition has an open query on it. Resolve that query before rejecting.");
+    }
+
+    return rejectRequisition(tx, tenant.id, user.id, requirementId, closure, comment);
+  });
 
   revalidatePath("/dashboard/approvals");
 }

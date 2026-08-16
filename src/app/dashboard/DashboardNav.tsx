@@ -12,6 +12,8 @@ import {
   RefreshCw,
   BarChart3,
   Settings,
+  LifeBuoy,
+  MessageCircleQuestion,
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -25,6 +27,8 @@ const NAV_ITEMS: { href: string; label: string; icon: LucideIcon }[] = [
   { href: "/dashboard/payments", label: "Payments", icon: Wallet },
   { href: "/dashboard/lifecycle", label: "Lifecycle", icon: RefreshCw },
   { href: "/dashboard/reports", label: "Reports", icon: BarChart3 },
+  { href: "/dashboard/queries", label: "Queries", icon: MessageCircleQuestion },
+  { href: "/dashboard/support", label: "Support", icon: LifeBuoy },
 ];
 
 const ADMIN_NAV_ITEM = { href: "/dashboard/admin/departments", label: "Admin", icon: Settings };

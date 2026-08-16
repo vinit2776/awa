@@ -9,7 +9,18 @@ export type NotificationType =
   | "requisition_approved"
   | "requisition_rejected"
   | "vendor_po_issued"
-  | "approval_escalated";
+  | "approval_escalated"
+  // Support desk (customer ↔ AWA support). Only ever sent to the customer
+  // side: a platform admin has no users row and therefore no push
+  // subscription to look up, so support-side alerting stays in the console.
+  | "support_ticket_replied"
+  | "support_ticket_resolved"
+  // Transaction clarifications (colleague ↔ colleague). Both parties are
+  // tenant users, so these work end-to-end today — unlike the support
+  // notifications above, they don't wait on an email provider to be useful.
+  | "clarification_raised"
+  | "clarification_answered"
+  | "clarification_resolved";
 
 /**
  * Transactional email has no provider account wired yet (Resend, SES,
