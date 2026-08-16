@@ -32,7 +32,11 @@ Every change — feature, fix, chore — goes through a branch and a PR into `ma
 Carried forward from gaps already flagged in `README.md` / `SETUP.md` — not a recurring gate, a checklist to clear once:
 
 - [ ] Switch WorkOS credentials from test-mode (`sk_test_...`) to live/production in the WorkOS dashboard (`SETUP.md`).
-- [ ] Wire a real email provider — notifications currently log to console only (`db/notifications.ts`).
+- [ ] Create a Resend account, verify a sending domain, and set `RESEND_API_KEY` / `EMAIL_FROM` in Vercel. The
+      integration is built (`db/email.ts`, used by `db/notifications.ts` and `db/vendorAuth.ts`) — without those
+      two variables it logs what it would have sent and carries on, so this is now an account task rather than a
+      code task. Deliberately left unset in CI: the suites exercise the notification paths against fixture
+      addresses.
 - [ ] Decide role-based UI permission gating (flagged as a known gap in `README.md`).
 - [ ] Turn on GitHub branch protection on `main` (PR + passing CI required) per the shipping policy above — blocked on GitHub Pro/Team (or making the repo public); currently unavailable on the private free-plan repo.
 - [ ] Confirm `db/__tests__/rls-isolation.test.ts` is green — this is the test that actually proves tenant isolation holds; treat a failure here as a launch blocker, not a flaky test to skip.
