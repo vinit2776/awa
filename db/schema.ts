@@ -587,3 +587,182 @@ export const paymentInstructions = pgTable("payment_instructions", {
   failureReason: text("failure_reason"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
+
+// =========================================================================
+// Support desk (0011_support_desk.sql) — customer ↔ AWA support.
+// Not the clarification system below; see docs/support-desk-plan.md §3.1.
+// =========================================================================
+
+export const supportTicketType = pgEnum("support_ticket_type", [
+  "bug", "feature_request", "feedback", "question",
+]);
+export const supportTicketStatus = pgEnum("support_ticket_status", [
+  "new", "triaged", "in_progress", "awaiting_customer", "resolved", "closed",
+]);
+export const supportTicketPriority = pgEnum("support_ticket_priority", ["urgent", "high", "normal", "low"]);
+export const supportResolutionOutcome = pgEnum("support_resolution_outcome", [
+  "fixed", "shipped", "wont_do", "duplicate", "not_a_bug", "no_response",
+]);
+export const supportMessageVisibility = pgEnum("support_message_visibility", ["customer", "support_only"]);
+export const supportActorKind = pgEnum("support_actor_kind", ["customer", "support", "system"]);
+
+export const supportTickets = pgTable("support_tickets", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  tenantId: uuid("tenant_id").notNull().references(() => tenants.id),
+  // Defaulted by the DB from a global sequence. Declared with the default here
+  // so Drizzle omits the column from INSERTs and lets Postgres assign it —
+  // application code never picks a ticket reference.
+  reference: text("reference")
+    .notNull()
+    .default(sql`'SUP-' || lpad(nextval('support_ticket_ref_seq')::text, 5, '0')`),
+  type: supportTicketType("type").notNull(),
+  status: supportTicketStatus("status").notNull().default("new"),
+  priority: supportTicketPriority("priority").notNull().default("normal"),
+  subject: text("subject").notNull(),
+  description: text("description").notNull(),
+  reportedByUserId: uuid("reported_by_user_id").notNull().references(() => users.id),
+  // Snapshot of where the report came from, not a join — see the migration.
+  pagePath: text("page_path"),
+  pageUrl: text("page_url"),
+  relatedEntityType: text("related_entity_type"),
+  relatedEntityId: uuid("related_entity_id"),
+  appVersion: text("app_version"),
+  userAgent: text("user_agent"),
+  viewport: text("viewport"),
+  assignedToAdminId: uuid("assigned_to_admin_id").references(() => platformAdmins.id),
+  assignedAt: timestamp("assigned_at", { withTimezone: true }),
+  firstResponseDueAt: timestamp("first_response_due_at", { withTimezone: true }),
+  resolutionDueAt: timestamp("resolution_due_at", { withTimezone: true }),
+  firstRespondedAt: timestamp("first_responded_at", { withTimezone: true }),
+  resolvedAt: timestamp("resolved_at", { withTimezone: true }),
+  closedAt: timestamp("closed_at", { withTimezone: true }),
+  resolutionOutcome: supportResolutionOutcome("resolution_outcome"),
+  resolutionSummary: text("resolution_summary"),
+  escalationLevel: integer("escalation_level").notNull().default(0),
+  escalatedAt: timestamp("escalated_at", { withTimezone: true }),
+  customerEscalatedAt: timestamp("customer_escalated_at", { withTimezone: true }),
+  relatedTicketId: uuid("related_ticket_id").references((): AnyPgColumn => supportTickets.id),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [
+  index().on(t.tenantId, t.status),
+  index().on(t.tenantId, t.reportedByUserId),
+  index().on(t.assignedToAdminId, t.status),
+  check(
+    "support_tickets_resolution_complete",
+    sql`${t.status} not in ('resolved','closed') or (${t.resolutionOutcome} is not null and ${t.resolutionSummary} is not null)`,
+  ),
+]);
+
+export const supportTicketMessages = pgTable("support_ticket_messages", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  tenantId: uuid("tenant_id").notNull().references(() => tenants.id),
+  ticketId: uuid("ticket_id").notNull().references(() => supportTickets.id, { onDelete: "cascade" }),
+  visibility: supportMessageVisibility("visibility").notNull().default("customer"),
+  body: text("body").notNull(),
+  isQuestion: boolean("is_question").notNull().default(false),
+  authorUserId: uuid("author_user_id").references(() => users.id),
+  authorPlatformAdminId: uuid("author_platform_admin_id").references(() => platformAdmins.id),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [
+  index().on(t.tenantId, t.ticketId, t.createdAt),
+  check("support_message_single_author", sql`num_nonnulls(${t.authorUserId}, ${t.authorPlatformAdminId}) = 1`),
+  // The constraint that keeps the two lanes apart — see the migration.
+  check(
+    "support_message_support_only_authorship",
+    sql`${t.visibility} <> 'support_only' or ${t.authorPlatformAdminId} is not null`,
+  ),
+]);
+
+export const supportTicketAttachments = pgTable("support_ticket_attachments", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  tenantId: uuid("tenant_id").notNull().references(() => tenants.id),
+  ticketId: uuid("ticket_id").notNull().references(() => supportTickets.id, { onDelete: "cascade" }),
+  messageId: uuid("message_id").references(() => supportTicketMessages.id, { onDelete: "cascade" }),
+  storageKey: text("storage_key").notNull().unique(),
+  fileName: text("file_name").notNull(),
+  contentType: text("content_type").notNull(),
+  sizeBytes: integer("size_bytes").notNull(),
+  uploadedByUserId: uuid("uploaded_by_user_id").references(() => users.id),
+  uploadedByPlatformAdminId: uuid("uploaded_by_platform_admin_id").references(() => platformAdmins.id),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [
+  index().on(t.tenantId, t.ticketId),
+  check(
+    "support_attachment_single_uploader",
+    sql`num_nonnulls(${t.uploadedByUserId}, ${t.uploadedByPlatformAdminId}) = 1`,
+  ),
+]);
+
+// Append-only (update/delete revoked from app_runtime in the migration).
+// Exists instead of reusing audit_log because audit_log.actor_user_id
+// references users(id) and a platform support admin has no users row.
+export const supportTicketEvents = pgTable("support_ticket_events", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  tenantId: uuid("tenant_id").notNull().references(() => tenants.id),
+  ticketId: uuid("ticket_id").notNull().references(() => supportTickets.id, { onDelete: "cascade" }),
+  event: text("event").notNull(),
+  actorKind: supportActorKind("actor_kind").notNull(),
+  actorUserId: uuid("actor_user_id").references(() => users.id),
+  actorPlatformAdminId: uuid("actor_platform_admin_id").references(() => platformAdmins.id),
+  fromValue: text("from_value"),
+  toValue: text("to_value"),
+  metadata: jsonb("metadata").notNull().default({}),
+  occurredAt: timestamp("occurred_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [index().on(t.tenantId, t.ticketId, t.occurredAt)]);
+
+// =========================================================================
+// Transaction clarifications (0012) — colleague ↔ colleague, on a record.
+// Never reaches AWA. See docs/transaction-clarifications-plan.md.
+// =========================================================================
+
+export const clarificationEntityType = pgEnum("clarification_entity_type", [
+  "requisition", "purchase_order", "invoice", "goods_receipt", "quotation",
+]);
+export const clarificationStatus = pgEnum("clarification_status", [
+  "open", "answered", "resolved", "withdrawn",
+]);
+
+export const transactionClarifications = pgTable("transaction_clarifications", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  tenantId: uuid("tenant_id").notNull().references(() => tenants.id),
+  // Polymorphic, constrained by the enum rather than a FK — same pattern as
+  // invoice_line_matches.matchedFulfillmentId above.
+  entityType: clarificationEntityType("entity_type").notNull(),
+  entityId: uuid("entity_id").notNull(),
+  raisedByUserId: uuid("raised_by_user_id").notNull().references(() => users.id),
+  assignedToUserId: uuid("assigned_to_user_id").references(() => users.id),
+  question: text("question").notNull(),
+  status: clarificationStatus("status").notNull().default("open"),
+  blocksProgress: boolean("blocks_progress").notNull().default(false),
+  answeredAt: timestamp("answered_at", { withTimezone: true }),
+  resolvedAt: timestamp("resolved_at", { withTimezone: true }),
+  resolvedByUserId: uuid("resolved_by_user_id").references(() => users.id),
+  escalatedTicketId: uuid("escalated_ticket_id").references(() => supportTickets.id),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [
+  index().on(t.tenantId, t.entityType, t.entityId, t.status),
+  index().on(t.tenantId, t.assignedToUserId, t.status),
+  index().on(t.tenantId, t.raisedByUserId, t.status),
+  // Only the asker resolves — the core rule of "held open until resolved".
+  check(
+    "clarification_resolved_by_asker",
+    sql`${t.status} <> 'resolved' or (${t.resolvedByUserId} is not null and ${t.resolvedByUserId} = ${t.raisedByUserId})`,
+  ),
+  check("clarification_resolved_has_timestamp", sql`${t.status} <> 'resolved' or ${t.resolvedAt} is not null`),
+]);
+
+export const transactionClarificationMessages = pgTable("transaction_clarification_messages", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  tenantId: uuid("tenant_id").notNull().references(() => tenants.id),
+  clarificationId: uuid("clarification_id")
+    .notNull()
+    .references(() => transactionClarifications.id, { onDelete: "cascade" }),
+  // One author column, no visibility column: everyone who can see the record
+  // sees every message. That simplicity is the structural signal that this is
+  // not the support desk.
+  authorUserId: uuid("author_user_id").notNull().references(() => users.id),
+  body: text("body").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [index().on(t.tenantId, t.clarificationId, t.createdAt)]);

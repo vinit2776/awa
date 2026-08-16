@@ -20,6 +20,8 @@ import { Breadcrumbs } from "@/components/ui/breadcrumbs";
 import { cn } from "@/lib/utils";
 import { LifecycleStatus } from "@/app/dashboard/lifecycle/LifecycleStatus";
 import { approvalStepDetail } from "@/app/dashboard/lifecycle/stage";
+import { isBlocked } from "@/db/clarificationRules";
+import { QueriesPanel } from "../queries/QueriesPanel";
 import { approveRequirement, requestRevision, rejectAndClose, addAdHocApprover } from "./actions";
 
 function pendingDays(submittedAt: Date | null): number | null {
@@ -108,6 +110,17 @@ export default async function ApprovalsInboxPage() {
         .map(async (requisition) => [requisition.id, await getRequisitionDocumentUrl(requisition.sourceDocumentKey!)] as const),
     ),
   );
+  // "Held" is derived from an open blocking query existing, never stored on the
+  // requisition — which is why a blocking query needs no new requisition_status
+  // value and can never leave a record stuck in a stale state.
+  const blockedByRequisition = new Map<string, boolean>();
+  if (requisitionIds.length > 0) {
+    await withTenant(tenant.id, async (tx) => {
+      for (const id of requisitionIds) {
+        blockedByRequisition.set(id, await isBlocked(tx, "requisition", id));
+      }
+    });
+  }
 
   return (
     <div className="flex flex-col gap-8 p-8">
@@ -122,6 +135,7 @@ export default async function ApprovalsInboxPage() {
       <div className="flex flex-col gap-6">
         {myActionable.map((req) => {
           const requisition = requisitionById.get(req.requisitionId)!;
+          const blocked = blockedByRequisition.get(req.requisitionId) ?? false;
           const linesForReq = lines.filter((l) => l.requisitionId === req.requisitionId);
           const costCenter = costCenters.find((c) => c.id === requisition.costCenterId);
           const budget = costCenter?.annualBudget ? Number(costCenter.annualBudget) : null;
@@ -197,7 +211,20 @@ export default async function ApprovalsInboxPage() {
                 </div>
               )}
 
-              <div className="flex flex-wrap items-end gap-2">
+              {blocked && (
+                <div className="flex items-center gap-3 rounded-lg border border-warning/45 bg-warning/10 px-3.5 py-2.5">
+                  <span className="w-[3px] self-stretch rounded-sm bg-warning" aria-hidden="true" />
+                  <div>
+                    <p className="text-sm font-medium text-warning-foreground">Held — open query on this requisition</p>
+                    <p className="text-xs text-muted-foreground">
+                      Approve and reject unlock once the person who asked resolves it. The requisition itself is
+                      untouched and still pending approval.
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              <fieldset disabled={blocked} className="flex flex-wrap items-end gap-2 disabled:opacity-50">
                 <form action={approveRequirement} className="flex items-end gap-2">
                   <input type="hidden" name="requirementId" value={req.id} />
                   <input
@@ -227,7 +254,18 @@ export default async function ApprovalsInboxPage() {
                   />
                   <button type="submit" className={cn(buttonVariants({ variant: "outline" }))}>Reject &amp; close</button>
                 </form>
-              </div>
+              </fieldset>
+
+              {/* The lightweight move that didn't exist before: ask instead of
+                  rejecting a requisition over a one-line question. canBlock is
+                  true here because this user is a pending approver — the server
+                  re-derives that regardless of what the form sends. */}
+              <QueriesPanel
+                entityType="requisition"
+                entityId={req.requisitionId}
+                returnTo="/dashboard/approvals"
+                canBlock
+              />
 
               <details className="text-xs text-muted-foreground">
                 <summary className="cursor-pointer">Add an approver ad hoc</summary>

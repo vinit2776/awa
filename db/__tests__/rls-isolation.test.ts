@@ -12,6 +12,11 @@ import {
   purchaseRequisitions,
   purchaseOrders,
   invoices,
+  supportTickets,
+  supportTicketMessages,
+  supportTicketEvents,
+  transactionClarifications,
+  transactionClarificationMessages,
 } from "../schema";
 
 /**
@@ -46,6 +51,23 @@ beforeAll(async () => {
       .values({ tenantId: tenantA.id, requisitionId: req.id, vendorId: vendor.id, poNumber: "PO-RLS-A", status: "issued", totalAmount: "100" })
       .returning();
     await tx.insert(invoices).values({ tenantId: tenantA.id, vendorId: vendor.id, poId: po.id, invoiceNumber: "INV-RLS-A", invoiceDate: "2026-01-01", totalAmount: "100" });
+
+    // Support desk + clarifications (0011, 0012). Both carry tenant_id, but
+    // their RLS policies were written by hand in those migrations — the
+    // generic do-block in 0001 only ran once and does not cover later tables.
+    // A new tenant-scoped table missing from this test is an untested
+    // isolation claim, which AGENTS.md treats as a launch blocker.
+    const [ticketA] = await tx
+      .insert(supportTickets)
+      .values({ tenantId: tenantA.id, type: "bug", subject: "Ticket A", description: "A", reportedByUserId: user.id })
+      .returning();
+    await tx.insert(supportTicketMessages).values({ tenantId: tenantA.id, ticketId: ticketA.id, body: "msg A", authorUserId: user.id });
+    await tx.insert(supportTicketEvents).values({ tenantId: tenantA.id, ticketId: ticketA.id, event: "created", actorKind: "customer", actorUserId: user.id });
+    const [clarA] = await tx
+      .insert(transactionClarifications)
+      .values({ tenantId: tenantA.id, entityType: "requisition", entityId: req.id, raisedByUserId: user.id, question: "Q A" })
+      .returning();
+    await tx.insert(transactionClarificationMessages).values({ tenantId: tenantA.id, clarificationId: clarA.id, authorUserId: user.id, body: "reply A" });
   });
 
   await withTenant(tenantB.id, async (tx) => {
@@ -62,13 +84,41 @@ beforeAll(async () => {
       .values({ tenantId: tenantB.id, requisitionId: req.id, vendorId: vendor.id, poNumber: "PO-RLS-B", status: "issued", totalAmount: "200" })
       .returning();
     await tx.insert(invoices).values({ tenantId: tenantB.id, vendorId: vendor.id, poId: po.id, invoiceNumber: "INV-RLS-B", invoiceDate: "2026-01-01", totalAmount: "200" });
+
+    const [ticketB] = await tx
+      .insert(supportTickets)
+      .values({ tenantId: tenantB.id, type: "bug", subject: "Ticket B", description: "B", reportedByUserId: user.id })
+      .returning();
+    await tx.insert(supportTicketMessages).values({ tenantId: tenantB.id, ticketId: ticketB.id, body: "msg B", authorUserId: user.id });
+    await tx.insert(supportTicketEvents).values({ tenantId: tenantB.id, ticketId: ticketB.id, event: "created", actorKind: "customer", actorUserId: user.id });
+    const [clarB] = await tx
+      .insert(transactionClarifications)
+      .values({ tenantId: tenantB.id, entityType: "requisition", entityId: req.id, raisedByUserId: user.id, question: "Q B" })
+      .returning();
+    await tx.insert(transactionClarificationMessages).values({ tenantId: tenantB.id, clarificationId: clarB.id, authorUserId: user.id, body: "reply B" });
   });
 });
 
 afterAll(async () => {
   // adminDb (owner role, bypasses RLS) so cleanup can see and delete
   // both tenants' rows in one pass regardless of which one is "current".
-  const cleanupTables = [invoices, purchaseOrders, purchaseRequisitions, vendors, catalogItems, users, departments];
+  // Child rows before parents. support_ticket_events has update/delete revoked
+  // from app_runtime, but adminDb is the owner role, so cleanup can still
+  // remove it — the revoke constrains the application, not the migration role.
+  const cleanupTables = [
+    transactionClarificationMessages,
+    transactionClarifications,
+    supportTicketEvents,
+    supportTicketMessages,
+    supportTickets,
+    invoices,
+    purchaseOrders,
+    purchaseRequisitions,
+    vendors,
+    catalogItems,
+    users,
+    departments,
+  ];
   for (const table of cleanupTables) {
     await adminDb.delete(table).where(sql`tenant_id in (${tenantA.id}, ${tenantB.id})`);
   }
@@ -90,6 +140,11 @@ describe("RLS isolation", () => {
     { name: "purchase_requisitions", table: purchaseRequisitions },
     { name: "purchase_orders", table: purchaseOrders },
     { name: "invoices", table: invoices },
+    { name: "support_tickets", table: supportTickets },
+    { name: "support_ticket_messages", table: supportTicketMessages },
+    { name: "support_ticket_events", table: supportTicketEvents },
+    { name: "transaction_clarifications", table: transactionClarifications },
+    { name: "transaction_clarification_messages", table: transactionClarificationMessages },
   ])("withTenant(A) querying $name sees only A's rows, never B's", async ({ table }) => {
     const rows = await withTenant(tenantA.id, (tx) => tx.select().from(table as typeof departments));
     expect(rows.length).toBeGreaterThan(0);
