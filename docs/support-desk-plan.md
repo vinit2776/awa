@@ -5,7 +5,7 @@ wherever they are in the app; a platform-side support team triages, responds, re
 and escalates against a TAT clock. Active in every tenant, no feature flag.
 
 > **Status: Phase A built** (branch `feat/support-desk-and-clarifications`).
-> Migration `0011_support_desk.sql` is applied to the dev database. Report widget,
+> Migration `0014_support_desk.sql` is applied to the dev database. Report widget,
 > `/dashboard/support`, `/dashboard/support/[id]`, `/platform/support`,
 > `/platform/support/[id]`, attachments, and the events audit trail are all in.
 > Phases B–D (auto-assignment, TAT, escalation) are not started — the TAT columns exist
@@ -534,7 +534,7 @@ Each phase is one branch and one PR into `main` per the AGENTS.md shipping polic
 The smallest thing that is genuinely useful: a customer can report from any page with a
 screenshot, and a human replies.
 
-- Migration `0011_support_desk.sql`: enums, four tenant-scoped tables, RLS policies per
+- Migration `0014_support_desk.sql`: enums, four tenant-scoped tables, RLS policies per
   table (hand-written — the generic `do $$` block does not re-run), append-only revoke,
   reference sequence
 - `db/schema.ts` additions to match

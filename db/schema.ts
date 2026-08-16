@@ -589,7 +589,7 @@ export const paymentInstructions = pgTable("payment_instructions", {
 });
 
 // =========================================================================
-// Support desk (0011_support_desk.sql) — customer ↔ AWA support.
+// Support desk (0014_support_desk.sql) — customer ↔ AWA support.
 // Not the clarification system below; see docs/support-desk-plan.md §3.1.
 // =========================================================================
 
@@ -712,7 +712,7 @@ export const supportTicketEvents = pgTable("support_ticket_events", {
 }, (t) => [index().on(t.tenantId, t.ticketId, t.occurredAt)]);
 
 // =========================================================================
-// Transaction clarifications (0012) — colleague ↔ colleague, on a record.
+// Transaction clarifications (0015) — colleague ↔ colleague, on a record.
 // Never reaches AWA. See docs/transaction-clarifications-plan.md.
 // =========================================================================
 
