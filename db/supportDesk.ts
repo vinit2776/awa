@@ -5,6 +5,8 @@ import { withTenant } from "./withTenant";
 import { getCurrentUserAndTenant } from "./session";
 import { getCurrentPlatformAdmin } from "./platformSession";
 import { isTenantAdmin } from "./permissions";
+import { alertSuperAdminsOfUnassigned, pickAssignee, resolveSlaTargets } from "./supportRouting";
+export { slaState, type SlaState } from "./supportRouting";
 import { notifyUser } from "./notifications";
 import {
   platformAdmins,
@@ -119,7 +121,14 @@ export async function createTicket(input: ReportInput) {
     throw new Error("A report needs both a subject and a description.");
   }
 
-  return withTenant(tenant.id, async (tx) => {
+  // Both of these run BEFORE the transaction opens, and neither can be moved
+  // inside it: pickAssignee counts an agent's tickets across every tenant, which
+  // withTenant would filter down to this one customer and get wrong.
+  const now = new Date();
+  const targets = await resolveSlaTargets(input.type, "normal", now);
+  const assignedToAdminId = await pickAssignee(tenant.id, input.type);
+
+  const ticket = await withTenant(tenant.id, async (tx) => {
     const [ticket] = await tx
       .insert(supportTickets)
       .values({
@@ -128,6 +137,13 @@ export async function createTicket(input: ReportInput) {
         subject,
         description,
         reportedByUserId: user.id,
+        firstResponseDueAt: targets.firstResponseDueAt,
+        resolutionDueAt: targets.resolutionDueAt,
+        assignedToAdminId,
+        assignedAt: assignedToAdminId ? now : null,
+        // Routed tickets skip 'new': someone owns it, so reporting it as
+        // untouched would misstate the queue.
+        status: assignedToAdminId ? "triaged" : "new",
         pagePath: input.pagePath ?? null,
         pageUrl: input.pageUrl ?? null,
         relatedEntityType: input.relatedEntityType ?? null,
@@ -143,12 +159,37 @@ export async function createTicket(input: ReportInput) {
       ticketId: ticket.id,
       event: "created",
       actor: { kind: "customer", userId: user.id },
-      toValue: "new",
-      metadata: { type: input.type, pagePath: input.pagePath ?? null },
+      toValue: assignedToAdminId ? "triaged" : "new",
+      metadata: {
+        type: input.type,
+        pagePath: input.pagePath ?? null,
+        firstResponseDueAt: targets.firstResponseDueAt?.toISOString() ?? null,
+        resolutionDueAt: targets.resolutionDueAt?.toISOString() ?? null,
+      },
     });
+
+    if (assignedToAdminId) {
+      await logTicketEvent(tx, {
+        tenantId: tenant.id,
+        ticketId: ticket.id,
+        event: "assigned",
+        // 'system', not the reporter: routing chose this, not a person.
+        actor: { kind: "system" },
+        toValue: assignedToAdminId,
+        metadata: { rule: "auto" },
+      });
+    }
 
     return ticket;
   });
+
+  // After the transaction, not inside it: this sends email, and a provider
+  // stall must not hold a pooled Postgres connection open.
+  if (!assignedToAdminId) {
+    await alertSuperAdminsOfUnassigned(ticket.reference, tenant.name, subject);
+  }
+
+  return ticket;
 }
 
 /**
@@ -264,10 +305,34 @@ export async function postCustomerReply(ticketId: string, body: string) {
     // A customer reply always takes the ball back off their court. Nobody has
     // to remember to flip the status by hand.
     if (ticket.status === "awaiting_customer") {
+      // Push the resolution deadline out by however long we waited, so time
+      // spent on the customer's side never counts against support. Without
+      // this, any ticket where the customer takes a day to reply reads as
+      // breached and the whole SLA display becomes noise people ignore.
+      // first_response_due_at is untouched — that clock never pauses.
+      const waitedMs = ticket.awaitingCustomerSince
+        ? Date.now() - ticket.awaitingCustomerSince.getTime()
+        : 0;
+      const shiftedDueAt = ticket.resolutionDueAt && waitedMs > 0
+        ? new Date(ticket.resolutionDueAt.getTime() + waitedMs)
+        : ticket.resolutionDueAt;
+
       await tx
         .update(supportTickets)
-        .set({ status: "in_progress" })
+        .set({ status: "in_progress", awaitingCustomerSince: null, resolutionDueAt: shiftedDueAt })
         .where(eq(supportTickets.id, ticketId));
+
+      if (shiftedDueAt && waitedMs > 0) {
+        await logTicketEvent(tx, {
+          tenantId: tenant.id,
+          ticketId,
+          event: "sla_clock_resumed",
+          actor: { kind: "system" },
+          fromValue: ticket.resolutionDueAt?.toISOString() ?? null,
+          toValue: shiftedDueAt.toISOString(),
+          metadata: { pausedMinutes: Math.round(waitedMs / 60_000) },
+        });
+      }
 
       await logTicketEvent(tx, {
         tenantId: tenant.id,
@@ -552,6 +617,8 @@ export async function postSupportReply(
     let statusChange: { from: string; to: string } | null = null;
     if (isQuestion && ticket.status !== "awaiting_customer" && ticket.status !== "closed") {
       patch.status = "awaiting_customer";
+      // Stamp the pause start; postCustomerReply reads it to shift the due date.
+      patch.awaitingCustomerSince = new Date();
       statusChange = { from: ticket.status, to: "awaiting_customer" };
     } else if (options.visibility === "customer" && (ticket.status === "new" || ticket.status === "triaged")) {
       patch.status = "in_progress";

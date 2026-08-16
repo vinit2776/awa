@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { Paperclip } from "lucide-react";
 import { PlatformAdminAccessError } from "@/db/platformSession";
-import { getCurrentSupportAgent, getTicketForSupport } from "@/db/supportDesk";
+import { getCurrentSupportAgent, getTicketForSupport, slaState } from "@/db/supportDesk";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { formatDateTime } from "../../../dashboard/support/ui";
@@ -30,6 +30,7 @@ export default async function SupportTicketDetailPage({ params }: { params: Prom
 
   const { ticket, tenantName, tenantSlug, tenantStatus, reporterName, reporterEmail, messages, attachments, events, assignees } =
     data;
+  const sla = slaState(ticket);
 
   return (
     <div className="flex flex-1 flex-col gap-5 p-6">
@@ -205,6 +206,48 @@ export default async function SupportTicketDetailPage({ params }: { params: Prom
         </div>
 
         <aside className="flex flex-col gap-3">
+          {/* Derived on every render from the two stored timestamps — breach is
+              never a column, so it can't go stale. */}
+          <div className="rounded-lg border border-border bg-card">
+            <h2 className="border-b border-border px-4 py-2.5 text-xs uppercase tracking-wide text-muted-foreground">
+              TAT
+            </h2>
+            <dl className="flex flex-col gap-3 p-4 text-sm">
+              <div>
+                <dt className="text-xs text-muted-foreground">First response</dt>
+                <dd className={cn("font-medium", sla.firstResponseBreached && "text-destructive")}>
+                  {ticket.firstRespondedAt
+                    ? `Met · ${formatDateTime(ticket.firstRespondedAt)}`
+                    : ticket.firstResponseDueAt
+                      ? sla.firstResponseBreached
+                        ? `Breached · was due ${formatDateTime(ticket.firstResponseDueAt)}`
+                        : `Due ${formatDateTime(ticket.firstResponseDueAt)}`
+                      : "No target"}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-xs text-muted-foreground">Resolution</dt>
+                <dd className={cn("font-medium", sla.resolutionBreached && "text-destructive")}>
+                  {ticket.resolutionDueAt ? formatDateTime(ticket.resolutionDueAt) : "No target"}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-xs text-muted-foreground">Clock</dt>
+                <dd className="font-medium">
+                  {sla.paused ? (
+                    <span className="text-warning-foreground">Paused · awaiting customer</span>
+                  ) : sla.resolutionBreached ? (
+                    <span className="text-destructive">Breached</span>
+                  ) : sla.minutesToResolution === null ? (
+                    "Not ticking"
+                  ) : (
+                    `${Math.floor(sla.minutesToResolution / 60)}h ${sla.minutesToResolution % 60}m left`
+                  )}
+                </dd>
+              </div>
+            </dl>
+          </div>
+
           <div className="rounded-lg border border-border bg-card">
             <h2 className="border-b border-border px-4 py-2.5 text-xs uppercase tracking-wide text-muted-foreground">
               Assignment
