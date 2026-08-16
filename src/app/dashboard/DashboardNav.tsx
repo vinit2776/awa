@@ -25,16 +25,17 @@ const NAV_ITEMS: { href: string; label: string; icon: LucideIcon }[] = [
   { href: "/dashboard/payments", label: "Payments", icon: Wallet },
   { href: "/dashboard/lifecycle", label: "Lifecycle", icon: RefreshCw },
   { href: "/dashboard/reports", label: "Reports", icon: BarChart3 },
-  { href: "/dashboard/admin/departments", label: "Admin", icon: Settings },
 ];
 
+const ADMIN_NAV_ITEM = { href: "/dashboard/admin/departments", label: "Admin", icon: Settings };
 
-export function DashboardNav() {
+export function DashboardNav({ showAdmin }: { showAdmin: boolean }) {
   const pathname = usePathname();
+  const items = showAdmin ? [...NAV_ITEMS, ADMIN_NAV_ITEM] : NAV_ITEMS;
 
   return (
     <nav className="flex flex-col gap-0.5">
-      {NAV_ITEMS.map(({ href, label, icon: Icon }) => {
+      {items.map(({ href, label, icon: Icon }) => {
         const active = pathname === href || pathname.startsWith(`${href}/`);
         return (
           <Link

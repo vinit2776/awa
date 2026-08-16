@@ -1,5 +1,7 @@
 import { revalidatePath } from "next/cache";
+import { and, asc, eq } from "drizzle-orm";
 import { getCurrentUserAndTenant } from "@/db/session";
+import { requireTenantAdmin } from "@/db/permissions";
 import { withTenant } from "@/db/withTenant";
 import { logAction } from "@/db/audit";
 import { seedDefaultRoles } from "@/db/seedDefaultRoles";
@@ -10,7 +12,7 @@ import { cn } from "@/lib/utils";
 
 async function seedDefaults() {
   "use server";
-  const { user, tenant } = await getCurrentUserAndTenant();
+  const { user, tenant } = await requireTenantAdmin();
   await withTenant(tenant.id, async (tx) => {
     await seedDefaultRoles(tx, tenant.id);
     await logAction(tx, {
@@ -24,9 +26,36 @@ async function seedDefaults() {
   revalidatePath("/dashboard/admin/roles");
 }
 
+async function updateRole(formData: FormData) {
+  "use server";
+  const { user, tenant } = await requireTenantAdmin();
+  const roleId = String(formData.get("roleId") ?? "");
+  const displayName = String(formData.get("displayName") ?? "").trim();
+  if (!roleId || !displayName) return;
+
+  await withTenant(tenant.id, async (tx) => {
+    const [updated] = await tx
+      .update(rolesTable)
+      .set({ displayName })
+      .where(and(eq(rolesTable.id, roleId), eq(rolesTable.tenantId, tenant.id)))
+      .returning();
+    if (!updated) return;
+    await logAction(tx, {
+      tenantId: tenant.id,
+      actorUserId: user.id,
+      action: "role.updated",
+      entityType: "role",
+      entityId: updated.id,
+      metadata: { displayName },
+    });
+  });
+
+  revalidatePath("/dashboard/admin/roles");
+}
+
 async function createRole(formData: FormData) {
   "use server";
-  const { user, tenant } = await getCurrentUserAndTenant();
+  const { user, tenant } = await requireTenantAdmin();
   const displayName = String(formData.get("displayName") ?? "").trim();
   if (!displayName) return;
   const key = displayName.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "");
@@ -51,7 +80,9 @@ async function createRole(formData: FormData) {
 
 export default async function RolesPage() {
   const { tenant } = await getCurrentUserAndTenant();
-  const roles = await withTenant(tenant.id, (tx) => tx.select().from(rolesTable));
+  const roles = await withTenant(tenant.id, (tx) =>
+    tx.select().from(rolesTable).orderBy(asc(rolesTable.createdAt)),
+  );
 
   return (
     <div className="flex flex-col gap-6">
@@ -89,7 +120,20 @@ export default async function RolesPage() {
         <tbody>
           {roles.map((r) => (
             <tr key={r.id} className="border-b">
-              <td className="py-2">{r.displayName}</td>
+              <td className="py-2">
+                <form action={updateRole} className="flex items-center gap-2">
+                  <input type="hidden" name="roleId" value={r.id} />
+                  <input
+                    name="displayName"
+                    defaultValue={r.displayName}
+                    required
+                    className="h-8 rounded-md border px-2 text-sm"
+                  />
+                  <button type="submit" className={cn(buttonVariants({ variant: "outline", size: "sm" }))}>
+                    Save
+                  </button>
+                </form>
+              </td>
               <td className="py-2 font-mono text-xs text-muted-foreground">{r.key}</td>
               <td className="py-2">{r.isSystem ? "Yes" : "No"}</td>
             </tr>

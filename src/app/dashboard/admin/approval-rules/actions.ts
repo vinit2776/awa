@@ -2,13 +2,13 @@
 
 import { revalidatePath } from "next/cache";
 import { eq } from "drizzle-orm";
-import { getCurrentUserAndTenant } from "@/db/session";
+import { requireTenantAdmin } from "@/db/permissions";
 import { withTenant } from "@/db/withTenant";
 import { logAction } from "@/db/audit";
 import { approvalRules, approvalRuleRequirements, tenants } from "@/db/schema";
 
 export async function updateEscalationSla(formData: FormData) {
-  const { user, tenant } = await getCurrentUserAndTenant();
+  const { user, tenant } = await requireTenantAdmin();
   const escalationSlaHours = Math.max(0, Number(formData.get("escalationSlaHours") ?? 48) || 0);
 
   await withTenant(tenant.id, async (tx) => {
@@ -48,7 +48,7 @@ export type CreateRuleWithRequirementsInput = {
  * (not a <form action>), since its payload is nested, not flat fields.
  */
 export async function createRuleWithRequirements(input: CreateRuleWithRequirementsInput): Promise<{ error?: string }> {
-  const { user, tenant } = await getCurrentUserAndTenant();
+  const { user, tenant } = await requireTenantAdmin();
 
   const name = input.name.trim();
   if (!name) return { error: "Give this rule a name." };
@@ -101,7 +101,7 @@ export async function createRuleWithRequirements(input: CreateRuleWithRequiremen
 }
 
 export async function toggleRuleActive(formData: FormData) {
-  const { user, tenant } = await getCurrentUserAndTenant();
+  const { user, tenant } = await requireTenantAdmin();
   const ruleId = String(formData.get("ruleId") ?? "");
   const active = formData.get("active") === "true";
   if (!ruleId) return;

@@ -1,6 +1,8 @@
 import { redirect } from "next/navigation";
 import { getCurrentUserAndTenant } from "@/db/session";
 import { clearAppSessionCookie } from "@/db/userSession";
+import { isTenantAdmin } from "@/db/permissions";
+import { withTenant } from "@/db/withTenant";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { DashboardNav } from "./DashboardNav";
@@ -9,6 +11,7 @@ import { PushNotifications } from "./PushNotifications";
 
 export default async function DashboardLayout({ children }: LayoutProps<"/dashboard">) {
   const { user, tenant } = await getCurrentUserAndTenant();
+  const showAdmin = await withTenant(tenant.id, (tx) => isTenantAdmin(tx, tenant.id, user.id));
 
   async function handleSignOut() {
     "use server";
@@ -26,7 +29,7 @@ export default async function DashboardLayout({ children }: LayoutProps<"/dashbo
             </span>
             <span className="font-serif text-lg text-sidebar-foreground">AWA</span>
           </div>
-          <DashboardNav />
+          <DashboardNav showAdmin={showAdmin} />
         </div>
 
         <div className="flex flex-col gap-3 border-t border-sidebar-border pt-4">
