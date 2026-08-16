@@ -2,13 +2,13 @@
 
 import { revalidatePath } from "next/cache";
 import { eq } from "drizzle-orm";
-import { getCurrentUserAndTenant } from "@/db/session";
+import { requireTenantAdmin } from "@/db/permissions";
 import { withTenant } from "@/db/withTenant";
 import { logAction } from "@/db/audit";
 import { vendors, vendorUsers } from "@/db/schema";
 
 export async function createVendor(formData: FormData) {
-  const { user, tenant } = await getCurrentUserAndTenant();
+  const { user, tenant } = await requireTenantAdmin();
   const name = String(formData.get("name") ?? "").trim();
   const taxId = String(formData.get("taxId") ?? "").trim() || null;
   const registeredPhone = String(formData.get("registeredPhone") ?? "").trim() || null;
@@ -30,7 +30,7 @@ export async function createVendor(formData: FormData) {
 }
 
 export async function setVendorStatus(formData: FormData) {
-  const { user, tenant } = await getCurrentUserAndTenant();
+  const { user, tenant } = await requireTenantAdmin();
   const vendorId = String(formData.get("vendorId") ?? "");
   const status = String(formData.get("status") ?? "") as "pending" | "active" | "blacklisted";
   if (!vendorId || !status) return;
@@ -51,7 +51,7 @@ export async function setVendorStatus(formData: FormData) {
 }
 
 export async function addVendorContact(formData: FormData) {
-  const { user, tenant } = await getCurrentUserAndTenant();
+  const { user, tenant } = await requireTenantAdmin();
   const vendorId = String(formData.get("vendorId") ?? "");
   const email = String(formData.get("email") ?? "").trim();
   const fullName = String(formData.get("fullName") ?? "").trim();

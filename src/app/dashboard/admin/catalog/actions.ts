@@ -3,12 +3,13 @@
 import { revalidatePath } from "next/cache";
 import { sql } from "drizzle-orm";
 import { getCurrentUserAndTenant } from "@/db/session";
+import { requireTenantAdmin } from "@/db/permissions";
 import { withTenant } from "@/db/withTenant";
 import { logAction } from "@/db/audit";
 import { catalogCategories, catalogItems } from "@/db/schema";
 
 export async function createCategory(formData: FormData) {
-  const { user, tenant } = await getCurrentUserAndTenant();
+  const { user, tenant } = await requireTenantAdmin();
   const name = String(formData.get("name") ?? "").trim();
   const parentCategoryId = String(formData.get("parentCategoryId") ?? "").trim() || null;
   const assetEligible = formData.get("assetEligible") === "on";
@@ -34,7 +35,7 @@ export async function createCategory(formData: FormData) {
 }
 
 export async function createItem(formData: FormData) {
-  const { user, tenant } = await getCurrentUserAndTenant();
+  const { user, tenant } = await requireTenantAdmin();
   const name = String(formData.get("name") ?? "").trim();
   const categoryId = String(formData.get("categoryId") ?? "").trim() || null;
   const uom = String(formData.get("uom") ?? "").trim() || "each";

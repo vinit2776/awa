@@ -1,5 +1,6 @@
 import { revalidatePath } from "next/cache";
 import { getCurrentUserAndTenant } from "@/db/session";
+import { requireTenantAdmin } from "@/db/permissions";
 import { withTenant } from "@/db/withTenant";
 import { logAction } from "@/db/audit";
 import { costCenters as costCentersTable } from "@/db/schema";
@@ -9,7 +10,7 @@ import { cn } from "@/lib/utils";
 
 async function createCostCenter(formData: FormData) {
   "use server";
-  const { user, tenant } = await getCurrentUserAndTenant();
+  const { user, tenant } = await requireTenantAdmin();
   const name = String(formData.get("name") ?? "").trim();
   const code = String(formData.get("code") ?? "").trim();
   const annualBudget = String(formData.get("annualBudget") ?? "").trim() || null;

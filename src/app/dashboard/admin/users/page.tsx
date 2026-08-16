@@ -1,8 +1,10 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { getCurrentUserAndTenant } from "@/db/session";
+import { requireTenantAdmin } from "@/db/permissions";
 import { withTenant } from "@/db/withTenant";
+import { logAction } from "@/db/audit";
 import { inviteUser, setUserStatus, assignUserRole } from "@/db/userInvite";
 import { makeUserSetPasswordToken } from "@/db/userAuth";
 import { getAppOrigin } from "@/lib/appOrigin";
@@ -19,7 +21,7 @@ import { cn } from "@/lib/utils";
 
 async function inviteUserAction(formData: FormData) {
   "use server";
-  const { user: actor, tenant } = await getCurrentUserAndTenant();
+  const { user: actor, tenant } = await requireTenantAdmin();
   const email = String(formData.get("email") ?? "");
   const fullName = String(formData.get("fullName") ?? "");
 
@@ -45,7 +47,7 @@ async function generateSetPasswordLinkAction(formData: FormData) {
 
 async function toggleUserStatusAction(formData: FormData) {
   "use server";
-  const { user: actor, tenant } = await getCurrentUserAndTenant();
+  const { user: actor, tenant } = await requireTenantAdmin();
   const userId = String(formData.get("userId") ?? "");
   const status = String(formData.get("status") ?? "") as "active" | "disabled";
   if (!userId || !status) return;
@@ -56,7 +58,7 @@ async function toggleUserStatusAction(formData: FormData) {
 
 async function assignRole(formData: FormData) {
   "use server";
-  const { user: actor, tenant } = await getCurrentUserAndTenant();
+  const { user: actor, tenant } = await requireTenantAdmin();
   const userId = String(formData.get("userId") ?? "");
   const roleId = String(formData.get("roleId") ?? "");
   const scopeType = String(formData.get("scopeType") ?? "global") as "global" | "department" | "cost_center";
@@ -67,6 +69,63 @@ async function assignRole(formData: FormData) {
   if (result.error) {
     redirect(`/dashboard/admin/users?error=${encodeURIComponent(result.error)}`);
   }
+
+  revalidatePath("/dashboard/admin/users");
+}
+
+async function revokeRole(formData: FormData) {
+  "use server";
+  const { user: actor, tenant } = await requireTenantAdmin();
+  const assignmentId = String(formData.get("assignmentId") ?? "");
+  if (!assignmentId) return;
+
+  const [assignment] = await withTenant(tenant.id, (tx) =>
+    tx
+      .select()
+      .from(userRolesTable)
+      .where(and(eq(userRolesTable.id, assignmentId), eq(userRolesTable.tenantId, tenant.id))),
+  );
+  if (!assignment) return;
+
+  const [role] = await withTenant(tenant.id, (tx) =>
+    tx.select().from(rolesTable).where(eq(rolesTable.id, assignment.roleId)),
+  );
+
+  // Revoking the last tenant_admin assignment doesn't lock anyone out —
+  // isTenantAdmin (db/permissions.ts) falls open to every tenant member
+  // once nobody holds the role — but that's an unintended privilege
+  // escalation if it happens by accident, not a safe default to fall
+  // into silently. Block it; require assigning a replacement first.
+  if (role?.key === "tenant_admin") {
+    const admins = await withTenant(tenant.id, (tx) =>
+      tx
+        .select({ id: userRolesTable.id })
+        .from(userRolesTable)
+        .where(and(eq(userRolesTable.tenantId, tenant.id), eq(userRolesTable.roleId, assignment.roleId))),
+    );
+    if (admins.length <= 1) {
+      redirect(
+        `/dashboard/admin/users?error=${encodeURIComponent("Can't revoke the last Tenant admin — assign the role to someone else first.")}`,
+      );
+    }
+  }
+
+  await withTenant(tenant.id, async (tx) => {
+    await tx.delete(userRolesTable).where(eq(userRolesTable.id, assignmentId));
+    await logAction(tx, {
+      tenantId: tenant.id,
+      actorUserId: actor.id,
+      action: "user_role.revoked",
+      entityType: "user_role",
+      entityId: assignmentId,
+      metadata: {
+        userId: assignment.userId,
+        roleId: assignment.roleId,
+        scopeType: assignment.scopeType,
+        scopeId: assignment.scopeId,
+      },
+    });
+  });
 
   revalidatePath("/dashboard/admin/users");
 }
@@ -208,6 +267,7 @@ export default async function UsersPage({
               <th className="py-2 font-normal">User</th>
               <th className="py-2 font-normal">Role</th>
               <th className="py-2 font-normal">Scope</th>
+              <th></th>
             </tr>
           </thead>
           <tbody>
@@ -216,10 +276,20 @@ export default async function UsersPage({
                 <td className="py-2">{nameFor.user(a.userId)}</td>
                 <td className="py-2">{nameFor.role(a.roleId)}</td>
                 <td className="py-2">{nameFor.scope(a.scopeType, a.scopeId)}</td>
+                <td className="py-2">
+                  <form action={revokeRole}>
+                    <input type="hidden" name="assignmentId" value={a.id} />
+                    <button type="submit" className={cn(buttonVariants({ variant: "outline", size: "sm" }))}>
+                      Revoke
+                    </button>
+                  </form>
+                </td>
               </tr>
             ))}
           </tbody>
         </table>
+
+        {error && <p className="text-sm text-destructive">{error}</p>}
 
         <form action={assignRole} className="flex flex-wrap items-end gap-2">
           <div className="flex flex-col gap-1">

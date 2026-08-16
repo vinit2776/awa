@@ -2,13 +2,13 @@
 
 import { revalidatePath } from "next/cache";
 import { eq } from "drizzle-orm";
-import { getCurrentUserAndTenant } from "@/db/session";
+import { requireTenantAdmin } from "@/db/permissions";
 import { withTenant } from "@/db/withTenant";
 import { logAction } from "@/db/audit";
 import { signatories } from "@/db/schema";
 
 export async function createSignatory(formData: FormData) {
-  const { user, tenant } = await getCurrentUserAndTenant();
+  const { user, tenant } = await requireTenantAdmin();
   const userId = String(formData.get("userId") ?? "");
   const title = String(formData.get("title") ?? "").trim();
   const maxAuthorizedValue = String(formData.get("maxAuthorizedValue") ?? "").trim() || null;
@@ -30,7 +30,7 @@ export async function createSignatory(formData: FormData) {
 }
 
 export async function toggleSignatoryActive(formData: FormData) {
-  const { user, tenant } = await getCurrentUserAndTenant();
+  const { user, tenant } = await requireTenantAdmin();
   const signatoryId = String(formData.get("signatoryId") ?? "");
   const active = formData.get("active") === "true";
   if (!signatoryId) return;
