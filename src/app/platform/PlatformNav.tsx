@@ -2,12 +2,13 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Building2, LifeBuoy, type LucideIcon } from "lucide-react";
+import { Building2, LifeBuoy, Users, type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const NAV_ITEMS: { href: string; label: string; icon: LucideIcon }[] = [
   { href: "/platform", label: "Tenants", icon: Building2 },
   { href: "/platform/support", label: "Support queue", icon: LifeBuoy },
+  { href: "/platform/support/agents", label: "Agent roster", icon: Users },
 ];
 
 export function PlatformNav() {
@@ -18,7 +19,10 @@ export function PlatformNav() {
       {NAV_ITEMS.map(({ href, label, icon: Icon }) => {
         // "/platform" would otherwise match every child route and light up
         // alongside the real one.
-        const active = href === "/platform" ? pathname === href : pathname.startsWith(href);
+        const active =
+          href === "/platform" || href === "/platform/support"
+            ? pathname === href
+            : pathname.startsWith(href);
         return (
           <Link
             key={href}

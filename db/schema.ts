@@ -641,6 +641,10 @@ export const supportTickets = pgTable("support_tickets", {
   escalationLevel: integer("escalation_level").notNull().default(0),
   escalatedAt: timestamp("escalated_at", { withTimezone: true }),
   customerEscalatedAt: timestamp("customer_escalated_at", { withTimezone: true }),
+  // Set on entering awaiting_customer, read and cleared on leaving — the
+  // resolution clock pauses for that span (0016). first_response_due_at has no
+  // equivalent: first response never pauses.
+  awaitingCustomerSince: timestamp("awaiting_customer_since", { withTimezone: true }),
   relatedTicketId: uuid("related_ticket_id").references((): AnyPgColumn => supportTickets.id),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
@@ -766,3 +770,38 @@ export const transactionClarificationMessages = pgTable("transaction_clarificati
   body: text("body").notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [index().on(t.tenantId, t.clarificationId, t.createdAt)]);
+
+// =========================================================================
+// Support routing & TAT (0016_support_routing_and_tat.sql)
+// Platform-level: no tenant_id, no RLS — these describe AWA, not a customer.
+// =========================================================================
+
+export const supportAgents = pgTable("support_agents", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  platformAdminId: uuid("platform_admin_id")
+    .notNull()
+    .unique()
+    .references(() => platformAdmins.id, { onDelete: "cascade" }),
+  active: boolean("active").notNull().default(true),
+  // Empty array means "all" for both of these, not "none" — see the migration.
+  handlesTypes: supportTicketType("handles_types").array().notNull().default([]),
+  coversTenantIds: uuid("covers_tenant_ids").array().notNull().default([]),
+  maxOpen: integer("max_open"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [
+  index().on(t.active),
+  check("support_agent_max_open_positive", sql`${t.maxOpen} is null or ${t.maxOpen} > 0`),
+]);
+
+export const supportSlaPolicies = pgTable("support_sla_policies", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  ticketType: supportTicketType("ticket_type").notNull(),
+  priority: supportTicketPriority("priority").notNull(),
+  firstResponseMinutes: integer("first_response_minutes").notNull(),
+  // null = no resolution target (feature requests, feedback).
+  resolutionMinutes: integer("resolution_minutes"),
+}, (t) => [
+  unique().on(t.ticketType, t.priority),
+  check("sla_first_response_positive", sql`${t.firstResponseMinutes} > 0`),
+  check("sla_resolution_positive", sql`${t.resolutionMinutes} is null or ${t.resolutionMinutes} > 0`),
+]);
