@@ -5,6 +5,26 @@ on:
   push:
     branches: [main]
 
+# One run per ref at a time. The test job targets the shared dev database
+# (vitest.config.ts), so a superseded run isn't merely wasted minutes — it sits
+# there creating and tearing down throwaway tenants alongside the run that
+# replaced it. A push during an in-flight run left two overlapping on the same
+# branch, and the older one was still going 38 minutes later; a single run of
+# this suite takes ~10.
+#
+# Not cancelled on main: an intermediate commit there is the one CI signal for
+# what production is about to deploy, and losing it to a rapid follow-up push is
+# worse than paying for the extra run. Cancelling only applies to PR refs, which
+# is where the pile-up actually happens.
+#
+# This bounds runs per ref, not in total — two different PRs still run at once.
+# That stays safe only because every test file suffixes its fixtures with
+# crypto.randomUUID() (1546c77); the real fix for cross-run contention is the
+# isolated test database AGENTS.md already flags.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
 jobs:
   check:
     runs-on: ubuntu-latest
