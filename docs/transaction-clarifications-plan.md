@@ -8,7 +8,7 @@ This is **not** the support desk. See [support-desk-plan.md](support-desk-plan.m
 the boundary; the one-line version is below.
 
 > **Status: Phases A and B built** (branch `feat/support-desk-and-clarifications`).
-> Migration `0012_transaction_clarifications.sql` is applied to the dev database. The
+> Migration `0015_transaction_clarifications.sql` is applied to the dev database. The
 > Queries panel is live on the approvals inbox, `/dashboard/queries` is the personal
 > inbox, and blocking works end to end — including server-side enforcement in
 > `approveRequirement` and `reject`, not just the disabled fieldset.

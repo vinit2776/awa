@@ -1,4 +1,4 @@
--- 0012_transaction_clarifications.sql
+-- 0015_transaction_clarifications.sql
 -- Transaction clarifications (docs/transaction-clarifications-plan.md) — a
 -- question raised ON a record (requisition, PO, invoice, goods receipt,
 -- quotation) by one user in a customer organisation, answered by another,
@@ -10,7 +10,7 @@
 -- requirement and is append-only, so it can host neither a PO/invoice query
 -- nor a mutable resolved state.
 --
--- NOT the support desk (0011). A clarification never reaches AWA.
+-- NOT the support desk (0014). A clarification never reaches AWA.
 
 -- =========================================================================
 -- Enums

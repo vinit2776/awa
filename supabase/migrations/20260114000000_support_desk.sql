@@ -1,9 +1,9 @@
--- 0011_support_desk.sql
+-- 0014_support_desk.sql
 -- Support desk (docs/support-desk-plan.md) — customers report bugs, feature
 -- requests and feedback from inside the app; a platform-side support team
 -- triages, responds and resolves.
 --
--- NOT the transaction clarification system (0012). A support ticket is a
+-- NOT the transaction clarification system (0015). A support ticket is a
 -- question about the product, asked of AWA. A clarification is a question
 -- about a record, asked of a colleague. They share no table, no enum and no
 -- status model — see docs/support-desk-plan.md §3.1.
@@ -192,7 +192,7 @@ create policy tenant_isolation on support_ticket_attachments
 -- =========================================================================
 -- Deliberately NOT audit_log. audit_log.actor_user_id references users(id),
 -- and a platform support admin has no users row — so support actions cannot
--- be written there at all. Transaction clarifications (0012) have the
+-- be written there at all. Transaction clarifications (0015) have the
 -- opposite property and do use audit_log.
 
 create table support_ticket_events (
