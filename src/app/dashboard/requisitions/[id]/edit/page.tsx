@@ -62,7 +62,7 @@ export default async function EditRequisitionPage({ params }: { params: Promise<
         <Breadcrumbs
           items={[
             { label: "Dashboard", href: "/dashboard" },
-            { label: "My requests", href: "/dashboard/requisitions" },
+            { label: "Requisitions", href: "/dashboard/requisitions" },
             { label: "Revise requisition" },
           ]}
         />

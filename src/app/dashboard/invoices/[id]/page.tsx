@@ -13,8 +13,8 @@ import {
 import { buttonVariants } from "@/components/ui/button";
 import { Breadcrumbs } from "@/components/ui/breadcrumbs";
 import { cn } from "@/lib/utils";
-import { invoiceStage, PAYMENT_CAPTIONS } from "@/app/dashboard/lifecycle/stage";
-import { LifecycleStatus } from "@/app/dashboard/lifecycle/LifecycleStatus";
+import { invoiceStage, PAYMENT_CAPTIONS } from "@/lib/lifecycle";
+import { LifecycleStatus } from "@/components/ui/lifecycle-status";
 import { LifecycleRail } from "@/components/ui/lifecycle-rail";
 import { approveForPayment, overrideException, disputeInvoice } from "../actions";
 

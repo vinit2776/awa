@@ -21,8 +21,8 @@ import {
 import { Breadcrumbs } from "@/components/ui/breadcrumbs";
 import { LifecycleRail } from "@/components/ui/lifecycle-rail";
 import { Info, Term } from "@/components/ui/help";
-import { computeStage, approvalStepDetail, PAYMENT_CAPTIONS } from "@/app/dashboard/lifecycle/stage";
-import { LifecycleStatus } from "@/app/dashboard/lifecycle/LifecycleStatus";
+import { computeStage, approvalStepDetail, PAYMENT_CAPTIONS } from "@/lib/lifecycle";
+import { LifecycleStatus } from "@/components/ui/lifecycle-status";
 
 /**
  * The requisition record — what a requestor opens to find out what
@@ -141,7 +141,7 @@ export default async function RequisitionDetailPage({ params }: { params: Promis
         <Breadcrumbs
           items={[
             { label: "Dashboard", href: "/dashboard" },
-            { label: "My requests", href: "/dashboard/requisitions" },
+            { label: "Requisitions", href: "/dashboard/requisitions" },
             { label: "Requisition" },
           ]}
         />

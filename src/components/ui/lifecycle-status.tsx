@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
-import { stageBadgeVariant, nextStep, waitedFor, type NextStepContext } from "./stage";
+import { stageBadgeVariant, nextStep, waitedFor, type NextStepContext } from "@/lib/lifecycle";
 
 /**
  * The one status+next-action treatment every transaction page should

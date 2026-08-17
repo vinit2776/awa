@@ -1,4 +1,4 @@
-import { LIFECYCLE_STEPS, railPosition } from "@/app/dashboard/lifecycle/stage";
+import { LIFECYCLE_STEPS, railPosition } from "@/lib/lifecycle";
 import { Term } from "@/components/ui/help";
 import { cn } from "@/lib/utils";
 

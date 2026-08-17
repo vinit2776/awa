@@ -6,8 +6,8 @@ import { purchaseRequisitions as purchaseRequisitionsTable, rfqs as rfqsTable, u
 import { buttonVariants } from "@/components/ui/button";
 import { Breadcrumbs } from "@/components/ui/breadcrumbs";
 import { cn } from "@/lib/utils";
-import { sourcingStage } from "@/app/dashboard/lifecycle/stage";
-import { LifecycleStatus } from "@/app/dashboard/lifecycle/LifecycleStatus";
+import { sourcingStage } from "@/lib/lifecycle";
+import { LifecycleStatus } from "@/components/ui/lifecycle-status";
 
 export default async function SourcingPage() {
   const { tenant } = await getCurrentUserAndTenant();

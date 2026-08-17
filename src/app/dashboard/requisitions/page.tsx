@@ -8,6 +8,7 @@ import {
   requisitionApprovalRequirements as requirementsTable,
   departments as departmentsTable,
   costCenters as costCentersTable,
+  users as usersTable,
   rfqs as rfqsTable,
   purchaseOrders as purchaseOrdersTable,
   invoices as invoicesTable,
@@ -16,9 +17,10 @@ import {
 } from "@/db/schema";
 import { buttonVariants } from "@/components/ui/button";
 import { Breadcrumbs } from "@/components/ui/breadcrumbs";
+import { Info } from "@/components/ui/help";
 import { cn } from "@/lib/utils";
-import { computeStage, approvalStepDetail } from "@/app/dashboard/lifecycle/stage";
-import { LifecycleStatus } from "@/app/dashboard/lifecycle/LifecycleStatus";
+import { computeStage, approvalStepDetail } from "@/lib/lifecycle";
+import { LifecycleStatus } from "@/components/ui/lifecycle-status";
 import { submitRequisition } from "./actions";
 
 function pendingDays(submittedAt: Date | null): number | null {
@@ -32,11 +34,21 @@ function humanizeStatus(status: string): string {
 
 type StatusValue = (typeof requisitionStatus.enumValues)[number];
 type SortValue = "status_asc" | "status_desc";
+type ScopeValue = "mine" | "all";
 
+/**
+ * The one requisition list.
+ *
+ * "Everyone's" used to be a separate page at /dashboard/lifecycle with
+ * its own nav item — the same records, the same stage column, differing
+ * only in whether a requestorId filter was applied. Two nav entries for
+ * one table taught every new user that there were two kinds of
+ * requisition. It is a filter, so it is now a filter.
+ */
 export default async function RequisitionsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ status?: string; sort?: string }>;
+  searchParams: Promise<{ status?: string; sort?: string; scope?: string }>;
 }) {
   const params = await searchParams;
   const { user, tenant } = await getCurrentUserAndTenant();
@@ -45,6 +57,7 @@ export default async function RequisitionsPage({
     ? (params.status as StatusValue)
     : null;
   const sort: SortValue | null = params.sort === "status_asc" || params.sort === "status_desc" ? params.sort : null;
+  const scope: ScopeValue = params.scope === "all" ? "all" : "mine";
 
   const orderBy =
     sort === "status_asc"
@@ -53,27 +66,38 @@ export default async function RequisitionsPage({
         ? [desc(purchaseRequisitionsTable.status), desc(purchaseRequisitionsTable.createdAt)]
         : [desc(purchaseRequisitionsTable.createdAt)];
 
-  const [requisitions, departments, costCenters] = await withTenant(tenant.id, async (tx) => [
+  const [requisitions, departments, costCenters, users] = await withTenant(tenant.id, async (tx) => [
     await tx
       .select()
       .from(purchaseRequisitionsTable)
       .where(
         and(
-          eq(purchaseRequisitionsTable.requestorId, user.id),
+          // RLS already scopes this to the tenant; this narrows it to the
+          // reader. Dropping it is the whole of what "Everyone's" means.
+          ...(scope === "mine" ? [eq(purchaseRequisitionsTable.requestorId, user.id)] : []),
           ...(statusFilter ? [eq(purchaseRequisitionsTable.status, statusFilter)] : []),
         ),
       )
       .orderBy(...orderBy),
     await tx.select().from(departmentsTable),
     await tx.select().from(costCentersTable),
+    await tx.select().from(usersTable),
   ]);
 
   const nextSort: SortValue | null = sort === "status_asc" ? "status_desc" : sort === "status_desc" ? null : "status_asc";
-  const sortHref = `?${new URLSearchParams({
-    ...(statusFilter ? { status: statusFilter } : {}),
-    ...(nextSort ? { sort: nextSort } : {}),
-  }).toString()}`;
-  const clearFilterHref = sort ? `?${new URLSearchParams({ sort }).toString()}` : "/dashboard/requisitions";
+  const queryWith = (overrides: Record<string, string | null>) => {
+    const base: Record<string, string> = {
+      ...(statusFilter ? { status: statusFilter } : {}),
+      ...(sort ? { sort } : {}),
+      ...(scope === "all" ? { scope } : {}),
+    };
+    for (const [key, value] of Object.entries(overrides)) {
+      if (value === null) delete base[key];
+      else base[key] = value;
+    }
+    const query = new URLSearchParams(base).toString();
+    return query ? `?${query}` : "/dashboard/requisitions";
+  };
 
   const allRequisitionIds = requisitions.map((r) => r.id);
   const requirementRows = allRequisitionIds.length
@@ -119,17 +143,19 @@ export default async function RequisitionsPage({
 
   const departmentName = (id: string | null) => departments.find((d) => d.id === id)?.name ?? "—";
   const costCenterName = (id: string | null) => costCenters.find((c) => c.id === id)?.name ?? "—";
+  const requestorName = (id: string) => users.find((u) => u.id === id)?.fullName ?? "—";
 
   return (
     <div className="flex flex-col gap-6 p-8">
       <div className="flex flex-col gap-2">
-        <Breadcrumbs items={[{ label: "Dashboard", href: "/dashboard" }, { label: "My requests" }]} />
+        <Breadcrumbs items={[{ label: "Dashboard", href: "/dashboard" }, { label: "Requisitions" }]} />
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="font-serif text-lg text-foreground">My requests</h1>
+            <h1 className="font-serif text-lg text-foreground">Requisitions</h1>
             <p className="text-sm text-muted-foreground">
-              {requisitions.length} in {tenant.name}
-              {statusFilter && ` matching "${humanizeStatus(statusFilter)}"`}
+              {scope === "mine"
+                ? "Everything you've asked to buy, and where each one has got to."
+                : `Every requisition in ${tenant.name}, wherever it currently is.`}
             </p>
           </div>
           <Link href="/dashboard/requisitions/new" className={cn(buttonVariants())}>
@@ -138,8 +164,21 @@ export default async function RequisitionsPage({
         </div>
       </div>
 
-      <form method="GET" className="flex items-end gap-2">
+      <form method="GET" className="flex flex-wrap items-end gap-2">
         {sort && <input type="hidden" name="sort" value={sort} />}
+        <div className="flex flex-col gap-1">
+          <label htmlFor="scope" className="text-xs text-muted-foreground">
+            Show
+            <Info title="Whose requisitions" next="Switching to everyone's is how you answer “what happened to my order?” for a colleague.">
+              Mine lists only requisitions you raised. Everyone&apos;s lists every requisition in your
+              organisation, whoever raised it.
+            </Info>
+          </label>
+          <select id="scope" name="scope" defaultValue={scope} className="h-8 rounded-md border px-2 text-sm">
+            <option value="mine">Mine</option>
+            <option value="all">Everyone&apos;s</option>
+          </select>
+        </div>
         <div className="flex flex-col gap-1">
           <label htmlFor="status" className="text-xs text-muted-foreground">Status</label>
           <select id="status" name="status" defaultValue={statusFilter ?? ""} className="h-8 rounded-md border px-2 text-sm">
@@ -153,21 +192,25 @@ export default async function RequisitionsPage({
           Filter
         </button>
         {statusFilter && (
-          <Link href={clearFilterHref} className="text-xs text-muted-foreground underline">
+          <Link href={queryWith({ status: null })} className="text-xs text-muted-foreground underline">
             Clear
           </Link>
         )}
+        <span className="ml-auto text-xs text-muted-foreground">
+          {requisitions.length} shown
+        </span>
       </form>
 
       <table className="w-full text-sm">
         <thead>
           <tr className="border-b text-left text-xs text-muted-foreground">
-            <th className="py-2 font-normal">Created</th>
-            <th className="py-2 font-normal">Department</th>
-            <th className="py-2 font-normal">Cost center</th>
-            <th className="py-2 font-normal">Total</th>
-            <th className="py-2 font-normal">
-              <Link href={sortHref} className="hover:text-foreground">
+            <th className="py-2 pr-4 font-normal whitespace-nowrap">Created</th>
+            {scope === "all" && <th className="py-2 pr-4 font-normal">Requestor</th>}
+            <th className="py-2 pr-4 font-normal">Department</th>
+            <th className="py-2 pr-4 font-normal whitespace-nowrap">Cost center</th>
+            <th className="py-2 pr-4 font-normal">Total</th>
+            <th className="py-2 pr-4 font-normal">
+              <Link href={queryWith({ sort: nextSort })} className="hover:text-foreground">
                 Status
                 {sort === "status_asc" && " ▲"}
                 {sort === "status_desc" && " ▼"}
@@ -179,8 +222,12 @@ export default async function RequisitionsPage({
         <tbody>
           {requisitions.length === 0 && (
             <tr>
-              <td colSpan={6} className="py-6 text-center text-sm text-muted-foreground">
-                No requisitions match this filter.
+              <td colSpan={scope === "all" ? 7 : 6} className="py-6 text-center text-sm text-muted-foreground">
+                {statusFilter
+                  ? "No requisitions match this filter."
+                  : scope === "mine"
+                    ? "You haven't raised a requisition yet. “New requisition” starts one."
+                    : "Nobody has raised a requisition yet."}
               </td>
             </tr>
           )}
@@ -191,16 +238,20 @@ export default async function RequisitionsPage({
             const stage = stageFor(r);
             return (
               <tr key={r.id} className="border-b align-top">
-                <td className="py-2">{r.createdAt.toISOString().slice(0, 10)}</td>
-                <td className="py-2">{departmentName(r.departmentId)}</td>
-                <td className="py-2">{costCenterName(r.costCenterId)}</td>
-                <td className="py-2">{r.totalEstimatedValue} {r.currency}</td>
-                <td className="py-2">
+                <td className="py-2 pr-4 whitespace-nowrap">{r.createdAt.toISOString().slice(0, 10)}</td>
+                {scope === "all" && <td className="py-2 pr-4 whitespace-nowrap">{requestorName(r.requestorId)}</td>}
+                <td className="py-2 pr-4">{departmentName(r.departmentId)}</td>
+                <td className="py-2 pr-4">{costCenterName(r.costCenterId)}</td>
+                <td className="py-2 pr-4">{r.totalEstimatedValue} {r.currency}</td>
+                <td className="py-2 pr-4">
                   <LifecycleStatus stage={stage} detail={stage === "Pending approval" ? stepDetailFor(r.id) : undefined} />
                   {showPending && <span className="text-muted-foreground">{days} day{days === 1 ? "" : "s"} pending</span>}
                   {reason && <p className="mt-0.5 max-w-xs text-xs text-muted-foreground">{reason}</p>}
                 </td>
-                <td className="py-2">
+                <td className="flex flex-wrap items-center gap-2 py-2">
+                  <Link href={`/dashboard/requisitions/${r.id}`} className={cn(buttonVariants({ variant: "outline", size: "sm" }))}>
+                    Open
+                  </Link>
                   {r.status === "draft" && (
                     <form action={submitRequisition}>
                       <input type="hidden" name="requisitionId" value={r.id} />
@@ -219,7 +270,7 @@ export default async function RequisitionsPage({
                       href={documentUrls.get(r.id)}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="ml-2 text-xs text-muted-foreground underline"
+                      className="text-xs text-muted-foreground underline"
                     >
                       View document
                     </a>

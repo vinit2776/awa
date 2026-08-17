@@ -15,8 +15,8 @@ import {
 import { buttonVariants } from "@/components/ui/button";
 import { Breadcrumbs } from "@/components/ui/breadcrumbs";
 import { cn } from "@/lib/utils";
-import { computeStage } from "@/app/dashboard/lifecycle/stage";
-import { LifecycleStatus } from "@/app/dashboard/lifecycle/LifecycleStatus";
+import { computeStage } from "@/lib/lifecycle";
+import { LifecycleStatus } from "@/components/ui/lifecycle-status";
 import { LifecycleRail } from "@/components/ui/lifecycle-rail";
 import { createRfq, inviteVendor, submitQuotation, selectQuotationAndIssuePo } from "./actions";
 
