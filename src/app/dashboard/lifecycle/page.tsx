@@ -63,8 +63,8 @@ export default async function LifecyclePage() {
               <td className="py-2">{requisition.totalEstimatedValue} {requisition.currency}</td>
               <td className="py-2">{stage}</td>
               <td className="py-2">
-                <Link href={`/dashboard/lifecycle/${requisition.id}`} className={cn(buttonVariants({ variant: "outline", size: "sm" }))}>
-                  Track
+                <Link href={`/dashboard/requisitions/${requisition.id}`} className={cn(buttonVariants({ variant: "outline", size: "sm" }))}>
+                  Open
                 </Link>
               </td>
             </tr>

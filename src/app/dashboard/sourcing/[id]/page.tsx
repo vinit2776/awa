@@ -15,6 +15,9 @@ import {
 import { buttonVariants } from "@/components/ui/button";
 import { Breadcrumbs } from "@/components/ui/breadcrumbs";
 import { cn } from "@/lib/utils";
+import { computeStage } from "@/app/dashboard/lifecycle/stage";
+import { LifecycleStatus } from "@/app/dashboard/lifecycle/LifecycleStatus";
+import { LifecycleRail } from "@/components/ui/lifecycle-rail";
 import { createRfq, inviteVendor, submitQuotation, selectQuotationAndIssuePo } from "./actions";
 
 export default async function SourcingDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -40,6 +43,9 @@ export default async function SourcingDetailPage({ params }: { params: Promise<{
 
   if (!requisition) notFound();
 
+  // No invoice or payment loaded here — computeStage walks only as far as
+  // the data it is given, which for a sourcing screen stops at the PO.
+  const stage = computeStage(requisition, rfq ? [rfq] : [], po ?? undefined, undefined, undefined);
   const vendorName = (vendorId: string) => vendors.find((v) => v.id === vendorId)?.name ?? "—";
   const invitedVendorIds = new Set(invitations.map((i) => i.vendorId));
   const uninvitedVendors = vendors.filter((v) => v.status === "active" && !invitedVendorIds.has(v.id));
@@ -54,12 +60,29 @@ export default async function SourcingDetailPage({ params }: { params: Promise<{
             { label: "Source requisition" },
           ]}
         />
-        <div>
-          <h1 className="font-serif text-lg text-foreground">Source requisition</h1>
-          <p className="text-sm text-muted-foreground">
-            {requisition.totalEstimatedValue} {requisition.currency} · {requisition.status}
-          </p>
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <h1 className="font-serif text-lg text-foreground">Source requisition</h1>
+            <p className="text-sm text-muted-foreground">
+              {requisition.totalEstimatedValue} {requisition.currency}
+            </p>
+          </div>
+          <LifecycleStatus stage={stage} className="shrink-0 items-end text-right" />
         </div>
+      </div>
+
+      <div className="rounded-lg border border-border p-4">
+        <LifecycleRail
+          stage={stage}
+          captions={{
+            sourcing: quotations.length
+              ? `${quotations.length} quotation${quotations.length === 1 ? "" : "s"}`
+              : rfq
+                ? "No quotations yet"
+                : "Not started",
+            purchase_order: po ? po.poNumber : "Not issued",
+          }}
+        />
       </div>
 
       <section className="flex flex-col gap-2">

@@ -13,8 +13,9 @@ import {
 import { buttonVariants } from "@/components/ui/button";
 import { Breadcrumbs } from "@/components/ui/breadcrumbs";
 import { cn } from "@/lib/utils";
-import { invoiceStage } from "@/app/dashboard/lifecycle/stage";
+import { invoiceStage, PAYMENT_CAPTIONS } from "@/app/dashboard/lifecycle/stage";
 import { LifecycleStatus } from "@/app/dashboard/lifecycle/LifecycleStatus";
+import { LifecycleRail } from "@/components/ui/lifecycle-rail";
 import { approveForPayment, overrideException, disputeInvoice } from "../actions";
 
 export default async function InvoiceDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -59,6 +60,20 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
           </div>
           <LifecycleStatus stage={invoiceStage(invoice, payment)} className="shrink-0 items-end text-right" />
         </div>
+      </div>
+
+      {/* Where this invoice sits in the whole chain, not just its own
+          status — an exception here is somebody's requisition from six
+          weeks ago, and that context is what makes it decidable. */}
+      <div className="rounded-lg border border-border p-4">
+        <LifecycleRail
+          stage={invoiceStage(invoice, payment)}
+          captions={{
+            purchase_order: po?.poNumber ?? "—",
+            invoice: invoice.invoiceNumber,
+            payment: payment ? PAYMENT_CAPTIONS[payment.status] : "—",
+          }}
+        />
       </div>
 
       <table className="w-full text-sm">

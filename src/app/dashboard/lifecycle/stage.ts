@@ -295,6 +295,18 @@ export function nextStep(stage: string, context: NextStepContext = {}): NextStep
   };
 }
 
+/**
+ * The payment_instructions enum in the reader's words rather than the
+ * column's. Lives here with the rest of the stage vocabulary so the
+ * requisition record and the invoice record can't describe the same
+ * payment differently.
+ */
+export const PAYMENT_CAPTIONS: Record<string, string> = {
+  queued: "Queued for release",
+  released: "Sent",
+  failed: "Failed — needs a retry",
+};
+
 /** "2 days", "5 hours" — how long something has been sitting where it is. Null when it hasn't been long enough to be worth saying. */
 export function waitedFor(since: Date | null | undefined): string | null {
   if (!since) return null;
