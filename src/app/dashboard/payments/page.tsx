@@ -5,7 +5,7 @@ import { paymentInstructions as paymentInstructionsTable, invoices as invoicesTa
 import { buttonVariants } from "@/components/ui/button";
 import { Breadcrumbs } from "@/components/ui/breadcrumbs";
 import { cn } from "@/lib/utils";
-import { LifecycleStatus } from "@/app/dashboard/lifecycle/LifecycleStatus";
+import { LifecycleStatus } from "@/components/ui/lifecycle-status";
 import { releasePayment, markPaymentFailed, retryPayment } from "./actions";
 
 export default async function PaymentsPage() {

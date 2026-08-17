@@ -6,8 +6,8 @@ import { purchaseOrders as purchaseOrdersTable, vendors as vendorsTable } from "
 import { buttonVariants } from "@/components/ui/button";
 import { Breadcrumbs } from "@/components/ui/breadcrumbs";
 import { cn } from "@/lib/utils";
-import { poStage } from "@/app/dashboard/lifecycle/stage";
-import { LifecycleStatus } from "@/app/dashboard/lifecycle/LifecycleStatus";
+import { poStage } from "@/lib/lifecycle";
+import { LifecycleStatus } from "@/components/ui/lifecycle-status";
 
 export default async function FulfillmentPage() {
   const { tenant } = await getCurrentUserAndTenant();

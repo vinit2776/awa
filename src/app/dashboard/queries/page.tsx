@@ -2,23 +2,8 @@ import Link from "next/link";
 import { listMyQueries } from "@/db/clarifications";
 import { Breadcrumbs } from "@/components/ui/breadcrumbs";
 import { cn } from "@/lib/utils";
+import { entityHref, entityLabel } from "@/lib/entityLinks";
 import { formatRelative } from "../support/ui";
-
-const ENTITY_LABEL: Record<string, string> = {
-  requisition: "Requisition",
-  purchase_order: "Purchase order",
-  invoice: "Invoice",
-  goods_receipt: "Goods receipt",
-  quotation: "Quotation",
-};
-
-const ENTITY_HREF: Record<string, (id: string) => string> = {
-  requisition: (id) => `/dashboard/requisitions/${id}`,
-  purchase_order: (id) => `/dashboard/sourcing/${id}`,
-  invoice: (id) => `/dashboard/invoices/${id}`,
-  goods_receipt: (id) => `/dashboard/fulfillment/${id}`,
-  quotation: (id) => `/dashboard/sourcing/${id}`,
-};
 
 /**
  * The personal inbox. This is what stops queries dying inside a record nobody
@@ -100,7 +85,7 @@ function QueryRow({
   counterpart: string;
   emphasise?: boolean;
 }) {
-  const href = ENTITY_HREF[clarification.entityType]?.(clarification.entityId) ?? "/dashboard";
+  const href = entityHref(clarification.entityType, clarification.entityId) ?? "/dashboard";
 
   return (
     <li
@@ -110,7 +95,7 @@ function QueryRow({
       )}
     >
       <div className="flex flex-wrap items-center gap-2 text-xs">
-        <span className="font-medium">{ENTITY_LABEL[clarification.entityType] ?? clarification.entityType}</span>
+        <span className="font-medium">{entityLabel(clarification.entityType)}</span>
         {clarification.blocksProgress &&
           (clarification.status === "open" || clarification.status === "answered") && (
             <span className="rounded border border-input px-1.5 py-0.5 text-muted-foreground">Blocking</span>

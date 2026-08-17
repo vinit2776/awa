@@ -6,8 +6,8 @@ import { invoices as invoicesTable, vendors as vendorsTable, paymentInstructions
 import { buttonVariants } from "@/components/ui/button";
 import { Breadcrumbs } from "@/components/ui/breadcrumbs";
 import { cn } from "@/lib/utils";
-import { invoiceStage } from "@/app/dashboard/lifecycle/stage";
-import { LifecycleStatus } from "@/app/dashboard/lifecycle/LifecycleStatus";
+import { invoiceStage } from "@/lib/lifecycle";
+import { LifecycleStatus } from "@/components/ui/lifecycle-status";
 
 export default async function InvoicesPage() {
   const { tenant } = await getCurrentUserAndTenant();
