@@ -15,8 +15,19 @@ import {
   users as usersTable,
 } from "@/db/schema";
 import { Breadcrumbs } from "@/components/ui/breadcrumbs";
+import { LifecycleRail } from "@/components/ui/lifecycle-rail";
+import { Info, PageHelp, Term } from "@/components/ui/help";
 import { computeStage, approvalStepDetail } from "../stage";
 import { LifecycleStatus } from "../LifecycleStatus";
+
+// The payment_instructions enum, in the reader's words rather than the
+// column's — the rail is the one place a requestor with no procurement
+// vocabulary reads this record.
+const PAYMENT_CAPTIONS: Record<string, string> = {
+  queued: "Queued for release",
+  released: "Sent",
+  failed: "Failed — needs a retry",
+};
 
 export default async function LifecycleDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -43,7 +54,7 @@ export default async function LifecycleDetailPage({ params }: { params: Promise<
   if (!data) notFound();
   const { requisition, rfq, quotations, po, invoice, payment, users, vendors, requirementRows, approvalRules } = data;
 
-  const requestorName = users.find((u) => u.id === requisition.requestorId)?.fullName ?? "—";
+  const userName = (id: string | null) => users.find((u) => u.id === id)?.fullName ?? "—";
   const vendorName = (id: string) => vendors.find((v) => v.id === id)?.name ?? "—";
   const stage = computeStage(requisition, rfq ? [rfq] : [], po, invoice, payment);
   const stepDetail = approvalStepDetail(requirementRows);
@@ -51,20 +62,53 @@ export default async function LifecycleDetailPage({ params }: { params: Promise<
     .map((ruleId) => approvalRules.find((r) => r.id === ruleId)?.name)
     .filter((name): name is string => !!name);
 
-  const approvalDetail =
-    requisition.status === "pending_approval"
-      ? [stepDetail, matchedRuleNames.length > 0 ? `via ${matchedRuleNames.map((n) => `"${n}"`).join(", ")}` : null].filter(Boolean).join(" — ") || "In progress"
-      : requisition.status;
+  // Who is actually holding this right now. Only the lowest-numbered
+  // pending group is actionable — later groups exist as rows but nobody
+  // is waiting on them yet, so naming one of those would be wrong.
+  const pendingRequirements = requirementRows.filter((r) => r.status === "pending");
+  const currentGroup = pendingRequirements.length ? Math.min(...pendingRequirements.map((r) => r.groupNo)) : null;
+  const currentApprovers = pendingRequirements.filter((r) => r.groupNo === currentGroup);
+  const waitingOn =
+    requisition.status === "pending_approval" && currentApprovers.length > 0
+      ? {
+          name:
+            currentApprovers.length === 1
+              ? userName(currentApprovers[0].assignedUserId)
+              : `${currentApprovers.length} approvers`,
+        }
+      : null;
+  // actionableAt, not createdAt — a later group's row is stamped at
+  // submission time, long before that group is waiting on anyone.
+  const since = currentApprovers.length ? (currentApprovers[0].actionableAt ?? requisition.submittedAt) : null;
 
-  const steps: { label: string; done: boolean; detail: string }[] = [
-    { label: "Requisition", done: true, detail: `${requestorName} — ${requisition.totalEstimatedValue} ${requisition.currency} — ${requisition.status}` },
-    { label: "Approval", done: ["approved", "converted_to_po"].includes(requisition.status), detail: approvalDetail },
-    { label: "Sourcing", done: !!po, detail: quotations.length ? `${quotations.length} quotation(s)` : rfq ? "RFQ open, no quotations yet" : "Not started" },
-    { label: "Purchase order", done: !!po, detail: po ? `${po.poNumber} — ${vendorName(po.vendorId)} — ${po.status}` : "Not issued" },
-    { label: "Receipt / acceptance", done: po?.status === "fulfilled", detail: po?.status === "fulfilled" ? "Complete" : po ? "Awaiting receipt" : "—" },
-    { label: "Invoice", done: !!invoice && invoice.status !== "exception", detail: invoice ? `${invoice.invoiceNumber} — ${invoice.status}` : "Not submitted" },
-    { label: "Payment", done: payment?.status === "released", detail: payment ? payment.status : invoice?.status === "approved_for_payment" ? "Awaiting queue" : "—" },
-  ];
+  // stepDetail is null for a single-step chain — "Step 1 of 1" isn't worth
+  // saying — so it can't stand in for the caption on its own, or a pending
+  // one-approver requisition reads as "Not started".
+  const approvalCaption = ["approved", "converted_to_po"].includes(requisition.status)
+    ? "Cleared"
+    : requisition.status === "pending_approval" || requisition.status === "submitted"
+      ? (stepDetail ?? "In progress")
+      : requisition.status.startsWith("rejected")
+        ? "Rejected"
+        : "Not started";
+
+  const captions = {
+    requisition: `${userName(requisition.requestorId)} · ${requisition.totalEstimatedValue} ${requisition.currency}`,
+    approval: approvalCaption,
+    sourcing: quotations.length
+      ? `${quotations.length} quotation${quotations.length === 1 ? "" : "s"}`
+      : rfq
+        ? "No quotations yet"
+        : "Not started",
+    purchase_order: po ? `${po.poNumber} · ${vendorName(po.vendorId)}` : "Not issued",
+    receipt: po?.status === "fulfilled" ? "Complete" : po ? "Awaiting delivery" : "—",
+    invoice: invoice ? invoice.invoiceNumber : "Not submitted",
+    payment: payment
+      ? PAYMENT_CAPTIONS[payment.status]
+      : invoice?.status === "approved_for_payment"
+        ? "Awaiting queue"
+        : "—",
+  };
 
   return (
     <div className="flex flex-col gap-6 p-8">
@@ -77,22 +121,94 @@ export default async function LifecycleDetailPage({ params }: { params: Promise<
           ]}
         />
         <div className="flex items-start justify-between gap-3">
-          <h1 className="font-serif text-lg text-foreground">Requisition lifecycle</h1>
-          <LifecycleStatus stage={stage} detail={stage === "Pending approval" ? stepDetail : undefined} className="shrink-0 items-end text-right" />
+          <div>
+            <h1 className="font-serif text-lg text-foreground">Requisition lifecycle</h1>
+            <p className="text-sm text-muted-foreground">
+              Every stage this <Term name="requisition">requisition</Term> passes through, and where it has got
+              to.
+            </p>
+          </div>
+          <LifecycleStatus
+            stage={stage}
+            detail={stage === "Pending approval" ? stepDetail : undefined}
+            waitingOn={waitingOn}
+            since={since}
+            className="shrink-0 items-end text-right"
+          />
         </div>
       </div>
 
-      <ol className="flex flex-col gap-4">
-        {steps.map((step) => (
-          <li key={step.label} className="flex items-start gap-3">
-            <span className={`mt-0.5 h-2 w-2 shrink-0 rounded-full ${step.done ? "bg-emerald-500" : "bg-muted-foreground/30"}`} />
-            <div>
-              <p className="text-sm font-medium">{step.label}</p>
-              <p className="text-sm text-muted-foreground">{step.detail}</p>
-            </div>
-          </li>
-        ))}
-      </ol>
+      <PageHelp
+        id="lifecycle-detail"
+        title="How to read this"
+        steps={[
+          "The rail below runs left to right through all seven stages. Green is done, orange is where it is now, grey is still to come.",
+          "Nothing skips a stage. A requisition cannot be invoiced before it is received, or paid before it is matched.",
+          "If it has stopped moving, the status on the right names who is holding it and for how long.",
+        ]}
+      />
+
+      <div className="rounded-lg border border-border p-4">
+        <LifecycleRail stage={stage} captions={captions} explain />
+      </div>
+
+      <dl className="flex flex-col gap-3 text-sm">
+        <div>
+          <dt className="font-medium">Approval</dt>
+          <dd className="text-muted-foreground">
+            {matchedRuleNames.length > 0 ? (
+              <>
+                Matched {matchedRuleNames.map((n) => `"${n}"`).join(", ")}
+                <Info title="Approval rule" next="Admin › Approval rules shows every rule and what it covers.">
+                  A standing instruction about who has to sign off, at what value, for which category or
+                  department. More than one rule can apply to the same requisition.
+                </Info>
+              </>
+            ) : (
+              <>
+                No approval rule matched this requisition, so it was approved automatically.
+                <Info
+                  title="Auto-approved"
+                  next="An admin can close this gap by adding a rule that covers this value and category."
+                >
+                  When no rule matches, there is nobody to route the requisition to, so AWA approves it rather
+                  than leaving it stuck forever.
+                </Info>
+              </>
+            )}
+          </dd>
+        </div>
+
+        {po && (
+          <div>
+            <dt className="font-medium">Purchase order</dt>
+            <dd className="text-muted-foreground">
+              {po.poNumber} · {vendorName(po.vendorId)} · {po.status.replace(/_/g, " ")}
+              {po.status === "partially_fulfilled" && (
+                <>
+                  {" — "}
+                  <Term name="partial-fulfilment">part of the order is still outstanding</Term>
+                </>
+              )}
+            </dd>
+          </div>
+        )}
+
+        {invoice && (
+          <div>
+            <dt className="font-medium">Invoice</dt>
+            <dd className="text-muted-foreground">
+              {invoice.invoiceNumber} · {invoice.status.replace(/_/g, " ")}
+              {invoice.status === "exception" && (
+                <>
+                  {" — failed the "}
+                  <Term name="three-way-match" />
+                </>
+              )}
+            </dd>
+          </div>
+        )}
+      </dl>
     </div>
   );
 }
