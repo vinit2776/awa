@@ -20,7 +20,7 @@ import { Badge } from "@/components/ui/badge";
 import { Info, PageHelp } from "@/components/ui/help";
 import { LifecycleStatus } from "@/components/ui/lifecycle-status";
 import { computeStage, approvalStepDetail } from "@/lib/lifecycle";
-import { entityHref, entityLabel } from "@/lib/entityLinks";
+import { entityLabel } from "@/lib/entityLinks";
 import { cn } from "@/lib/utils";
 
 /**
@@ -256,16 +256,13 @@ export default async function DashboardPage() {
               />
             ))}
 
-            {openQueries.map(({ clarification, counterpartName }) => (
+            {openQueries.map(({ clarification, counterpartName, href }) => (
               <ActionRow
                 key={clarification.id}
                 tone="info"
                 title={`${counterpartName} asked you a question`}
                 detail={clarification.question}
-                cta={{
-                  label: "Answer",
-                  href: entityHref(clarification.entityType, clarification.entityId) ?? "/dashboard/queries",
-                }}
+                cta={{ label: "Answer", href }}
                 meta={clarification.blocksProgress ? `Blocking the ${entityLabel(clarification.entityType).toLowerCase()}` : undefined}
               />
             ))}
