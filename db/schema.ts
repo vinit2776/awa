@@ -805,3 +805,24 @@ export const supportSlaPolicies = pgTable("support_sla_policies", {
   check("sla_first_response_positive", sql`${t.firstResponseMinutes} > 0`),
   check("sla_resolution_positive", sql`${t.resolutionMinutes} is null or ${t.resolutionMinutes} > 0`),
 ]);
+
+export const supportEscalationTrigger = pgEnum("support_escalation_trigger", [
+  "first_response_breach", "resolution_breach", "reopened_twice", "customer_escalated",
+]);
+
+export const supportEscalationMatrix = pgTable("support_escalation_matrix", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  level: integer("level").notNull(),
+  trigger: supportEscalationTrigger("trigger").notNull(),
+  afterMinutes: integer("after_minutes").notNull().default(0),
+  notifyPlatformAdminId: uuid("notify_platform_admin_id").references(() => platformAdmins.id, {
+    onDelete: "set null",
+  }),
+  notifyRole: platformAdminRole("notify_role"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [
+  unique().on(t.level, t.trigger),
+  index().on(t.trigger, t.level),
+  check("escalation_level_range", sql`${t.level} between 1 and 2`),
+  check("escalation_grace_non_negative", sql`${t.afterMinutes} >= 0`),
+]);

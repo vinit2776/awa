@@ -6,7 +6,7 @@ import { Breadcrumbs } from "@/components/ui/breadcrumbs";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { StatusPill, TypeTag, formatDateTime } from "../ui";
-import { confirmTicketResolved, reopenTicketAction, replyToTicket } from "../actions";
+import { confirmTicketResolved, escalateTicket, reopenTicketAction, replyToTicket } from "../actions";
 
 export default async function SupportTicketPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -144,6 +144,38 @@ export default async function SupportTicketPage({ params }: { params: Promise<{ 
                 </button>
               </div>
             </form>
+          )}
+
+          {!isClosed && ticket.status !== "resolved" && (
+            ticket.customerEscalatedAt ? (
+              <p className="rounded-lg border border-warning/40 bg-warning/5 p-3 text-xs text-muted-foreground">
+                You escalated this on {formatDateTime(ticket.customerEscalatedAt)}. AWA&apos;s senior support has
+                been notified.
+              </p>
+            ) : (
+              <details className="rounded-lg border border-dashed border-input">
+                <summary className="cursor-pointer px-3.5 py-2.5 text-sm font-medium">
+                  Not moving fast enough? Escalate it
+                </summary>
+                <form action={escalateTicket} className="flex flex-col gap-2 border-t border-border p-3.5">
+                  <input type="hidden" name="ticketId" value={ticket.id} />
+                  <p className="text-xs text-muted-foreground">
+                    This flags the ticket to AWA&apos;s senior support. You can do it once.
+                  </p>
+                  <input
+                    name="reason"
+                    required
+                    placeholder="What's changed — why is this urgent now?"
+                    className="rounded-lg border border-input bg-background px-3 py-1.5 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  />
+                  <div className="flex justify-end">
+                    <button type="submit" className={cn(buttonVariants({ variant: "outline", size: "sm" }))}>
+                      Escalate
+                    </button>
+                  </div>
+                </form>
+              </details>
+            )
           )}
 
           {isClosed && (

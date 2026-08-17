@@ -1,9 +1,15 @@
 {
-  "regions": ["bom1"],
+  "regions": [
+    "bom1"
+  ],
   "crons": [
     {
       "path": "/api/cron/escalate-approvals",
       "schedule": "0 3 * * *"
+    },
+    {
+      "path": "/api/cron/support-sla-sweep",
+      "schedule": "0 * * * *"
     }
   ]
 }

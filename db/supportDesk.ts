@@ -377,6 +377,59 @@ export async function confirmResolution(ticketId: string) {
   });
 }
 
+/**
+ * The customer's own escalation lever, usable once per ticket.
+ *
+ * Deliberately does NOT change priority. Priority is support's triage judgement
+ * and it already shaped the SLA targets; letting a customer rewrite it would
+ * let anyone reprice their own ticket. What this does is set a flag the sweep
+ * picks up to raise the ticket to L2 and tell the super admins — the outcome
+ * the customer actually wants, without handing them the dial.
+ */
+export async function customerEscalate(ticketId: string, reason: string) {
+  const { user, tenant } = await getCurrentUserAndTenant();
+  const text = reason.trim();
+  if (!text) throw new Error("Say what's urgent about it, so support knows what changed.");
+
+  await withTenant(tenant.id, async (tx) => {
+    const [ticket] = await tx
+      .select()
+      .from(supportTickets)
+      .where(and(eq(supportTickets.id, ticketId), eq(supportTickets.tenantId, tenant.id)))
+      .limit(1);
+
+    if (!ticket) throw new Error("Ticket not found.");
+    if (ticket.reportedByUserId !== user.id) throw new Error("Only the person who raised this can escalate it.");
+    if (ticket.customerEscalatedAt) throw new Error("You've already escalated this one — support has been told.");
+    if (ticket.status === "resolved" || ticket.status === "closed") {
+      throw new Error("This is already resolved. Reopen it instead if it isn't fixed.");
+    }
+
+    await tx
+      .update(supportTickets)
+      .set({ customerEscalatedAt: new Date() })
+      .where(eq(supportTickets.id, ticketId));
+
+    // Posted into the thread as well as flagged, so support sees the reason
+    // rather than just a state change.
+    await tx.insert(supportTicketMessages).values({
+      tenantId: tenant.id,
+      ticketId,
+      visibility: "customer",
+      body: text,
+      authorUserId: user.id,
+    });
+
+    await logTicketEvent(tx, {
+      tenantId: tenant.id,
+      ticketId,
+      event: "customer_escalated",
+      actor: { kind: "customer", userId: user.id },
+      metadata: { reason: text },
+    });
+  });
+}
+
 /** Reopen within 14 days of resolution; after that it's a new ticket. */
 const REOPEN_WINDOW_MS = 14 * 24 * 60 * 60 * 1000;
 
