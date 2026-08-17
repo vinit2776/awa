@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import {
   confirmResolution,
   createTicket,
+  customerEscalate,
   postCustomerReply,
   reopenTicket,
   type ReportInput,
@@ -64,6 +65,16 @@ export async function reopenTicketAction(formData: FormData) {
   if (!ticketId) return;
 
   await reopenTicket(ticketId, reason);
+  revalidatePath(`/dashboard/support/${ticketId}`);
+  revalidatePath("/dashboard/support");
+}
+
+export async function escalateTicket(formData: FormData) {
+  const ticketId = String(formData.get("ticketId") ?? "");
+  const reason = String(formData.get("reason") ?? "");
+  if (!ticketId) return;
+
+  await customerEscalate(ticketId, reason);
   revalidatePath(`/dashboard/support/${ticketId}`);
   revalidatePath("/dashboard/support");
 }

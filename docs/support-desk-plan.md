@@ -4,15 +4,17 @@ In-app support ticketing: customers report bugs, feature requests and feedback f
 wherever they are in the app; a platform-side support team triages, responds, resolves
 and escalates against a TAT clock. Active in every tenant, no feature flag.
 
-> **Status: Phases A and B built.**
+> **Status: Phases A, B and C built.**
 > Migration `0014_support_desk.sql` is applied to the dev database. Report widget,
 > `/dashboard/support`, `/dashboard/support/[id]`, `/platform/support`,
 > `/platform/support/[id]`, attachments, and the events audit trail are all in.
 > Phase B added routing and the TAT clock (migration `0016`): auto-assignment, the agent
 > roster at `/platform/support/agents`, SLA targets populated at creation, the clock
-> pausing while `awaiting_customer`, and breach shown in the queue. Phases C–D
-> (escalation matrix, the cron sweep, auto-close) are not started —
-> `escalation_level` exists but nothing ever increments it.
+> pausing while `awaiting_customer`, and breach shown in the queue. Phase C added the
+> escalation matrix, the hourly sweep at `/api/cron/support-sla-sweep`, auto-close after
+> the 7-day confirmation window, and the customer's one-shot escalate control (migration
+> `0017`). Phase D (console error capture, saved replies, CSAT, per-tenant SLA overrides,
+> business-hours calendars) is not started.
 >
 > Decisions **D1** (email provider) and **D4** (publish TAT) are still open and were built
 > to the recommended default. **D2** (paste + file picker) and **D3** (reporter + tenant
