@@ -6,6 +6,7 @@ import {
   createTicket,
   customerEscalate,
   postCustomerReply,
+  rateTicket,
   reopenTicket,
   type ReportInput,
 } from "@/db/supportDesk";
@@ -32,6 +33,7 @@ export async function submitReport(formData: FormData): Promise<{ id: string; re
     appVersion: String(formData.get("appVersion") ?? "") || null,
     userAgent: String(formData.get("userAgent") ?? "") || null,
     viewport: String(formData.get("viewport") ?? "") || null,
+    consoleErrors: String(formData.get("consoleErrors") ?? "") || null,
   });
 
   revalidatePath("/dashboard/support");
@@ -77,4 +79,14 @@ export async function escalateTicket(formData: FormData) {
   await customerEscalate(ticketId, reason);
   revalidatePath(`/dashboard/support/${ticketId}`);
   revalidatePath("/dashboard/support");
+}
+
+export async function rateTicketAction(formData: FormData) {
+  const ticketId = String(formData.get("ticketId") ?? "");
+  const raw = String(formData.get("rating") ?? "");
+  const comment = String(formData.get("comment") ?? "");
+  if (!ticketId || (raw !== "positive" && raw !== "negative")) return;
+
+  await rateTicket(ticketId, raw, comment);
+  revalidatePath(`/dashboard/support/${ticketId}`);
 }

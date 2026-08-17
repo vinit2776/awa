@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { Bug, Lightbulb, MessageSquare, Paperclip, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { buttonVariants } from "@/components/ui/button";
+import { getRecentErrors } from "@/lib/errorBuffer";
 import { submitReport } from "./support/actions";
 
 type ReportType = "bug" | "feature_request" | "feedback";
@@ -35,12 +36,18 @@ export function ReportWidget({ storageEnabled }: { storageEnabled: boolean }) {
   const [type, setType] = useState<ReportType>("bug");
   const [files, setFiles] = useState<File[]>([]);
   const [error, setError] = useState<string | null>(null);
+  // Read when the panel opens rather than on every render, so the disclosure
+  // reflects what will actually be sent.
+  const [recentErrorCount, setRecentErrorCount] = useState(0);
   const [pending, startTransition] = useTransition();
 
   useEffect(() => {
     const dialog = dialogRef.current;
     if (!dialog) return;
-    if (open && !dialog.open) dialog.showModal();
+    if (open && !dialog.open) {
+      setRecentErrorCount(getRecentErrors().length);
+      dialog.showModal();
+    }
     if (!open && dialog.open) dialog.close();
   }, [open]);
 
@@ -90,6 +97,11 @@ export function ReportWidget({ storageEnabled }: { storageEnabled: boolean }) {
     data.set("appVersion", process.env.NEXT_PUBLIC_APP_VERSION ?? "dev");
     data.set("userAgent", navigator.userAgent);
     data.set("viewport", `${window.innerWidth}×${window.innerHeight}`);
+    // Only on a bug report: a feature request or a note about the UI has no use
+    // for browser errors, and attaching them anyway would widen what's captured
+    // for no diagnostic gain.
+    const errors = type === "bug" ? getRecentErrors() : [];
+    if (errors.length > 0) data.set("consoleErrors", JSON.stringify(errors));
 
     startTransition(async () => {
       try {
@@ -262,8 +274,11 @@ export function ReportWidget({ storageEnabled }: { storageEnabled: boolean }) {
                 protect. Nothing beyond these four fields is captured. */}
             <div className="flex flex-col gap-2 rounded-lg border border-border bg-background p-3">
               <p className="text-xs text-muted-foreground">
-                We&apos;ll include this page, your browser, and your name and organisation. Nothing else from the
-                screen is captured.
+                We&apos;ll include this page, your browser, and your name and organisation
+                {type === "bug" && recentErrorCount > 0
+                  ? `, plus the last ${recentErrorCount} error${recentErrorCount === 1 ? "" : "s"} your browser recorded`
+                  : ""}
+                . Nothing else from the screen is captured.
               </p>
               <div className="flex flex-wrap gap-1.5 font-mono text-[10px] text-muted-foreground">
                 <span className="rounded bg-accent px-1.5 py-0.5">{pathname}</span>

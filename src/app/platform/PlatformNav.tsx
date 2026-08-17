@@ -2,13 +2,14 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Building2, LifeBuoy, Users, type LucideIcon } from "lucide-react";
+import { Building2, LifeBuoy, Timer, Users, type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const NAV_ITEMS: { href: string; label: string; icon: LucideIcon }[] = [
   { href: "/platform", label: "Tenants", icon: Building2 },
   { href: "/platform/support", label: "Support queue", icon: LifeBuoy },
   { href: "/platform/support/agents", label: "Agent roster", icon: Users },
+  { href: "/platform/support/sla", label: "SLA targets", icon: Timer },
 ];
 
 export function PlatformNav() {

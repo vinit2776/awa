@@ -2,11 +2,12 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { Paperclip } from "lucide-react";
 import { PlatformAdminAccessError } from "@/db/platformSession";
-import { getCurrentSupportAgent, getTicketForSupport, slaState } from "@/db/supportDesk";
+import { getCurrentSupportAgent, getTicketForSupport, listSavedReplies, slaState } from "@/db/supportDesk";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { formatDateTime } from "../../../dashboard/support/ui";
 import { assign, changePriority, replyAsSupport, resolve } from "../actions";
+import { SavedReplyPicker } from "./SavedReplyPicker";
 
 const OUTCOMES = [
   { value: "fixed", label: "Fixed" },
@@ -31,6 +32,7 @@ export default async function SupportTicketDetailPage({ params }: { params: Prom
   const { ticket, tenantName, tenantSlug, tenantStatus, reporterName, reporterEmail, messages, attachments, events, assignees } =
     data;
   const sla = slaState(ticket);
+  const savedReplies = await listSavedReplies(ticket.type);
 
   return (
     <div className="flex flex-1 flex-col gap-5 p-6">
@@ -80,6 +82,24 @@ export default async function SupportTicketDetailPage({ params }: { params: Prom
           </p>
         </div>
       </div>
+
+      {ticket.consoleErrors && ticket.consoleErrors.length > 0 && (
+        <details className="rounded-lg border border-border bg-card">
+          <summary className="cursor-pointer px-4 py-2.5 text-xs uppercase tracking-wide text-muted-foreground">
+            Browser errors at report time · {ticket.consoleErrors.length}
+          </summary>
+          <ol className="flex flex-col gap-2 border-t border-border p-4">
+            {ticket.consoleErrors.map((entry, i) => (
+              <li key={i} className="flex flex-col gap-0.5">
+                <code className="font-mono text-xs break-words">{entry.message}</code>
+                <span className="font-mono text-[10px] text-muted-foreground">
+                  {[entry.source, entry.line ? `line ${entry.line}` : null, entry.at].filter(Boolean).join(" · ")}
+                </span>
+              </li>
+            ))}
+          </ol>
+        </details>
+      )}
 
       <div className="grid gap-4 lg:grid-cols-[1fr_280px]">
         <div className="flex flex-col gap-3">
@@ -154,7 +174,12 @@ export default async function SupportTicketDetailPage({ params }: { params: Prom
                     Support-only note
                   </label>
                 </div>
+                <SavedReplyPicker
+                  replies={savedReplies.map((r) => ({ id: r.id, title: r.title, body: r.body }))}
+                  targetId="support-reply-body"
+                />
                 <textarea
+                  id="support-reply-body"
                   name="body"
                   required
                   rows={4}
@@ -247,6 +272,22 @@ export default async function SupportTicketDetailPage({ params }: { params: Prom
               </div>
             </dl>
           </div>
+
+          {ticket.csatRating && (
+            <div className="rounded-lg border border-border bg-card">
+              <h2 className="border-b border-border px-4 py-2.5 text-xs uppercase tracking-wide text-muted-foreground">
+                Customer rating
+              </h2>
+              <div className="flex flex-col gap-1 p-4">
+                <p className={cn("text-sm font-medium", ticket.csatRating === "negative" && "text-destructive")}>
+                  {ticket.csatRating === "positive" ? "Handled well" : "Not handled well"}
+                </p>
+                {ticket.csatComment && (
+                  <p className="text-sm whitespace-pre-wrap text-muted-foreground">{ticket.csatComment}</p>
+                )}
+              </div>
+            </div>
+          )}
 
           <div className="rounded-lg border border-border bg-card">
             <h2 className="border-b border-border px-4 py-2.5 text-xs uppercase tracking-wide text-muted-foreground">
