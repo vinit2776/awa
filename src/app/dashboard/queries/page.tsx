@@ -2,7 +2,7 @@ import Link from "next/link";
 import { listMyQueries } from "@/db/clarifications";
 import { Breadcrumbs } from "@/components/ui/breadcrumbs";
 import { cn } from "@/lib/utils";
-import { entityHref, entityLabel } from "@/lib/entityLinks";
+import { entityLabel } from "@/lib/entityLinks";
 import { formatRelative } from "../support/ui";
 
 /**
@@ -37,10 +37,11 @@ export default async function QueriesPage() {
           </p>
         ) : (
           <ul className="flex flex-col gap-2">
-            {askedOfMe.map(({ clarification, counterpartName }) => (
+            {askedOfMe.map(({ clarification, counterpartName, href }) => (
               <QueryRow
                 key={clarification.id}
                 clarification={clarification}
+                href={href}
                 counterpart={`${counterpartName} asked`}
                 emphasise
               />
@@ -60,10 +61,11 @@ export default async function QueriesPage() {
           </p>
         ) : (
           <ul className="flex flex-col gap-2">
-            {iAsked.map(({ clarification, counterpartName }) => (
+            {iAsked.map(({ clarification, counterpartName, href }) => (
               <QueryRow
                 key={clarification.id}
                 clarification={clarification}
+                href={href}
                 counterpart={counterpartName ? `asked ${counterpartName}` : "asked anyone"}
               />
             ))}
@@ -78,14 +80,15 @@ type Row = Awaited<ReturnType<typeof listMyQueries>>["askedOfMe"][number]["clari
 
 function QueryRow({
   clarification,
+  href,
   counterpart,
   emphasise,
 }: {
   clarification: Row;
+  href: string;
   counterpart: string;
   emphasise?: boolean;
 }) {
-  const href = entityHref(clarification.entityType, clarification.entityId) ?? "/dashboard";
 
   return (
     <li
