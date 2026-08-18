@@ -5,6 +5,8 @@ import { withTenant } from "@/db/withTenant";
 import { getRequisitionDocumentUrl } from "@/db/documentStorage";
 import {
   purchaseRequisitions as purchaseRequisitionsTable,
+  purchaseRequisitionLines as purchaseRequisitionLinesTable,
+  catalogItems as catalogItemsTable,
   requisitionApprovalRequirements as requirementsTable,
   departments as departmentsTable,
   costCenters as costCentersTable,
@@ -20,6 +22,7 @@ import { Breadcrumbs } from "@/components/ui/breadcrumbs";
 import { Info } from "@/components/ui/help";
 import { cn } from "@/lib/utils";
 import { computeStage, approvalStepDetail } from "@/lib/lifecycle";
+import { requisitionLabel } from "@/lib/requisitionSummary";
 import { LifecycleStatus } from "@/components/ui/lifecycle-status";
 import { submitRequisition } from "./actions";
 
@@ -109,6 +112,15 @@ export default async function RequisitionsPage({
       .sort((a, b) => (b.decidedAt?.getTime() ?? 0) - (a.decidedAt?.getTime() ?? 0))[0]?.decisionComment ?? null;
   const stepDetailFor = (requisitionId: string) => approvalStepDetail(requirementRows.filter((r) => r.requisitionId === requisitionId));
 
+  // What each requisition is for. Without this the table says who, when,
+  // how much and what stage — everything except the thing being bought.
+  const [lines, catalogItems] = allRequisitionIds.length
+    ? await withTenant(tenant.id, async (tx) => [
+        await tx.select().from(purchaseRequisitionLinesTable).where(inArray(purchaseRequisitionLinesTable.requisitionId, allRequisitionIds)),
+        await tx.select().from(catalogItemsTable),
+      ])
+    : [[], []];
+
   const documentUrls = new Map(
     await Promise.all(
       requisitions
@@ -144,6 +156,10 @@ export default async function RequisitionsPage({
   const departmentName = (id: string | null) => departments.find((d) => d.id === id)?.name ?? "—";
   const costCenterName = (id: string | null) => costCenters.find((c) => c.id === id)?.name ?? "—";
   const requestorName = (id: string) => users.find((u) => u.id === id)?.fullName ?? "—";
+  // A requisition has no number and no title — what it is for is the only
+  // thing anyone can recognise it by.
+  const labelFor = (r: { id: string }) =>
+    requisitionLabel(lines.filter((l) => l.requisitionId === r.id), catalogItems);
 
   return (
     <div className="flex flex-col gap-6 p-8">
@@ -201,10 +217,15 @@ export default async function RequisitionsPage({
         </span>
       </form>
 
-      <table className="w-full text-sm">
+      {/* Eight columns don't fit a laptop once "For" is in. The table
+          scrolls inside its own container rather than pushing the page
+          sideways. */}
+      <div className="overflow-x-auto">
+      <table className="w-full min-w-3xl text-sm">
         <thead>
           <tr className="border-b text-left text-xs text-muted-foreground">
             <th className="py-2 pr-4 font-normal whitespace-nowrap">Created</th>
+            <th className="py-2 pr-4 font-normal">For</th>
             {scope === "all" && <th className="py-2 pr-4 font-normal">Requestor</th>}
             <th className="py-2 pr-4 font-normal">Department</th>
             <th className="py-2 pr-4 font-normal whitespace-nowrap">Cost center</th>
@@ -222,7 +243,7 @@ export default async function RequisitionsPage({
         <tbody>
           {requisitions.length === 0 && (
             <tr>
-              <td colSpan={scope === "all" ? 7 : 6} className="py-6 text-center text-sm text-muted-foreground">
+              <td colSpan={scope === "all" ? 8 : 7} className="py-6 text-center text-sm text-muted-foreground">
                 {statusFilter
                   ? "No requisitions match this filter."
                   : scope === "mine"
@@ -239,6 +260,11 @@ export default async function RequisitionsPage({
             return (
               <tr key={r.id} className="border-b align-top">
                 <td className="py-2 pr-4 whitespace-nowrap">{r.createdAt.toISOString().slice(0, 10)}</td>
+                <td className="py-2 pr-4">
+                  <Link href={`/dashboard/requisitions/${r.id}`} className="font-medium hover:underline">
+                    {labelFor(r)}
+                  </Link>
+                </td>
                 {scope === "all" && <td className="py-2 pr-4 whitespace-nowrap">{requestorName(r.requestorId)}</td>}
                 <td className="py-2 pr-4">{departmentName(r.departmentId)}</td>
                 <td className="py-2 pr-4">{costCenterName(r.costCenterId)}</td>
@@ -281,6 +307,7 @@ export default async function RequisitionsPage({
           })}
         </tbody>
       </table>
+      </div>
     </div>
   );
 }
