@@ -32,7 +32,11 @@ export default async function AdminLayout({ children }: { children: React.ReactN
         <p className="mb-3 text-xs font-medium text-muted-foreground">{tenant.name}</p>
         <AdminNav />
       </nav>
-      <div className="flex-1 p-6">{children}</div>
+      {/* min-w-0 for the same reason the dashboard <main> needs it: as a
+          flex item this defaults to min-width:auto, so a wide table — the
+          audit log, whose entity column is full uuids — pushes the whole
+          admin section sideways instead of scrolling within itself. */}
+      <div className="min-w-0 flex-1 p-6">{children}</div>
     </div>
   );
 }
