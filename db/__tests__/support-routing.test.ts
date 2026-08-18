@@ -30,6 +30,12 @@ let quiet: typeof platformAdmins.$inferSelect;   // idle in tenant A, buried in 
 let busy: typeof platformAdmins.$inferSelect;    // the reverse
 let owner: typeof platformAdmins.$inferSelect;   // named account owner for tenant A
 const adminIds: string[] = [];
+// support_agents is a platform-level table — no tenant_id, no RLS, and
+// pickAssignee() reads the whole roster. There is no per-run key that can
+// isolate it, so this suite cannot run concurrently with another copy of
+// itself; the ids below at least keep it from corrupting the shared dev
+// database's roster on the way out. See AGENTS.md on the shared-dev-DB choice.
+const deactivated: string[] = [];
 
 async function makeTenant(label: string, suffix: string) {
   const [tenant] = await adminDb
@@ -87,8 +93,17 @@ beforeAll(async () => {
   owner = await makeAdmin("owner", suffix);
 
   // Deactivate every pre-existing agent so the roster under test is only ours;
-  // the migration seeds one per platform_admin.
-  await adminDb.update(supportAgents).set({ active: false });
+  // the migration seeds one per platform_admin. Note which ones we actually
+  // switched off, so afterAll restores exactly those — a blanket
+  // set({ active: true }) would also switch on agents that were deliberately
+  // inactive before this run ever started.
+  deactivated.push(
+    ...(await adminDb
+      .update(supportAgents)
+      .set({ active: false })
+      .where(eq(supportAgents.active, true))
+      .returning({ id: supportAgents.id })).map((r) => r.id),
+  );
   await adminDb.insert(supportAgents).values([
     { platformAdminId: quiet.id },
     { platformAdminId: busy.id },
@@ -108,8 +123,10 @@ afterAll(async () => {
   await adminDb.delete(supportAgents).where(inArray(supportAgents.platformAdminId, adminIds));
   await adminDb.delete(platformAdmins).where(inArray(platformAdmins.id, adminIds));
   await adminDb.delete(tenants).where(inArray(tenants.id, [tenantA.id, tenantB.id]));
-  // Restore the agents the migration seeded.
-  await adminDb.update(supportAgents).set({ active: true });
+  // Restore exactly the agents this run switched off, not every row in the table.
+  if (deactivated.length > 0) {
+    await adminDb.update(supportAgents).set({ active: true }).where(inArray(supportAgents.id, deactivated));
+  }
 });
 
 describe("SLA targets", () => {

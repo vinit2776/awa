@@ -15,13 +15,18 @@ import { tenants, users, roles, userRoles, departments, auditLog } from "../sche
  * wouldn't have caught it either — assignUserRole checks explicitly.
  */
 
+// tenants.slug is globally unique, so a fixed slug collides outright with a
+// concurrent run on the shared dev database. Same per-run suffix every other
+// suite in this directory uses.
+const suffix = crypto.randomUUID().slice(0, 8);
+
 let tenant: typeof tenants.$inferSelect;
 let user: typeof users.$inferSelect;
 let role: typeof roles.$inferSelect;
 let dept: typeof departments.$inferSelect;
 
 beforeAll(async () => {
-  [tenant] = await adminDb.insert(tenants).values({ name: "Role Dup Co", slug: "role-dup-co" }).returning();
+  [tenant] = await adminDb.insert(tenants).values({ name: "Role Dup Co", slug: `role-dup-co-${suffix}` }).returning();
   [user] = await adminDb.insert(users).values({ tenantId: tenant.id, email: "role-dup@example.com", fullName: "Rae Dupe", status: "active" }).returning();
   [role] = await adminDb.insert(roles).values({ tenantId: tenant.id, key: "dup-role", displayName: "Dup Role" }).returning();
   [dept] = await adminDb.insert(departments).values({ tenantId: tenant.id, name: "Dup Dept" }).returning();

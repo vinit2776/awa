@@ -6,12 +6,18 @@ import { inviteUser, setUserStatus } from "../userInvite";
 import { linkUserOnSignIn, TenantLinkError } from "../tenant";
 import { tenants, users, auditLog } from "../schema";
 
+// Globally unique, and resolved with no tenant scope by linkUserOnSignIn() —
+// see the note in db/__tests__/domain-restriction.test.ts. A fixed id lets a
+// concurrent run's still-active user satisfy the already-linked fast path, so
+// the disabled-user rejection below never fires.
+const suffix = crypto.randomUUID().slice(0, 8);
+const workosUser = (name: string) => `workos_${name}_${suffix}`;
+
 let tenant: typeof tenants.$inferSelect;
 let restrictedTenant: typeof tenants.$inferSelect;
 let admin: typeof users.$inferSelect;
 
 beforeAll(async () => {
-  const suffix = crypto.randomUUID().slice(0, 8);
   [tenant] = await adminDb.insert(tenants).values({ name: "Invite Test Co", slug: `invite-test-co-${suffix}`, workosOrganizationId: `org_invite_test_${suffix}` }).returning();
   [restrictedTenant] = await adminDb
     .insert(tenants)
@@ -80,23 +86,23 @@ describe("disabling a user actually blocks them", () => {
     // hit on any subsequent sign-in attempt is fully testable, and is
     // the same status check session.ts applies on every request after.
     const invited = await withTenant(tenant.id, (tx) => inviteUser(tx, tenant.id, admin.id, { email: "disable-me@example.com", fullName: "Soon Disabled" }));
-    const linked = await linkUserOnSignIn({ workosUserId: "workos_disable_test", workosOrganizationId: tenant.workosOrganizationId!, email: "disable-me@example.com" });
+    const linked = await linkUserOnSignIn({ workosUserId: workosUser("disable_test"), workosOrganizationId: tenant.workosOrganizationId!, email: "disable-me@example.com" });
     expect(linked.status).toBe("active");
 
     await withTenant(tenant.id, (tx) => setUserStatus(tx, tenant.id, admin.id, invited.userId!, "disabled"));
 
     await expect(
-      linkUserOnSignIn({ workosUserId: "workos_disable_test", workosOrganizationId: tenant.workosOrganizationId!, email: "disable-me@example.com" }),
+      linkUserOnSignIn({ workosUserId: workosUser("disable_test"), workosOrganizationId: tenant.workosOrganizationId!, email: "disable-me@example.com" }),
     ).rejects.toThrow(TenantLinkError);
   });
 
   it("re-enabling restores access", async () => {
     const invited = await withTenant(tenant.id, (tx) => inviteUser(tx, tenant.id, admin.id, { email: "reenable-me@example.com", fullName: "Reenabled" }));
-    await linkUserOnSignIn({ workosUserId: "workos_reenable_test", workosOrganizationId: tenant.workosOrganizationId!, email: "reenable-me@example.com" });
+    await linkUserOnSignIn({ workosUserId: workosUser("reenable_test"), workosOrganizationId: tenant.workosOrganizationId!, email: "reenable-me@example.com" });
     await withTenant(tenant.id, (tx) => setUserStatus(tx, tenant.id, admin.id, invited.userId!, "disabled"));
     await withTenant(tenant.id, (tx) => setUserStatus(tx, tenant.id, admin.id, invited.userId!, "active"));
 
-    const linked = await linkUserOnSignIn({ workosUserId: "workos_reenable_test", workosOrganizationId: tenant.workosOrganizationId!, email: "reenable-me@example.com" });
+    const linked = await linkUserOnSignIn({ workosUserId: workosUser("reenable_test"), workosOrganizationId: tenant.workosOrganizationId!, email: "reenable-me@example.com" });
     expect(linked.status).toBe("active");
   });
 });
