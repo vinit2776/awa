@@ -167,10 +167,18 @@ export function PageHelp({
   id,
   title,
   steps,
+  defaultCollapsed = false,
   className,
 }: {
   id: string;
   title: string;
+  /**
+   * Start as the link rather than the open panel. For a page that already
+   * carries an explanation — Today, where the first-run welcome sits
+   * directly above — two stacked tinted panels read as one repeated thing
+   * rather than two different ones, and the second gets ignored.
+   */
+  defaultCollapsed?: boolean;
   /**
    * Keyed rather than a bare ReactNode[]: a step is often JSX (it carries
    * <Term>s), and an array literal of elements with no keys makes React
@@ -184,7 +192,7 @@ export function PageHelp({
   // Rendered open on the server, since that is the right default for a user
   // who has never seen it. The effect below runs before paint, so a returning
   // user does not watch it collapse.
-  const [dismissed, setDismissed] = useState(false);
+  const [dismissed, setDismissed] = useState(defaultCollapsed);
 
   useIsomorphicLayoutEffect(() => {
     try {
