@@ -4,16 +4,43 @@ import { withTenant } from "@/db/withTenant";
 import { vendors as vendorsTable, vendorUsers as vendorUsersTable } from "@/db/schema";
 import { buttonVariants } from "@/components/ui/button";
 import { Breadcrumbs } from "@/components/ui/breadcrumbs";
+import { ListControls, ListFilter } from "@/components/ui/list-controls";
 import { cn } from "@/lib/utils";
 import { createVendor, setVendorStatus, addVendorContact } from "./actions";
 
-export default async function VendorsPage() {
+export default async function VendorsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ q?: string; status?: string }>;
+}) {
+  const params = await searchParams;
+  const q = typeof params.q === "string" ? params.q.trim().toLowerCase() : "";
+  const statusFilter =
+    params.status === "pending" || params.status === "active" || params.status === "blacklisted"
+      ? params.status
+      : null;
   const { tenant } = await getCurrentUserAndTenant();
 
   const [vendors, contacts] = await withTenant(tenant.id, async (tx) => [
     await tx.select().from(vendorsTable),
     await tx.select().from(vendorUsersTable),
   ]);
+
+  // Filtered here rather than in SQL: this page already loads every vendor
+  // for the tenant, and the list is bounded by how many suppliers an
+  // organisation has. Matching on the contacts needs them joined anyway.
+  const contactsFor = (vendorId: string) => contacts.filter((c) => c.vendorId === vendorId);
+  const visibleVendors = vendors.filter((v) => {
+    if (statusFilter && v.status !== statusFilter) return false;
+    if (!q) return true;
+    return (
+      v.name.toLowerCase().includes(q) ||
+      (v.taxId ?? "").toLowerCase().includes(q) ||
+      contactsFor(v.id).some(
+        (c) => (c.email ?? "").toLowerCase().includes(q) || (c.fullName ?? "").toLowerCase().includes(q),
+      )
+    );
+  });
 
   return (
     <div className="flex flex-col gap-10">
@@ -36,6 +63,26 @@ export default async function VendorsPage() {
       </div>
 
       <section className="flex flex-col gap-3">
+        <ListControls
+          q={typeof params.q === "string" ? params.q : ""}
+          searchPlaceholder="Name, tax ID, contact…"
+          searchMatches="the vendor name, its tax ID, and its registered contacts"
+          clearHref={q || statusFilter ? "/dashboard/admin/vendors" : undefined}
+          count={visibleVendors.length}
+        >
+          <ListFilter
+            name="status"
+            label="Status"
+            value={statusFilter ?? ""}
+            options={[
+              { value: "", label: "All" },
+              { value: "pending", label: "Pending" },
+              { value: "active", label: "Active" },
+              { value: "blacklisted", label: "Blacklisted" },
+            ]}
+          />
+        </ListControls>
+
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b text-left text-xs text-muted-foreground">
@@ -48,7 +95,7 @@ export default async function VendorsPage() {
             </tr>
           </thead>
           <tbody>
-            {vendors.map((v) => (
+            {visibleVendors.map((v) => (
               <tr key={v.id} className="border-b align-top">
                 <td className="py-2">{v.name}</td>
                 <td className="py-2">{v.taxId ?? "—"}</td>
