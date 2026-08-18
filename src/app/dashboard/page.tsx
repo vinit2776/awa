@@ -6,6 +6,8 @@ import { isTenantAdmin } from "@/db/permissions";
 import { listMyQueries } from "@/db/clarifications";
 import { isBlocked } from "@/db/clarificationRules";
 import {
+  roles as rolesTable,
+  userRoles as userRolesTable,
   purchaseRequisitions as purchaseRequisitionsTable,
   purchaseRequisitionLines as purchaseRequisitionLinesTable,
   catalogItems as catalogItemsTable,
@@ -24,6 +26,8 @@ import { LifecycleStatus } from "@/components/ui/lifecycle-status";
 import { computeStage, approvalStepDetail } from "@/lib/lifecycle";
 import { entityLabel } from "@/lib/entityLinks";
 import { requisitionLabel } from "@/lib/requisitionSummary";
+import { stagesForRoles } from "@/lib/roleStages";
+import { WelcomeCard } from "./WelcomeCard";
 import { cn } from "@/lib/utils";
 
 /**
@@ -89,6 +93,13 @@ export default async function DashboardPage() {
       payments,
       purchaseOrders,
       users: await tx.select().from(usersTable),
+      // The viewer's own roles, for the first-run welcome — which parts of
+      // the process are theirs is the one thing worth saying on day one.
+      myRoles: await tx
+        .select({ key: rolesTable.key, displayName: rolesTable.displayName })
+        .from(userRolesTable)
+        .innerJoin(rolesTable, eq(rolesTable.id, userRolesTable.roleId))
+        .where(eq(userRolesTable.userId, user.id)),
       activeRules: (await tx.select().from(approvalRulesTable)).filter((r) => r.active),
       viewerIsAdmin: await isTenantAdmin(tx, tenant.id, user.id),
     };
@@ -96,7 +107,7 @@ export default async function DashboardPage() {
 
   const {
     myRequisitions, myRfqs, myRequirementRows, myLines, catalogItems, pendingRequirements, requisitionsInApproval,
-    allRequisitions, invoices, payments, purchaseOrders, users, activeRules, viewerIsAdmin,
+    allRequisitions, invoices, payments, purchaseOrders, users, myRoles, activeRules, viewerIsAdmin,
   } = data;
 
   const userName = (id: string | null) => users.find((u) => u.id === id)?.fullName ?? "—";
@@ -200,6 +211,12 @@ export default async function DashboardPage() {
             : `${needsMe} thing${needsMe === 1 ? "" : "s"} need${needsMe === 1 ? "s" : ""} you, ${user.fullName.split(" ")[0]}. Everything else is moving on its own.`}
         </p>
       </div>
+
+      <WelcomeCard
+        firstName={user.fullName.split(" ")[0]}
+        roleNames={myRoles.map((r) => r.displayName)}
+        ownedStages={stagesForRoles(myRoles.map((r) => r.key))}
+      />
 
       {viewerIsAdmin && activeRules.length === 0 && (
         <div className="flex items-start gap-3 rounded-lg border border-destructive/40 bg-destructive/5 px-3.5 py-3">

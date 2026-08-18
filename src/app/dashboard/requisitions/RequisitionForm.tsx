@@ -1,8 +1,9 @@
 "use client";
 
-import { useMemo, useRef, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
+  previewApprovers,
   createRequisition,
   reviseAndResubmitRequisition,
   getRequisitionDocumentUploadUrl,
@@ -10,7 +11,9 @@ import {
   type LineInput,
 } from "./actions";
 import { buttonVariants } from "@/components/ui/button";
+import { Info, Term } from "@/components/ui/help";
 import { cn } from "@/lib/utils";
+import type { ApprovalPreview } from "@/db/approvalPreview";
 
 type Department = { id: string; name: string };
 type CostCenter = { id: string; name: string; annualBudget: string | null };
@@ -66,6 +69,7 @@ export function RequisitionForm({
   );
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+  const [preview, setPreview] = useState<ApprovalPreview | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [sourceDocumentKey, setSourceDocumentKey] = useState<string | null>(null);
@@ -126,6 +130,31 @@ export function RequisitionForm({
   const budget = selectedCostCenter?.annualBudget ? Number(selectedCostCenter.annualBudget) : null;
   const committed = costCenterId ? (committedByCostCenter[costCenterId] ?? 0) : 0;
   const remainingAfterThis = budget !== null ? budget - committed - total : null;
+
+  // Refreshed whenever something that affects routing changes. Rules match
+  // on value, department, cost centre and line category, so those are the
+  // dependencies — not every keystroke in the form.
+  const categoryKey = lines.map((l) => l.categoryId ?? "").sort().join(",");
+  useEffect(() => {
+    let cancelled = false;
+    void previewApprovers({
+      departmentId: departmentId || null,
+      costCenterId: costCenterId || null,
+      totalEstimatedValue: total.toFixed(2),
+      categoryIds: categoryKey.split(",").filter(Boolean),
+    })
+      .then((result) => {
+        if (!cancelled) setPreview(result);
+      })
+      .catch(() => {
+        // A preview that can't be fetched shows nothing rather than
+        // guessing — submitting still works.
+        if (!cancelled) setPreview(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [departmentId, costCenterId, total, categoryKey]);
 
   const submit = (shouldSubmit: boolean) => {
     setError(null);
@@ -197,20 +226,85 @@ export function RequisitionForm({
       </div>
 
       {selectedCostCenter && budget !== null && (
+        <div className="max-w-2xl rounded-lg border border-border p-3">
+          <div className="flex flex-wrap items-baseline justify-between gap-2 text-xs">
+            <span className="text-muted-foreground">
+              {selectedCostCenter.name} · annual budget {budget.toFixed(2)}
+            </span>
+            <span className={cn("font-medium", remainingAfterThis !== null && remainingAfterThis < 0 && "text-amber-600")}>
+              {remainingAfterThis !== null && remainingAfterThis < 0
+                ? `${Math.abs(remainingAfterThis).toFixed(2)} over budget`
+                : `${remainingAfterThis?.toFixed(2)} left after this`}
+            </span>
+          </div>
+
+          {/* A bar rather than four lines of arithmetic: the question is
+              "can I afford this", and a number nobody subtracts by eye
+              doesn't answer it. */}
+          <div className="mt-2 flex h-2 overflow-hidden rounded-full bg-muted">
+            <span
+              className="bg-muted-foreground/50"
+              style={{ width: `${Math.min((committed / budget) * 100, 100)}%` }}
+            />
+            <span
+              className={cn(
+                remainingAfterThis !== null && remainingAfterThis < 0 ? "bg-amber-500" : "bg-primary",
+              )}
+              style={{ width: `${Math.min((total / budget) * 100, Math.max(100 - (committed / budget) * 100, 0))}%` }}
+            />
+          </div>
+
+          <div className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+            <span>Already committed {committed.toFixed(2)}</span>
+            <span className="text-primary">This request {total.toFixed(2)}</span>
+          </div>
+
+          {remainingAfterThis !== null && remainingAfterThis < 0 && (
+            <p className="mt-2 text-xs text-amber-600">
+              This would take the <Term name="cost-center" sentenceCase /> over its annual budget. You can still
+              submit — it is a heads-up, not a block.
+            </p>
+          )}
+        </div>
+      )}
+
+      {/* What submitting will actually do. The single most common question
+          a first-time requester has, and the form never answered it. */}
+      {preview && (
         <div
           className={cn(
-            "w-fit rounded-md border p-3 text-xs",
-            remainingAfterThis !== null && remainingAfterThis < 0 && "border-amber-500",
+            "max-w-2xl rounded-lg border p-3 text-sm",
+            preview.autoApproves ? "border-warning/50 bg-warning/5" : "border-border",
           )}
         >
-          <p>Annual budget: {budget.toFixed(2)}</p>
-          <p>Already committed: {committed.toFixed(2)}</p>
-          <p>This request: {total.toFixed(2)}</p>
-          <p className="font-medium">Remaining after this: {remainingAfterThis?.toFixed(2)}</p>
-          {remainingAfterThis !== null && remainingAfterThis < 0 && (
-            <p className="mt-1 text-amber-600">
-              This would exceed the cost center&apos;s budget. You can still submit — this is a heads-up, not a block.
-            </p>
+          {preview.autoApproves ? (
+            <>
+              <p className="font-medium">Nobody will review this</p>
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                No approval rule covers a request of this value and category, so submitting approves it
+                immediately and it goes straight to sourcing.
+                <Info title="Why no approver?" next="An admin can add a rule from Admin › Approval rules.">
+                  When no rule matches there is nobody to route the requisition to, so AWA approves it rather
+                  than leaving it stuck with nobody able to act.
+                </Info>
+              </p>
+            </>
+          ) : (
+            <>
+              <p className="font-medium">
+                When you submit, this goes to{" "}
+                {preview.steps.map((step, i) => (
+                  <span key={step.groupNo}>
+                    {i > 0 && ", then "}
+                    {step.approvers.join(" and ")}
+                  </span>
+                ))}
+              </p>
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                {preview.steps.map((s) => s.roleName).join(", then ")}
+                {preview.ruleNames.length > 0 && ` · via “${preview.ruleNames.join("”, “")}”`}
+              </p>
+            </>
           )}
         </div>
       )}
@@ -387,11 +481,15 @@ export function RequisitionForm({
             onClick={() => submit(false)}
             className={cn(buttonVariants({ variant: "outline" }))}
           >
-            Save as draft
+            Save draft
+            <span className="font-normal opacity-70"> · only you see it</span>
           </button>
         )}
         <button type="button" disabled={isPending} onClick={() => submit(true)} className={cn(buttonVariants())}>
-          {revision ? "Resubmit" : "Submit"}
+          {revision ? "Resubmit for approval" : "Submit for approval"}
+          {preview && !preview.autoApproves && preview.steps[0] && (
+            <span className="font-normal opacity-80"> · to {preview.steps[0].approvers.join(" and ")}</span>
+          )}
         </button>
       </div>
     </div>
