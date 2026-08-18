@@ -1,0 +1,38 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "awa-dev",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "run",
+        "dev",
+        "--",
+        "-p",
+        "3400"
+      ],
+      "port": 3400
+    },
+    {
+      "name": "awa-main-test",
+      "runtimeExecutable": "bash",
+      "runtimeArgs": [
+        "-c",
+        "cd '/private/tmp/claude-501/-Users-vinitchordia-Dev-Projects-AWA-Local/443de923-bcd9-49b0-8632-f8128bf1d068/scratchpad/main-test' && npm run dev -- -p 3200"
+      ],
+      "port": 3200
+    },
+    {
+      "name": "awa-prod",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "run",
+        "start",
+        "--",
+        "-p",
+        "3101"
+      ],
+      "port": 3101
+    }
+  ]
+}
