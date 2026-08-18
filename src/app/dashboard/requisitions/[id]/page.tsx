@@ -254,7 +254,7 @@ export default async function RequisitionDetailPage({ params }: { params: Promis
               {invoice.status === "exception" && (
                 <>
                   {" — failed the "}
-                  <Term name="three-way-match" />
+                  <Term name="three-way-match" sentenceCase />
                 </>
               )}
             </dd>

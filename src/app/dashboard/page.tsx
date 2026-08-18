@@ -217,11 +217,14 @@ export default async function DashboardPage() {
       <PageHelp
         id="today"
         title="How this page works"
-        steps={[
-          "“Waiting on you” is only ever your own work — a decision you owe, a requisition of yours that needs fixing, or a question somebody asked you.",
-          "“Your requisitions in flight” names whoever is currently holding each one, so you can chase a person rather than a status.",
-          "“Across your organisation” is shared work, counted. It is nobody's in particular until somebody picks it up.",
-        ]}
+        steps={{
+          yours:
+            "“Waiting on you” is only ever your own work — a decision you owe, a requisition of yours that needs fixing, or a question somebody asked you.",
+          inFlight:
+            "“Your requisitions in flight” names whoever is currently holding each one, so you can chase a person rather than a status.",
+          shared:
+            "“Across your organisation” is shared work, counted. It is nobody's in particular until somebody picks it up.",
+        }}
       />
 
       <section className="flex flex-col gap-3">
