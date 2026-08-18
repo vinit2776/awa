@@ -2,13 +2,21 @@ import Link from "next/link";
 import { eq, inArray } from "drizzle-orm";
 import { getCurrentUserAndTenant } from "@/db/session";
 import { withTenant } from "@/db/withTenant";
-import { purchaseRequisitions as purchaseRequisitionsTable, rfqs as rfqsTable, users as usersTable, departments as departmentsTable } from "@/db/schema";
+import {
+  purchaseRequisitions as purchaseRequisitionsTable,
+  purchaseRequisitionLines as purchaseRequisitionLinesTable,
+  catalogItems as catalogItemsTable,
+  rfqs as rfqsTable,
+  users as usersTable,
+  departments as departmentsTable,
+} from "@/db/schema";
 import { buttonVariants } from "@/components/ui/button";
 import { Breadcrumbs } from "@/components/ui/breadcrumbs";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Info, PageHelp, Term } from "@/components/ui/help";
 import { cn } from "@/lib/utils";
 import { sourcingStage } from "@/lib/lifecycle";
+import { requisitionLabel } from "@/lib/requisitionSummary";
 import { LifecycleStatus } from "@/components/ui/lifecycle-status";
 
 export default async function SourcingPage() {
@@ -29,8 +37,19 @@ export default async function SourcingPage() {
     : [];
   const requisitionIdsWithRfq = new Set(rfqRows.map((rfq) => rfq.requisitionId));
 
+  // What is actually being bought. Sourcing is the one screen where that
+  // is the whole job, and it was the one column missing.
+  const [lines, catalogItems] = requisitionIds.length
+    ? await withTenant(tenant.id, async (tx) => [
+        await tx.select().from(purchaseRequisitionLinesTable).where(inArray(purchaseRequisitionLinesTable.requisitionId, requisitionIds)),
+        await tx.select().from(catalogItemsTable),
+      ])
+    : [[], []];
+
   const requestorName = (id: string) => users.find((u) => u.id === id)?.fullName ?? "—";
   const departmentName = (id: string | null) => departments.find((d) => d.id === id)?.name ?? "—";
+  const labelFor = (r: { id: string }) =>
+    requisitionLabel(lines.filter((l) => l.requisitionId === r.id), catalogItems);
 
   return (
     <div className="flex flex-col gap-6 p-8">
@@ -84,9 +103,11 @@ export default async function SourcingPage() {
           )}
         </EmptyState>
       ) : (
-        <table className="w-full text-sm">
+        <div className="overflow-x-auto">
+        <table className="w-full min-w-2xl text-sm">
           <thead>
             <tr className="border-b text-left text-xs text-muted-foreground">
+              <th className="py-2 pr-4 font-normal">For</th>
               <th className="py-2 pr-4 font-normal">Requestor</th>
               <th className="py-2 pr-4 font-normal">Department</th>
               <th className="py-2 pr-4 font-normal">Total</th>
@@ -103,6 +124,7 @@ export default async function SourcingPage() {
           <tbody>
             {requisitions.map((r) => (
               <tr key={r.id} className="border-b">
+                <td className="py-2 pr-4">{labelFor(r)}</td>
                 <td className="py-2 pr-4">{requestorName(r.requestorId)}</td>
                 <td className="py-2 pr-4">{departmentName(r.departmentId)}</td>
                 <td className="py-2 pr-4 whitespace-nowrap">{r.totalEstimatedValue} {r.currency}</td>
@@ -118,6 +140,7 @@ export default async function SourcingPage() {
             ))}
           </tbody>
         </table>
+        </div>
       )}
     </div>
   );

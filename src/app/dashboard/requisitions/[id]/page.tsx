@@ -22,6 +22,7 @@ import { Breadcrumbs } from "@/components/ui/breadcrumbs";
 import { LifecycleRail } from "@/components/ui/lifecycle-rail";
 import { Info, Term } from "@/components/ui/help";
 import { computeStage, approvalStepDetail, PAYMENT_CAPTIONS } from "@/lib/lifecycle";
+import { requisitionLabel } from "@/lib/requisitionSummary";
 import { LifecycleStatus } from "@/components/ui/lifecycle-status";
 
 /**
@@ -148,10 +149,11 @@ export default async function RequisitionDetailPage({ params }: { params: Promis
         <div className="flex items-start justify-between gap-3">
           <div>
             <h1 className="font-serif text-lg text-foreground">
-              {requisition.totalEstimatedValue} {requisition.currency}
+              {requisitionLabel(lines, catalogItems)}
             </h1>
             <p className="text-sm text-muted-foreground">
-              Raised by {userName(requisition.requestorId)} · {departmentName} · {costCenterName}
+              {requisition.totalEstimatedValue} {requisition.currency} · raised by{" "}
+              {userName(requisition.requestorId)} · {departmentName} · {costCenterName}
             </p>
           </div>
           <LifecycleStatus

@@ -7,6 +7,8 @@ import { listMyQueries } from "@/db/clarifications";
 import { isBlocked } from "@/db/clarificationRules";
 import {
   purchaseRequisitions as purchaseRequisitionsTable,
+  purchaseRequisitionLines as purchaseRequisitionLinesTable,
+  catalogItems as catalogItemsTable,
   requisitionApprovalRequirements as requirementsTable,
   approvalRules as approvalRulesTable,
   rfqs as rfqsTable,
@@ -21,6 +23,7 @@ import { Info, PageHelp } from "@/components/ui/help";
 import { LifecycleStatus } from "@/components/ui/lifecycle-status";
 import { computeStage, approvalStepDetail } from "@/lib/lifecycle";
 import { entityLabel } from "@/lib/entityLinks";
+import { requisitionLabel } from "@/lib/requisitionSummary";
 import { cn } from "@/lib/utils";
 
 /**
@@ -67,11 +70,18 @@ export default async function DashboardPage() {
     const myRequirementRows = myIds.length
       ? await tx.select().from(requirementsTable).where(inArray(requirementsTable.requisitionId, myIds))
       : [];
+    // Lines are what a requisition is called — it has no number and no
+    // title, so without these every row here reads "600.00 INR".
+    const myLines = myIds.length
+      ? await tx.select().from(purchaseRequisitionLinesTable).where(inArray(purchaseRequisitionLinesTable.requisitionId, myIds))
+      : [];
 
     return {
       myRequisitions,
       myRfqs,
       myRequirementRows,
+      myLines,
+      catalogItems: await tx.select().from(catalogItemsTable),
       pendingRequirements,
       requisitionsInApproval,
       allRequisitions,
@@ -85,11 +95,15 @@ export default async function DashboardPage() {
   });
 
   const {
-    myRequisitions, myRfqs, myRequirementRows, pendingRequirements, requisitionsInApproval,
+    myRequisitions, myRfqs, myRequirementRows, myLines, catalogItems, pendingRequirements, requisitionsInApproval,
     allRequisitions, invoices, payments, purchaseOrders, users, activeRules, viewerIsAdmin,
   } = data;
 
   const userName = (id: string | null) => users.find((u) => u.id === id)?.fullName ?? "—";
+  // A requisition has no number and no title, so what it is *for* is the
+  // only label anyone can search their memory for.
+  const labelFor = (r: { id: string }) =>
+    requisitionLabel(myLines.filter((l) => l.requisitionId === r.id), catalogItems);
 
   // ---- Waiting on me -----------------------------------------------------
 
@@ -253,8 +267,8 @@ export default async function DashboardPage() {
               <ActionRow
                 key={r.id}
                 tone="warning"
-                title={`Your requisition for ${r.totalEstimatedValue} ${r.currency} was sent back`}
-                detail="An approver asked for changes. Revising it restarts approval from the first step."
+                title={`“${labelFor(r)}” was sent back`}
+                detail={`An approver asked for changes to your ${r.totalEstimatedValue} ${r.currency} requisition. Revising it restarts approval from the first step.`}
                 cta={{ label: "Revise", href: `/dashboard/requisitions/${r.id}/edit` }}
               />
             ))}
@@ -274,8 +288,8 @@ export default async function DashboardPage() {
               <ActionRow
                 key={r.id}
                 tone="neutral"
-                title={`Unsubmitted draft — ${r.totalEstimatedValue} ${r.currency}`}
-                detail="Nobody can see this until you submit it."
+                title={`Unsubmitted draft — ${labelFor(r)}`}
+                detail={`${r.totalEstimatedValue} ${r.currency}. Nobody can see this until you submit it.`}
                 cta={{ label: "Open", href: `/dashboard/requisitions/${r.id}` }}
               />
             ))}
@@ -295,14 +309,20 @@ export default async function DashboardPage() {
             {myInFlight.map(({ requisition, stage, stepDetail, waitingOn, since }) => (
               <li
                 key={requisition.id}
-                className="flex flex-wrap items-start justify-between gap-3 rounded-lg border border-border p-3.5"
+                className="flex items-start justify-between gap-4 rounded-lg border border-border p-3.5"
               >
-                <div>
+                <div className="min-w-0">
                   <Link href={`/dashboard/requisitions/${requisition.id}`} className="text-sm font-medium hover:underline">
-                    {requisition.totalEstimatedValue} {requisition.currency}
+                    {labelFor(requisition)}
                   </Link>
                   <p className="text-xs text-muted-foreground">
-                    Raised {requisition.createdAt.toISOString().slice(0, 10)}
+                    <span className="whitespace-nowrap">
+                      {requisition.totalEstimatedValue} {requisition.currency}
+                    </span>{" "}
+                    ·{" "}
+                    <span className="whitespace-nowrap">
+                      raised {requisition.createdAt.toISOString().slice(0, 10)}
+                    </span>
                   </p>
                 </div>
                 <LifecycleStatus
@@ -310,7 +330,7 @@ export default async function DashboardPage() {
                   detail={stage === "Pending approval" ? stepDetail : undefined}
                   waitingOn={waitingOn}
                   since={since}
-                  className="max-w-sm items-end text-right"
+                  className="max-w-xs shrink-0 items-end text-right"
                 />
               </li>
             ))}
