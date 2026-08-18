@@ -3,17 +3,36 @@ import { withTenant } from "@/db/withTenant";
 import { catalogCategories, catalogItems } from "@/db/schema";
 import { buttonVariants } from "@/components/ui/button";
 import { Breadcrumbs } from "@/components/ui/breadcrumbs";
+import { ListControls, ListFilter } from "@/components/ui/list-controls";
 import { cn } from "@/lib/utils";
 import { createCategory, createItem } from "./actions";
 import { ItemNameField } from "./ItemNameField";
 
-export default async function CatalogPage() {
+export default async function CatalogPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ q?: string; cat?: string }>;
+}) {
+  const params = await searchParams;
+  const q = typeof params.q === "string" ? params.q.trim().toLowerCase() : "";
+  const catFilter = typeof params.cat === "string" && params.cat ? params.cat : null;
   const { tenant } = await getCurrentUserAndTenant();
 
   const [categories, items] = await withTenant(tenant.id, async (tx) => [
     await tx.select().from(catalogCategories),
     await tx.select().from(catalogItems),
   ]);
+
+  // Same reasoning as vendors: the page already loads every item, so the
+  // filter belongs where the data already is. (That unbounded load is a
+  // pre-existing concern for a catalogue that grows — noted, not changed
+  // here.)
+  const visibleItems = items.filter((i) => {
+    if (catFilter && i.categoryId !== catFilter) return false;
+    if (!q) return true;
+    const categoryName = categories.find((c) => c.id === i.categoryId)?.name ?? "";
+    return i.name.toLowerCase().includes(q) || categoryName.toLowerCase().includes(q);
+  });
 
   const categoryName = (id: string | null) => categories.find((c) => c.id === id)?.name ?? "—";
 
@@ -99,6 +118,24 @@ export default async function CatalogPage() {
 
       <section className="flex flex-col gap-3">
         <h2 className="text-sm font-medium text-muted-foreground">Items</h2>
+        <ListControls
+          q={typeof params.q === "string" ? params.q : ""}
+          searchPlaceholder="Item name…"
+          searchMatches="the item name and its category"
+          clearHref={q || catFilter ? "/dashboard/admin/catalog" : undefined}
+          count={visibleItems.length}
+        >
+          <ListFilter
+            name="cat"
+            label="Category"
+            value={catFilter ?? ""}
+            options={[
+              { value: "", label: "All categories" },
+              ...categories.map((c) => ({ value: c.id, label: c.name })),
+            ]}
+          />
+        </ListControls>
+
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b text-left text-xs text-muted-foreground">
@@ -109,7 +146,7 @@ export default async function CatalogPage() {
             </tr>
           </thead>
           <tbody>
-            {items.map((i) => (
+            {visibleItems.map((i) => (
               <tr key={i.id} className="border-b">
                 <td className="py-2">{i.name}</td>
                 <td className="py-2">{categoryName(i.categoryId)}</td>
