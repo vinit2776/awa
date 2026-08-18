@@ -24,6 +24,8 @@ import { requisitionLabel } from "@/lib/requisitionSummary";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Info, PageHelp } from "@/components/ui/help";
 import { isBlocked } from "@/db/clarificationRules";
+import { findRequisitionIdsMatching, REQUISITION_SEARCH_FIELDS } from "@/db/requisitionSearch";
+import { ListControls, ListFilter } from "@/components/ui/list-controls";
 import { QueriesPanel } from "../queries/QueriesPanel";
 import { approveRequirement, requestRevision, rejectAndClose, addAdHocApprover } from "./actions";
 
@@ -32,8 +34,16 @@ function pendingDays(submittedAt: Date | null): number | null {
   return Math.floor((Date.now() - submittedAt.getTime()) / 86_400_000);
 }
 
-export default async function ApprovalsInboxPage() {
+export default async function ApprovalsInboxPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ q?: string; show?: string }>;
+}) {
+  const params = await searchParams;
   const { user, tenant } = await getCurrentUserAndTenant();
+
+  const q = typeof params.q === "string" ? params.q.trim() : "";
+  const showFilter = params.show === "held" || params.show === "overdue" ? params.show : null;
 
   const [pendingRequirements, requisitions, users, departments, costCenters, committedByCostCenter] =
     await withTenant(tenant.id, async (tx) => [
@@ -58,11 +68,23 @@ export default async function ApprovalsInboxPage() {
   const departmentName = (id: string | null) => departments.find((d) => d.id === id)?.name ?? "—";
   const costCenterName = (id: string | null) => costCenters.find((c) => c.id === id)?.name ?? "—";
 
+  /**
+   * Search resolves requisition ids first, then those ids are intersected
+   * with what is already this approver's to see. The order matters: the
+   * assignment check is applied *after* the match, never instead of it,
+   * so a search term can only ever narrow this list. Written the other
+   * way round — searching the tenant and then displaying the hits — this
+   * box would be a way to read other people's requisitions. There is a
+   * test for that in db/__tests__/approval-inbox-scope.test.ts.
+   */
+  const matchingIds = q ? await withTenant(tenant.id, (tx) => findRequisitionIdsMatching(tx, q)) : null;
+
   const myActionable = pendingRequirements.filter(
     (req) =>
       req.assignedUserId === user.id &&
       requisitionById.has(req.requisitionId) &&
-      currentGroupByRequisition.get(req.requisitionId) === req.groupNo,
+      currentGroupByRequisition.get(req.requisitionId) === req.groupNo &&
+      (matchingIds === null || matchingIds.includes(req.requisitionId)),
   );
 
   // Decision-support context (S13, §04): budget standing for each
@@ -158,6 +180,15 @@ export default async function ApprovalsInboxPage() {
     });
   }
 
+  // "Held" and "overdue" are both derived, not stored — held from an open
+  // blocking query existing, overdue from the escalation sweep having
+  // stamped the row — so they filter here rather than in SQL.
+  const visible = showFilter
+    ? myActionable.filter((req) =>
+        showFilter === "held" ? (blockedByRequisition.get(req.requisitionId) ?? false) : req.escalatedAt !== null,
+      )
+    : myActionable;
+
   return (
     <div className="flex flex-col gap-8 p-8">
       <div className="flex flex-col gap-2">
@@ -181,15 +212,47 @@ export default async function ApprovalsInboxPage() {
         }}
       />
 
-      {myActionable.length === 0 && (
-        <EmptyState title="Nothing waiting on you">
-          Requisitions appear here when an approval rule routes one to you and every earlier step has
-          cleared. If you are expecting something, it may still be with an earlier approver.
+      <ListControls
+        q={q}
+        searchPlaceholder="Item, requester, department…"
+        searchMatches={REQUISITION_SEARCH_FIELDS}
+        clearHref={q || showFilter ? "/dashboard/approvals" : undefined}
+        count={visible.length}
+      >
+        <ListFilter
+          name="show"
+          label="Show"
+          value={showFilter ?? ""}
+          options={[
+            { value: "", label: "Everything waiting on me" },
+            { value: "held", label: "Held by a query" },
+            { value: "overdue", label: "Overdue" },
+          ]}
+        />
+      </ListControls>
+
+      {visible.length === 0 && (
+        <EmptyState
+          title={
+            q ? `Nothing waiting on you matches “${q}”` : showFilter ? "Nothing matches that filter" : "Nothing waiting on you"
+          }
+        >
+          {q || showFilter ? (
+            <>
+              This only ever searches requisitions already assigned to you — it will not find one that is with
+              another approver.
+            </>
+          ) : (
+            <>
+              Requisitions appear here when an approval rule routes one to you and every earlier step has
+              cleared. If you are expecting something, it may still be with an earlier approver.
+            </>
+          )}
         </EmptyState>
       )}
 
       <div className="flex flex-col gap-6">
-        {myActionable.map((req) => {
+        {visible.map((req) => {
           const requisition = requisitionById.get(req.requisitionId)!;
           const blocked = blockedByRequisition.get(req.requisitionId) ?? false;
           const linesForReq = lines.filter((l) => l.requisitionId === req.requisitionId);

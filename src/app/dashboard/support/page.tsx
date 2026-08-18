@@ -1,10 +1,36 @@
 import Link from "next/link";
 import { customerStatusLabel, listTicketsForCustomer, type SupportTicketStatus } from "@/db/supportDesk";
 import { Breadcrumbs } from "@/components/ui/breadcrumbs";
+import { ListControls, ListFilter } from "@/components/ui/list-controls";
 import { StatusPill, TypeTag, formatRelative } from "./ui";
 
-export default async function SupportPage() {
-  const { rows, viewerIsTenantAdmin } = await listTicketsForCustomer();
+export default async function SupportPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ q?: string; type?: string }>;
+}) {
+  const params = await searchParams;
+  const q = typeof params.q === "string" ? params.q.trim().toLowerCase() : "";
+  const typeFilter =
+    params.type === "bug" || params.type === "feature_request" || params.type === "question" || params.type === "feedback"
+      ? params.type
+      : null;
+
+  const { rows: allRows, viewerIsTenantAdmin } = await listTicketsForCustomer();
+
+  // Already scoped to this person (or this tenant for an admin) and small,
+  // so filtering here rather than adding a query. The platform-side
+  // searchTickets() is a different thing: it is cross-tenant and needs SQL.
+  const rows = allRows.filter(({ ticket, reporterName }) => {
+    if (typeFilter && ticket.type !== typeFilter) return false;
+    if (!q) return true;
+    return (
+      ticket.subject.toLowerCase().includes(q) ||
+      ticket.description.toLowerCase().includes(q) ||
+      (ticket.reference ?? "").toLowerCase().includes(q) ||
+      (reporterName ?? "").toLowerCase().includes(q)
+    );
+  });
 
   return (
     <div className="flex flex-1 flex-col gap-5 p-6">
@@ -21,11 +47,39 @@ export default async function SupportPage() {
         </div>
       </div>
 
+      <ListControls
+        q={typeof params.q === "string" ? params.q : ""}
+        searchPlaceholder="Subject, description, reference…"
+        searchMatches="the subject, the description, the reference, and who raised it"
+        clearHref={q || typeFilter ? "/dashboard/support" : undefined}
+        count={rows.length}
+      >
+        <ListFilter
+          name="type"
+          label="Type"
+          value={typeFilter ?? ""}
+          options={[
+            { value: "", label: "All types" },
+            { value: "bug", label: "Bug" },
+            { value: "feature_request", label: "Feature" },
+            { value: "question", label: "Question" },
+            { value: "feedback", label: "Feedback" },
+          ]}
+        />
+      </ListControls>
+
       {rows.length === 0 ? (
         <div className="rounded-lg border border-border p-8 text-center">
           <p className="text-sm text-muted-foreground">
-            Nothing raised yet. Use <span className="font-medium text-foreground">Help &amp; feedback</span> in the
-            sidebar to report a bug, request a feature, or send us a note — from whichever page it&apos;s about.
+            {q || typeFilter ? (
+              <>Nothing raised matches that.</>
+            ) : (
+              <>
+                Nothing raised yet. Use <span className="font-medium text-foreground">Help &amp; feedback</span> in
+                the sidebar to report a bug, request a feature, or send us a note — from whichever page it&apos;s
+                about.
+              </>
+            )}
           </p>
         </div>
       ) : (
