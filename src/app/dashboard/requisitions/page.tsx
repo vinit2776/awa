@@ -20,9 +20,11 @@ import {
 import { buttonVariants } from "@/components/ui/button";
 import { Breadcrumbs } from "@/components/ui/breadcrumbs";
 import { Info } from "@/components/ui/help";
+import { EmptyState } from "@/components/ui/empty-state";
 import { cn } from "@/lib/utils";
 import { computeStage, approvalStepDetail } from "@/lib/lifecycle";
 import { requisitionLabel } from "@/lib/requisitionSummary";
+import { findRequisitionIdsMatching, REQUISITION_SEARCH_FIELDS } from "@/db/requisitionSearch";
 import { LifecycleStatus } from "@/components/ui/lifecycle-status";
 import { submitRequisition } from "./actions";
 
@@ -51,7 +53,7 @@ type ScopeValue = "mine" | "all";
 export default async function RequisitionsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ status?: string; sort?: string; scope?: string }>;
+  searchParams: Promise<{ status?: string; sort?: string; scope?: string; q?: string }>;
 }) {
   const params = await searchParams;
   const { user, tenant } = await getCurrentUserAndTenant();
@@ -61,6 +63,7 @@ export default async function RequisitionsPage({
     : null;
   const sort: SortValue | null = params.sort === "status_asc" || params.sort === "status_desc" ? params.sort : null;
   const scope: ScopeValue = params.scope === "all" ? "all" : "mine";
+  const q = typeof params.q === "string" ? params.q.trim() : "";
 
   const orderBy =
     sort === "status_asc"
@@ -69,23 +72,37 @@ export default async function RequisitionsPage({
         ? [desc(purchaseRequisitionsTable.status), desc(purchaseRequisitionsTable.createdAt)]
         : [desc(purchaseRequisitionsTable.createdAt)];
 
-  const [requisitions, departments, costCenters, users] = await withTenant(tenant.id, async (tx) => [
-    await tx
-      .select()
-      .from(purchaseRequisitionsTable)
-      .where(
-        and(
-          // RLS already scopes this to the tenant; this narrows it to the
-          // reader. Dropping it is the whole of what "Everyone's" means.
-          ...(scope === "mine" ? [eq(purchaseRequisitionsTable.requestorId, user.id)] : []),
-          ...(statusFilter ? [eq(purchaseRequisitionsTable.status, statusFilter)] : []),
-        ),
-      )
-      .orderBy(...orderBy),
+  // Search resolves to ids first so it can be intersected with the scope
+  // and status filters, rather than replacing them. null means "no search
+  // term"; an empty array means "searched, matched nothing" — which are
+  // different, and conflating them would show everything on a failed
+  // search.
+  const matchingIds = q ? await withTenant(tenant.id, (tx) => findRequisitionIdsMatching(tx, q)) : null;
+  const searchedAndFoundNothing = matchingIds !== null && matchingIds.length === 0;
+
+  const [departments, costCenters, users] = await withTenant(tenant.id, async (tx) => [
     await tx.select().from(departmentsTable),
     await tx.select().from(costCentersTable),
     await tx.select().from(usersTable),
   ]);
+
+  const requisitions = searchedAndFoundNothing
+    ? []
+    : await withTenant(tenant.id, (tx) =>
+        tx
+          .select()
+          .from(purchaseRequisitionsTable)
+          .where(
+            and(
+              // RLS already scopes this to the tenant; this narrows it to the
+              // reader. Dropping it is the whole of what "Everyone's" means.
+              ...(scope === "mine" ? [eq(purchaseRequisitionsTable.requestorId, user.id)] : []),
+              ...(statusFilter ? [eq(purchaseRequisitionsTable.status, statusFilter)] : []),
+              ...(matchingIds ? [inArray(purchaseRequisitionsTable.id, matchingIds)] : []),
+            ),
+          )
+          .orderBy(...orderBy),
+      );
 
   const nextSort: SortValue | null = sort === "status_asc" ? "status_desc" : sort === "status_desc" ? null : "status_asc";
   const queryWith = (overrides: Record<string, string | null>) => {
@@ -93,6 +110,7 @@ export default async function RequisitionsPage({
       ...(statusFilter ? { status: statusFilter } : {}),
       ...(sort ? { sort } : {}),
       ...(scope === "all" ? { scope } : {}),
+      ...(q ? { q } : {}),
     };
     for (const [key, value] of Object.entries(overrides)) {
       if (value === null) delete base[key];
@@ -159,7 +177,7 @@ export default async function RequisitionsPage({
   // A requisition has no number and no title — what it is for is the only
   // thing anyone can recognise it by.
   const labelFor = (r: { id: string }) =>
-    requisitionLabel(lines.filter((l) => l.requisitionId === r.id), catalogItems);
+    requisitionLabel(lines.filter((l) => l.requisitionId === r.id), catalogItems, { prefer: q });
 
   return (
     <div className="flex flex-col gap-6 p-8">
@@ -182,6 +200,23 @@ export default async function RequisitionsPage({
 
       <form method="GET" className="flex flex-wrap items-end gap-2">
         {sort && <input type="hidden" name="sort" value={sort} />}
+        <div className="flex flex-col gap-1">
+          <label htmlFor="q" className="text-xs text-muted-foreground">
+            Search
+            <Info title="What gets searched" next="Combine it with the filters — search narrows what they return.">
+              Matches on {REQUISITION_SEARCH_FIELDS}. A requisition has no reference number, so what it was for
+              is usually the quickest way back to it.
+            </Info>
+          </label>
+          <input
+            id="q"
+            name="q"
+            type="search"
+            defaultValue={q}
+            placeholder="Safety helmet, Anjali, Facilities…"
+            className="h-8 w-60 rounded-md border px-2 text-sm"
+          />
+        </div>
         <div className="flex flex-col gap-1">
           <label htmlFor="scope" className="text-xs text-muted-foreground">
             Show
@@ -207,8 +242,11 @@ export default async function RequisitionsPage({
         <button type="submit" className={cn(buttonVariants({ variant: "outline", size: "sm" }))}>
           Filter
         </button>
-        {statusFilter && (
-          <Link href={queryWith({ status: null })} className="text-xs text-muted-foreground underline">
+        {(statusFilter || q) && (
+          <Link
+            href={queryWith({ status: null, q: null })}
+            className="text-xs text-muted-foreground underline underline-offset-2"
+          >
             Clear
           </Link>
         )}
@@ -217,9 +255,46 @@ export default async function RequisitionsPage({
         </span>
       </form>
 
-      {/* Eight columns don't fit a laptop once "For" is in. The table
-          scrolls inside its own container rather than pushing the page
-          sideways. */}
+      {requisitions.length === 0 ? (
+        <EmptyState
+          title={
+            q
+              ? `Nothing matches “${q}”`
+              : statusFilter
+                ? "No requisitions with that status"
+                : scope === "mine"
+                  ? "You haven't raised a requisition yet"
+                  : "Nobody has raised a requisition yet"
+          }
+        >
+          {q ? (
+            <>
+              Search covers {REQUISITION_SEARCH_FIELDS}
+              {statusFilter && <> — and the status filter is still set to “{humanizeStatus(statusFilter)}”</>}
+              {scope === "mine" && <>, across your own requisitions only</>}.
+              <div className="mt-3 flex flex-wrap justify-center gap-2">
+                {scope === "mine" && (
+                  <Link href={queryWith({ scope: "all" })} className={cn(buttonVariants({ variant: "outline", size: "sm" }))}>
+                    Search everyone&apos;s
+                  </Link>
+                )}
+                {statusFilter && (
+                  <Link href={queryWith({ status: null })} className={cn(buttonVariants({ variant: "outline", size: "sm" }))}>
+                    Drop the status filter
+                  </Link>
+                )}
+              </div>
+            </>
+          ) : statusFilter ? (
+            <>Nothing is at that stage right now.</>
+          ) : (
+            <>&ldquo;New requisition&rdquo; starts one. Nothing is sent until you submit it.</>
+          )}
+        </EmptyState>
+      ) : (
+      /* Eight columns don't fit a laptop once "For" is in. The table
+         scrolls inside its own container rather than pushing the page
+         sideways. */
       <div className="overflow-x-auto">
       <table className="w-full min-w-3xl text-sm">
         <thead>
@@ -241,17 +316,6 @@ export default async function RequisitionsPage({
           </tr>
         </thead>
         <tbody>
-          {requisitions.length === 0 && (
-            <tr>
-              <td colSpan={scope === "all" ? 8 : 7} className="py-6 text-center text-sm text-muted-foreground">
-                {statusFilter
-                  ? "No requisitions match this filter."
-                  : scope === "mine"
-                    ? "You haven't raised a requisition yet. “New requisition” starts one."
-                    : "Nobody has raised a requisition yet."}
-              </td>
-            </tr>
-          )}
           {requisitions.map((r) => {
             const days = pendingDays(r.submittedAt);
             const showPending = days !== null && (r.status === "submitted" || r.status === "pending_approval");
@@ -308,6 +372,7 @@ export default async function RequisitionsPage({
         </tbody>
       </table>
       </div>
+      )}
     </div>
   );
 }

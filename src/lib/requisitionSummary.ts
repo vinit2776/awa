@@ -27,11 +27,27 @@ function lineName(line: LineLike, catalogItems: CatalogItemLike[]): string | nul
  * for three. Returns null when there is nothing to go on, so callers can
  * decide their own fallback rather than being handed a fake label.
  */
-export function describeRequisition(lines: LineLike[], catalogItems: CatalogItemLike[]): string | null {
+export function describeRequisition(
+  lines: LineLike[],
+  catalogItems: CatalogItemLike[],
+  options: { prefer?: string } = {},
+): string | null {
   const named = lines.map((l) => lineName(l, catalogItems)).filter((n): n is string => n !== null);
   if (named.length === 0) return null;
 
-  const [first, ...rest] = named;
+  // `prefer` leads with the line that matched a search. Without it a
+  // three-line requisition found by its third line displays the first,
+  // and the result looks like a mistake — you searched "helmet" and got
+  // back "Ball valve 2 inch". Array.sort is stable, so everything else
+  // keeps its original order.
+  const prefer = options.prefer?.trim().toLowerCase();
+  const ordered = prefer
+    ? [...named].sort(
+        (a, b) => Number(b.toLowerCase().includes(prefer)) - Number(a.toLowerCase().includes(prefer)),
+      )
+    : named;
+
+  const [first, ...rest] = ordered;
   return rest.length > 0 ? `${first} +${rest.length} more` : first;
 }
 
@@ -43,6 +59,10 @@ export function describeRequisition(lines: LineLike[], catalogItems: CatalogItem
  * repeats it and reads badly once the caller adds its own prefix
  * ("Unsubmitted draft — Untitled — 150.00 INR").
  */
-export function requisitionLabel(lines: LineLike[], catalogItems: CatalogItemLike[]): string {
-  return describeRequisition(lines, catalogItems) ?? "Untitled";
+export function requisitionLabel(
+  lines: LineLike[],
+  catalogItems: CatalogItemLike[],
+  options: { prefer?: string } = {},
+): string {
+  return describeRequisition(lines, catalogItems, options) ?? "Untitled";
 }
