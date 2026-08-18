@@ -20,6 +20,9 @@ import { Breadcrumbs } from "@/components/ui/breadcrumbs";
 import { cn } from "@/lib/utils";
 import { LifecycleStatus } from "@/components/ui/lifecycle-status";
 import { approvalStepDetail } from "@/lib/lifecycle";
+import { requisitionLabel } from "@/lib/requisitionSummary";
+import { EmptyState } from "@/components/ui/empty-state";
+import { Info, PageHelp } from "@/components/ui/help";
 import { isBlocked } from "@/db/clarificationRules";
 import { QueriesPanel } from "../queries/QueriesPanel";
 import { approveRequirement, requestRevision, rejectAndClose, addAdHocApprover } from "./actions";
@@ -102,6 +105,39 @@ export default async function ApprovalsInboxPage() {
 
   const itemName = (id: string | null) => catalogItems.find((i) => i.id === id)?.name ?? null;
 
+  /**
+   * Who this goes to after you approve. Approving is the one decision
+   * whose consequence isn't visible on screen — everything else stays
+   * where it is, but approval hands the requisition on, and to whom
+   * depends on which rule matched.
+   */
+  const nextStepAfterApproval = (requisitionId: string, currentGroup: number) => {
+    const later = allRequirementRows.filter((r) => r.requisitionId === requisitionId && r.groupNo > currentGroup);
+    if (later.length === 0) return null;
+    const nextGroup = Math.min(...later.map((r) => r.groupNo));
+    const names = [...new Set(later.filter((r) => r.groupNo === nextGroup).map((r) => userName(r.assignedUserId)))];
+    return names.length === 1 ? names[0] : `${names.length} approvers`;
+  };
+
+  /**
+   * How this price compares with the last time the same catalogue item
+   * was bought. The history is already loaded and already shown, but as
+   * an undifferentiated list of past prices — the comparison is the
+   * reason the feature exists, and nobody does that arithmetic by eye.
+   */
+  const priceVariance = (line: { catalogItemId: string | null; estimatedUnitPrice: string }) => {
+    if (!line.catalogItemId) return null;
+    const history = itemHistoryById.get(line.catalogItemId);
+    const last = history?.[0];
+    if (!last) return null;
+    const previous = Number(last.unitPrice);
+    const now = Number(line.estimatedUnitPrice);
+    if (!previous || !Number.isFinite(previous) || !Number.isFinite(now)) return null;
+    const pct = ((now - previous) / previous) * 100;
+    if (Math.abs(pct) < 1) return null;
+    return { pct, last };
+  };
+
   const documentUrls = new Map(
     await Promise.all(
       myActionable
@@ -128,9 +164,29 @@ export default async function ApprovalsInboxPage() {
         <Breadcrumbs items={[{ label: "Dashboard", href: "/dashboard" }, { label: "Approvals" }]} />
         <div>
           <h1 className="font-serif text-lg text-foreground">Approvals</h1>
-          <p className="text-sm text-muted-foreground">{myActionable.length} awaiting your decision</p>
+          <p className="text-sm text-muted-foreground">
+            Requisitions waiting on a decision from you. Nothing here is visible to other approvers until
+            you have decided — a multi-step chain opens one step at a time.
+          </p>
         </div>
       </div>
+
+      <PageHelp
+        id="approvals"
+        title="Your four options, and what each one does"
+        steps={{
+          approve: "Approve hands the requisition on — to the next approver if there is one, or to sourcing if you are the last.",
+          ask: "Asking a question holds it exactly where it is. The requester keeps their place in the queue and nothing is rejected.",
+          back: "Sending it back lets the requester edit and resubmit. Approval then restarts from the first step, including you.",
+        }}
+      />
+
+      {myActionable.length === 0 && (
+        <EmptyState title="Nothing waiting on you">
+          Requisitions appear here when an approval rule routes one to you and every earlier step has
+          cleared. If you are expecting something, it may still be with an earlier approver.
+        </EmptyState>
+      )}
 
       <div className="flex flex-col gap-6">
         {myActionable.map((req) => {
@@ -146,7 +202,8 @@ export default async function ApprovalsInboxPage() {
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <p className="text-sm font-medium">
-                    {userName(requisition.requestorId)} — {requisition.totalEstimatedValue} {requisition.currency}
+                    {userName(requisition.requestorId)} needs {requisition.totalEstimatedValue}{" "}
+                    {requisition.currency} for {requisitionLabel(linesForReq, catalogItems)}
                   </p>
                   <p className="text-xs text-muted-foreground">
                     {departmentName(requisition.departmentId)} · {costCenterName(requisition.costCenterId)}
@@ -201,6 +258,18 @@ export default async function ApprovalsInboxPage() {
                           <span className="text-muted-foreground">
                             {" "}
                             — previously: {history.map((h) => `${h.unitPrice} (${h.vendorName})`).join(", ")}
+                            {(() => {
+                              const variance = priceVariance(line);
+                              if (!variance) return null;
+                              const up = variance.pct > 0;
+                              return (
+                                <span className={up ? "text-amber-600" : "text-emerald-600"}>
+                                  {" "}
+                                  — {Math.abs(variance.pct).toFixed(1)}% {up ? "higher" : "lower"} than the last
+                                  purchase
+                                </span>
+                              );
+                            })()}
                           </span>
                         ) : line.catalogItemId ? (
                           <span className="text-muted-foreground"> — never purchased before</span>
@@ -224,36 +293,87 @@ export default async function ApprovalsInboxPage() {
                 </div>
               )}
 
-              <fieldset disabled={blocked} className="flex flex-wrap items-end gap-2 disabled:opacity-50">
-                <form action={approveRequirement} className="flex items-end gap-2">
-                  <input type="hidden" name="requirementId" value={req.id} />
-                  <input
-                    name="comment"
-                    placeholder="Comment (optional)"
-                    className="h-8 w-48 rounded-md border px-2 text-sm"
-                  />
-                  <button type="submit" className={cn(buttonVariants())}>Approve</button>
-                </form>
-                <form action={requestRevision} className="flex items-end gap-2">
-                  <input type="hidden" name="requirementId" value={req.id} />
-                  <input
-                    name="comment"
-                    required
-                    placeholder="What needs fixing?"
-                    className="h-8 w-48 rounded-md border px-2 text-sm"
-                  />
-                  <button type="submit" className={cn(buttonVariants({ variant: "outline" }))}>Request revision</button>
-                </form>
-                <form action={rejectAndClose} className="flex items-end gap-2">
-                  <input type="hidden" name="requirementId" value={req.id} />
-                  <input
-                    name="comment"
-                    required
-                    placeholder="Reason for closing"
-                    className="h-8 w-48 rounded-md border px-2 text-sm"
-                  />
-                  <button type="submit" className={cn(buttonVariants({ variant: "outline" }))}>Reject &amp; close</button>
-                </form>
+              {/* Four choices, ranked and each stating its consequence, rather
+                  than three peer forms of equal visual weight. The old layout
+                  gave "Reject & close" — which is permanent and forces a brand
+                  new requisition — the same prominence as "Approve", and hid
+                  the cheap option (ask a question) below the fold entirely. */}
+              <fieldset disabled={blocked} className="flex flex-col gap-2 disabled:opacity-50">
+                <legend className="sr-only">Your decision</legend>
+
+                <div className="flex items-start gap-3 rounded-lg border border-primary/35 p-3">
+                  <span className="mt-0.5 w-[3px] self-stretch rounded-sm bg-primary" aria-hidden="true" />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium">Approve</p>
+                    <p className="text-xs text-muted-foreground">
+                      {(() => {
+                        const next = nextStepAfterApproval(req.requisitionId, req.groupNo);
+                        return next
+                          ? `Goes to ${next} for the next step. ${userName(requisition.requestorId)} is notified.`
+                          : `You are the last approver — this moves straight to sourcing. ${userName(requisition.requestorId)} is notified.`;
+                      })()}
+                    </p>
+                    <form action={approveRequirement} className="mt-2 flex flex-wrap items-end gap-2">
+                      <input type="hidden" name="requirementId" value={req.id} />
+                      <input
+                        name="comment"
+                        placeholder="Comment (optional)"
+                        className="h-8 w-48 rounded-md border px-2 text-sm"
+                      />
+                      <button type="submit" className={cn(buttonVariants())}>Approve</button>
+                    </form>
+                  </div>
+                </div>
+
+                <div className="flex items-start gap-3 rounded-lg border border-border p-3">
+                  <span className="mt-0.5 w-[3px] self-stretch rounded-sm bg-warning" aria-hidden="true" />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium">Send back for changes</p>
+                    <p className="text-xs text-muted-foreground">
+                      {userName(requisition.requestorId)} edits and resubmits. Approval then restarts from the
+                      first step — including you.
+                      <Info title="Send back vs reject" next="Use this whenever the answer could become yes.">
+                        Sending back keeps the requisition alive: the same record is revised and resubmitted.
+                        Rejecting closes it for good.
+                      </Info>
+                    </p>
+                    <form action={requestRevision} className="mt-2 flex flex-wrap items-end gap-2">
+                      <input type="hidden" name="requirementId" value={req.id} />
+                      <input
+                        name="comment"
+                        required
+                        placeholder="What needs fixing?"
+                        className="h-8 w-56 rounded-md border px-2 text-sm"
+                      />
+                      <button type="submit" className={cn(buttonVariants({ variant: "outline" }))}>
+                        Send back
+                      </button>
+                    </form>
+                  </div>
+                </div>
+
+                <details className="rounded-lg border border-border p-3">
+                  <summary className="cursor-pointer text-sm font-medium text-destructive">
+                    Reject and close
+                  </summary>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    <strong className="text-destructive">Permanent.</strong>{" "}
+                    {userName(requisition.requestorId)} would have to raise a brand-new requisition from
+                    scratch. Use &ldquo;send back&rdquo; unless the answer is genuinely no.
+                  </p>
+                  <form action={rejectAndClose} className="mt-2 flex flex-wrap items-end gap-2">
+                    <input type="hidden" name="requirementId" value={req.id} />
+                    <input
+                      name="comment"
+                      required
+                      placeholder="Reason for closing"
+                      className="h-8 w-56 rounded-md border px-2 text-sm"
+                    />
+                    <button type="submit" className={cn(buttonVariants({ variant: "destructive" }))}>
+                      Reject &amp; close
+                    </button>
+                  </form>
+                </details>
               </fieldset>
 
               {/* The lightweight move that didn't exist before: ask instead of
@@ -268,7 +388,16 @@ export default async function ApprovalsInboxPage() {
               />
 
               <details className="text-xs text-muted-foreground">
-                <summary className="cursor-pointer">Add an approver ad hoc</summary>
+                <summary className="cursor-pointer">
+                  Bring someone else in on this decision
+                  <Info
+                    title="Ad-hoc approver"
+                    next="It changes this requisition only — not the rule for future ones."
+                  >
+                    Adds one more person to this requisition&apos;s approval chain. You&apos;ll be asked why,
+                    and the reason is recorded in the audit log.
+                  </Info>
+                </summary>
                 <form action={addAdHocApprover} className="mt-2 flex flex-wrap items-end gap-2">
                   <input type="hidden" name="requisitionId" value={req.requisitionId} />
                   <select name="assignedUserId" required className="h-8 rounded-md border px-2 text-sm">

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { eq, inArray } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { getCurrentUserAndTenant } from "@/db/session";
 import { withTenant } from "@/db/withTenant";
 import {
@@ -17,13 +17,27 @@ import { Info, PageHelp, Term } from "@/components/ui/help";
 import { cn } from "@/lib/utils";
 import { sourcingStage } from "@/lib/lifecycle";
 import { requisitionLabel } from "@/lib/requisitionSummary";
+import { findRequisitionIdsMatching } from "@/db/requisitionSearch";
+import { SOURCING_SEARCH_FIELDS } from "@/db/pipelineSearch";
+import { ListControls, ListFilter } from "@/components/ui/list-controls";
 import { LifecycleStatus } from "@/components/ui/lifecycle-status";
 
-export default async function SourcingPage() {
+export default async function SourcingPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ q?: string; dept?: string; rfq?: string }>;
+}) {
+  const params = await searchParams;
   const { tenant } = await getCurrentUserAndTenant();
 
-  const [requisitions, users, departments, awaitingApproval] = await withTenant(tenant.id, async (tx) => [
-    await tx.select().from(purchaseRequisitionsTable).where(eq(purchaseRequisitionsTable.status, "approved")),
+  const q = typeof params.q === "string" ? params.q.trim() : "";
+  const deptFilter = typeof params.dept === "string" && params.dept ? params.dept : null;
+  const rfqFilter = params.rfq === "open" || params.rfq === "none" ? params.rfq : null;
+
+  const matchingIds = q ? await withTenant(tenant.id, (tx) => findRequisitionIdsMatching(tx, q)) : null;
+  const searchedAndFoundNothing = matchingIds !== null && matchingIds.length === 0;
+
+  const [users, departments, awaitingApproval] = await withTenant(tenant.id, async (tx) => [
     await tx.select().from(usersTable),
     await tx.select().from(departmentsTable),
     // Only used to point somewhere useful when this page is empty, which
@@ -31,11 +45,34 @@ export default async function SourcingPage() {
     await tx.select().from(purchaseRequisitionsTable).where(eq(purchaseRequisitionsTable.status, "pending_approval")),
   ]);
 
+  const requisitions = searchedAndFoundNothing
+    ? []
+    : await withTenant(tenant.id, (tx) =>
+        tx
+          .select()
+          .from(purchaseRequisitionsTable)
+          .where(
+            and(
+              eq(purchaseRequisitionsTable.status, "approved"),
+              ...(deptFilter ? [eq(purchaseRequisitionsTable.departmentId, deptFilter)] : []),
+              ...(matchingIds ? [inArray(purchaseRequisitionsTable.id, matchingIds)] : []),
+            ),
+          ),
+      );
+
   const requisitionIds = requisitions.map((r) => r.id);
   const rfqRows = requisitionIds.length
     ? await withTenant(tenant.id, (tx) => tx.select().from(rfqsTable).where(inArray(rfqsTable.requisitionId, requisitionIds)))
     : [];
   const requisitionIdsWithRfq = new Set(rfqRows.map((rfq) => rfq.requisitionId));
+
+  // "Quoting" vs "not started" is derived from whether an RFQ exists, not
+  // stored on the requisition, so it filters here rather than in SQL.
+  const visible = rfqFilter
+    ? requisitions.filter((r) =>
+        rfqFilter === "open" ? requisitionIdsWithRfq.has(r.id) : !requisitionIdsWithRfq.has(r.id),
+      )
+    : requisitions;
 
   // What is actually being bought. Sourcing is the one screen where that
   // is the whole job, and it was the one column missing.
@@ -49,7 +86,7 @@ export default async function SourcingPage() {
   const requestorName = (id: string) => users.find((u) => u.id === id)?.fullName ?? "—";
   const departmentName = (id: string | null) => departments.find((d) => d.id === id)?.name ?? "—";
   const labelFor = (r: { id: string }) =>
-    requisitionLabel(lines.filter((l) => l.requisitionId === r.id), catalogItems);
+    requisitionLabel(lines.filter((l) => l.requisitionId === r.id), catalogItems, { prefer: q });
 
   return (
     <div className="flex flex-col gap-6 p-8">
@@ -81,8 +118,56 @@ export default async function SourcingPage() {
         }}
       />
 
-      {requisitions.length === 0 ? (
-        <EmptyState title="Nothing to source yet">
+      <ListControls
+        q={q}
+        searchPlaceholder="Item, requester, department…"
+        searchMatches={SOURCING_SEARCH_FIELDS}
+        clearHref={q || deptFilter || rfqFilter ? "/dashboard/sourcing" : undefined}
+        count={visible.length}
+      >
+        <ListFilter
+          name="rfq"
+          label="Progress"
+          value={rfqFilter ?? ""}
+          options={[
+            { value: "", label: "All" },
+            { value: "none", label: "Not started" },
+            { value: "open", label: "Quoting" },
+          ]}
+        />
+        <ListFilter
+          name="dept"
+          label="Department"
+          value={deptFilter ?? ""}
+          options={[
+            { value: "", label: "All departments" },
+            ...departments.map((d) => ({ value: d.id, label: d.name })),
+          ]}
+        />
+      </ListControls>
+
+      {visible.length === 0 ? (
+        <EmptyState
+          title={
+            q
+              ? `Nothing matches “${q}”`
+              : deptFilter || rfqFilter
+                ? "Nothing matches those filters"
+                : "Nothing to source yet"
+          }
+        >
+          {q || deptFilter || rfqFilter ? (
+            <>
+              Search covers {SOURCING_SEARCH_FIELDS}, across requisitions that have cleared approval — one
+              still being approved won&apos;t appear here whatever you search for.
+              <div className="mt-3">
+                <Link href="/dashboard/sourcing" className={cn(buttonVariants({ variant: "outline", size: "sm" }))}>
+                  Clear filters
+                </Link>
+              </div>
+            </>
+          ) : (
+            <>
           Requisitions arrive here the moment their last approver signs off.{" "}
           {awaitingApproval.length > 0 ? (
             <>
@@ -100,6 +185,8 @@ export default async function SourcingPage() {
                 See what&apos;s in approval
               </Link>
             </div>
+          )}
+            </>
           )}
         </EmptyState>
       ) : (
@@ -122,7 +209,7 @@ export default async function SourcingPage() {
             </tr>
           </thead>
           <tbody>
-            {requisitions.map((r) => (
+            {visible.map((r) => (
               <tr key={r.id} className="border-b">
                 <td className="py-2 pr-4">{labelFor(r)}</td>
                 <td className="py-2 pr-4">{requestorName(r.requestorId)}</td>

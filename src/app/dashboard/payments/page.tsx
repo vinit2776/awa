@@ -1,8 +1,18 @@
 import Link from "next/link";
-import { inArray } from "drizzle-orm";
+import { and, inArray } from "drizzle-orm";
 import { getCurrentUserAndTenant } from "@/db/session";
 import { withTenant } from "@/db/withTenant";
-import { paymentInstructions as paymentInstructionsTable, invoices as invoicesTable, vendors as vendorsTable } from "@/db/schema";
+import {
+  paymentInstructions as paymentInstructionsTable,
+  invoices as invoicesTable,
+  vendors as vendorsTable,
+  purchaseOrders as purchaseOrdersTable,
+  purchaseRequisitionLines as purchaseRequisitionLinesTable,
+  catalogItems as catalogItemsTable,
+} from "@/db/schema";
+import { findPaymentIdsMatching, PAYMENT_SEARCH_FIELDS } from "@/db/pipelineSearch";
+import { requisitionLabel } from "@/lib/requisitionSummary";
+import { ListControls } from "@/components/ui/list-controls";
 import { buttonVariants } from "@/components/ui/button";
 import { Breadcrumbs } from "@/components/ui/breadcrumbs";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -11,17 +21,69 @@ import { cn } from "@/lib/utils";
 import { LifecycleStatus } from "@/components/ui/lifecycle-status";
 import { releasePayment, markPaymentFailed, retryPayment } from "./actions";
 
-export default async function PaymentsPage() {
+export default async function PaymentsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ q?: string }>;
+}) {
+  const params = await searchParams;
   const { tenant } = await getCurrentUserAndTenant();
+  const q = typeof params.q === "string" ? params.q.trim() : "";
 
-  const [paymentRows, invoiceRows, vendors] = await withTenant(tenant.id, async (tx) => [
-    await tx.select().from(paymentInstructionsTable).where(inArray(paymentInstructionsTable.status, ["queued", "failed"])),
+  const matchingIds = q ? await withTenant(tenant.id, (tx) => findPaymentIdsMatching(tx, q)) : null;
+  const searchedAndFoundNothing = matchingIds !== null && matchingIds.length === 0;
+
+  const [invoiceRows, vendors] = await withTenant(tenant.id, async (tx) => [
     await tx.select().from(invoicesTable),
     await tx.select().from(vendorsTable),
   ]);
 
+  const paymentRows = searchedAndFoundNothing
+    ? []
+    : await withTenant(tenant.id, (tx) =>
+        tx
+          .select()
+          .from(paymentInstructionsTable)
+          .where(
+            and(
+              inArray(paymentInstructionsTable.status, ["queued", "failed"]),
+              ...(matchingIds ? [inArray(paymentInstructionsTable.id, matchingIds)] : []),
+            ),
+          ),
+      );
+
   // Only read when the queue is empty, to say where the work is instead.
   const awaitingApproval = invoiceRows.filter((i) => i.status === "matched");
+
+  // What each payment is actually for. The row otherwise shows an invoice
+  // number and an amount, which is no help to somebody chasing "the helmet
+  // payment" — and it is what explains an inherited search match.
+  const shownInvoiceIds = [...new Set(paymentRows.map((p) => p.invoiceId))];
+  const poIds = [
+    ...new Set(
+      invoiceRows.filter((i) => shownInvoiceIds.includes(i.id)).map((i) => i.poId).filter((id): id is string => id !== null),
+    ),
+  ];
+  const [posForPayments, lines, catalogItems] = poIds.length
+    ? await withTenant(tenant.id, async (tx) => {
+        const pos = await tx.select().from(purchaseOrdersTable).where(inArray(purchaseOrdersTable.id, poIds));
+        const requisitionIds = [...new Set(pos.map((po) => po.requisitionId))];
+        return [
+          pos,
+          requisitionIds.length
+            ? await tx.select().from(purchaseRequisitionLinesTable).where(inArray(purchaseRequisitionLinesTable.requisitionId, requisitionIds))
+            : [],
+          await tx.select().from(catalogItemsTable),
+        ] as const;
+      })
+    : [[], [], []];
+
+  const labelForPayment = (invoiceId: string) => {
+    const invoice = invoiceRows.find((i) => i.id === invoiceId);
+    const requisitionId = posForPayments.find((po) => po.id === invoice?.poId)?.requisitionId;
+    if (!requisitionId) return "—";
+    return requisitionLabel(lines.filter((l) => l.requisitionId === requisitionId), catalogItems, { prefer: q });
+  };
 
   const queued = paymentRows.filter((p) => p.status === "queued");
   const failed = paymentRows.filter((p) => p.status === "failed");
@@ -60,8 +122,17 @@ export default async function PaymentsPage() {
         }}
       />
 
+      <ListControls
+        q={q}
+        searchPlaceholder="UTR, invoice number, vendor, what it was for…"
+        searchMatches={PAYMENT_SEARCH_FIELDS}
+        clearHref={q ? "/dashboard/payments" : undefined}
+        count={paymentRows.length}
+      />
+
       {queued.length === 0 && failed.length === 0 ? (
-        <EmptyState title="Nothing waiting to be paid">
+        <EmptyState title={q ? `Nothing matches “${q}”` : "Nothing waiting to be paid"}>
+          {q && <>Search covers {PAYMENT_SEARCH_FIELDS}, across payments queued or failed. </>}
           Invoices arrive here once they have been three-way matched and approved for payment.{" "}
           {awaitingApproval.length > 0 ? (
             <>
@@ -81,17 +152,18 @@ export default async function PaymentsPage() {
       <table className="w-full text-sm">
         <thead>
           <tr className="border-b text-left text-xs text-muted-foreground">
-            <th className="py-2 font-normal">Invoice</th>
-            <th className="py-2 font-normal">Vendor</th>
-            <th className="py-2 font-normal">Amount</th>
-            <th className="py-2 font-normal">Status</th>
+            <th className="py-2 pr-4 font-normal">Invoice</th>
+            <th className="py-2 pr-4 font-normal">For</th>
+            <th className="py-2 pr-4 font-normal">Vendor</th>
+            <th className="py-2 pr-4 font-normal">Amount</th>
+            <th className="py-2 pr-4 font-normal">Status</th>
             <th></th>
           </tr>
         </thead>
         <tbody>
           {queued.length === 0 && (
             <tr>
-              <td colSpan={5} className="py-6 text-center text-sm text-muted-foreground">
+              <td colSpan={6} className="py-6 text-center text-sm text-muted-foreground">
                 Nothing queued for release — see the payments needing attention below.
               </td>
             </tr>
@@ -100,10 +172,11 @@ export default async function PaymentsPage() {
             const invoice = invoiceFor(p.invoiceId);
             return (
               <tr key={p.id} className="border-b align-top">
-                <td className="py-2">{invoice?.invoiceNumber ?? "—"}</td>
-                <td className="py-2">{invoice ? vendorName(invoice.vendorId) : "—"}</td>
-                <td className="py-2">{p.amount} {p.currency}</td>
-                <td className="py-2"><LifecycleStatus stage="Payment queued" /></td>
+                <td className="py-2 pr-4">{invoice?.invoiceNumber ?? "—"}</td>
+                <td className="py-2 pr-4">{labelForPayment(p.invoiceId)}</td>
+                <td className="py-2 pr-4">{invoice ? vendorName(invoice.vendorId) : "—"}</td>
+                <td className="py-2 pr-4 whitespace-nowrap">{p.amount} {p.currency}</td>
+                <td className="py-2 pr-4"><LifecycleStatus stage="Payment queued" /></td>
                 <td className="py-2">
                   <form action={releasePayment} className="flex items-end gap-2">
                     <input type="hidden" name="paymentId" value={p.id} />
