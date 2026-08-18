@@ -33,7 +33,7 @@ const NAV_ITEMS: { href: string; label: string; icon: LucideIcon }[] = [
   { href: "/dashboard/support", label: "Support", icon: LifeBuoy },
 ];
 
-const ADMIN_NAV_ITEM = { href: "/dashboard/admin/departments", label: "Admin", icon: Settings };
+const ADMIN_NAV_ITEM = { href: "/dashboard/admin", label: "Admin", icon: Settings };
 
 export function DashboardNav({ showAdmin }: { showAdmin: boolean }) {
   const pathname = usePathname();

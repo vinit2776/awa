@@ -5,6 +5,9 @@ import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 
 const ADMIN_NAV_ITEMS = [
+  // Setup leads, and is the only entry that isn't a screen for editing one
+  // kind of record — it's the one that says what order the rest go in.
+  { href: "/dashboard/admin", label: "Setup" },
   { href: "/dashboard/admin/departments", label: "Departments" },
   { href: "/dashboard/admin/cost-centers", label: "Cost centers" },
   { href: "/dashboard/admin/catalog", label: "Catalog" },
@@ -22,7 +25,10 @@ export function AdminNav() {
   return (
     <ul className="flex flex-col gap-1">
       {ADMIN_NAV_ITEMS.map(({ href, label }) => {
-        const active = pathname === href || pathname.startsWith(`${href}/`);
+        // Setup sits at the section root, so the usual startsWith check
+        // would light it up on every child page too. It matches exactly;
+        // everything else keeps prefix matching for its own detail routes.
+        const active = href === "/dashboard/admin" ? pathname === href : pathname === href || pathname.startsWith(`${href}/`);
         return (
           <li key={href}>
             <Link
