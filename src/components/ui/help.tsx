@@ -103,14 +103,24 @@ export function Info({
  */
 export function Term({
   name,
+  sentenceCase = false,
   className,
   children,
 }: {
   name: GlossaryKey;
+  /**
+   * Lower-cases the first letter for use mid-sentence. The glossary
+   * stores each term title-cased because that is how it reads as a popup
+   * heading and in a glossary listing, which meant every inline use came
+   * out as "record a Goods receipt". Only the first character is touched,
+   * so acronyms ("RFQ") and proper nouns survive.
+   */
+  sentenceCase?: boolean;
   className?: string;
   children?: ReactNode;
 }) {
   const entry = GLOSSARY[name];
+  const label = sentenceCase ? entry.term.charAt(0).toLowerCase() + entry.term.slice(1) : entry.term;
 
   return (
     <Popover.Root>
@@ -126,7 +136,7 @@ export function Term({
           className,
         )}
       >
-        {children ?? entry.term}
+        {children ?? label}
       </Popover.Trigger>
       <Popover.Portal>
         <Popover.Positioner side="top" sideOffset={6} align="center" collisionPadding={12} className="z-50">
@@ -161,7 +171,13 @@ export function PageHelp({
 }: {
   id: string;
   title: string;
-  steps: ReactNode[];
+  /**
+   * Keyed rather than a bare ReactNode[]: a step is often JSX (it carries
+   * <Term>s), and an array literal of elements with no keys makes React
+   * warn at the call site, where the fix is unobvious. A record forces a
+   * key without the caller having to think about Fragment.
+   */
+  steps: Record<string, ReactNode>;
   className?: string;
 }) {
   const storageKey = `awa.pagehelp.${id}`;
@@ -225,8 +241,8 @@ export function PageHelp({
         </button>
       </div>
       <ol className="ml-4 flex list-decimal flex-col gap-1 text-xs leading-relaxed text-muted-foreground">
-        {steps.map((step, i) => (
-          <li key={i}>{step}</li>
+        {Object.entries(steps).map(([key, step]) => (
+          <li key={key}>{step}</li>
         ))}
       </ol>
     </section>
