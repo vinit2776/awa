@@ -217,7 +217,17 @@ export async function resolveApprovals(tx: typeof db, tenantId: string, requisit
   }
 
   if (requirementRows.length === 0) {
-    await autoApprove(tx, tenantId, requisition.id, "matched rules resolved to zero eligible approvers");
+    // A deliberate auto_approve rule (see admin/approval-rules'
+    // "no review needed" outcome) carries zero approval_rule_requirements
+    // rows by design, so it always lands here too — same as the
+    // accidental "everyone eligible was the requestor" case below, but
+    // worth a distinct audit action so the two aren't conflated.
+    const autoApproveRule = matchingRules.find((r) => r.ruleType === "auto_approve");
+    if (autoApproveRule) {
+      await autoApprove(tx, tenantId, requisition.id, `rule: ${autoApproveRule.name}`, "requisition.rule_auto_approved");
+    } else {
+      await autoApprove(tx, tenantId, requisition.id, "matched rules resolved to zero eligible approvers");
+    }
     return;
   }
 
@@ -238,7 +248,7 @@ export async function resolveApprovals(tx: typeof db, tenantId: string, requisit
   await notifyCurrentGroup(tx, requisition.id);
 }
 
-async function autoApprove(tx: typeof db, tenantId: string, requisitionId: string, reason: string) {
+async function autoApprove(tx: typeof db, tenantId: string, requisitionId: string, reason: string, action = "requisition.auto_approved") {
   const [requisition] = await tx
     .update(purchaseRequisitions)
     .set({ status: "approved" })
@@ -246,7 +256,7 @@ async function autoApprove(tx: typeof db, tenantId: string, requisitionId: strin
     .returning();
   await logAction(tx, {
     tenantId,
-    action: "requisition.auto_approved",
+    action,
     entityType: "purchase_requisition",
     entityId: requisitionId,
     metadata: { reason },

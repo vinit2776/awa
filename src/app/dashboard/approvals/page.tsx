@@ -316,6 +316,7 @@ export default async function ApprovalsInboxPage({
                         <span className="font-medium">
                           {line.freeTextDescription ?? itemName(line.catalogItemId) ?? "Item"} — {line.quantity} {line.uom} @{" "}
                           {line.estimatedUnitPrice}
+                          {!line.priceConfirmed && <span className="font-normal text-muted-foreground"> (est.)</span>}
                         </span>
                         {history && history.length > 0 ? (
                           <span className="text-muted-foreground">

@@ -38,6 +38,10 @@ export type CreateRuleWithRequirementsInput = {
   combinationMode: "additive" | "exclusive";
   priority: number;
   steps: WizardStepInput[];
+  // "auto_approve" carries zero requirement rows on purpose — a
+  // deliberate outcome, not the accidental auto-approval that already
+  // happens when no rule matches at all (see db/approvals.ts).
+  ruleType: "requires_approval" | "auto_approve";
 };
 
 /**
@@ -46,14 +50,24 @@ export type CreateRuleWithRequirementsInput = {
  * flow it replaces let a rule exist with no requirements at all,
  * silently approving nothing. Called directly from the client wizard
  * (not a <form action>), since its payload is nested, not flat fields.
+ *
+ * The "at least one step" guard only applies to requires_approval rules
+ * — an auto_approve rule has zero requirement rows by design, and its
+ * combinationMode is forced to "exclusive" regardless of what the client
+ * sent, since an auto-approve outcome combined additively with another
+ * rule's approvers would contradict itself.
  */
 export async function createRuleWithRequirements(input: CreateRuleWithRequirementsInput): Promise<{ error?: string }> {
   const { user, tenant } = await requireTenantAdmin();
 
   const name = input.name.trim();
   if (!name) return { error: "Give this rule a name." };
-  const steps = input.steps.filter((step) => step.length > 0);
-  if (steps.length === 0) return { error: "Add at least one approval step." };
+
+  const isAutoApprove = input.ruleType === "auto_approve";
+  const steps = isAutoApprove ? [] : input.steps.filter((step) => step.length > 0);
+  if (!isAutoApprove && steps.length === 0) return { error: "Add at least one approval step." };
+
+  const combinationMode = isAutoApprove ? "exclusive" : input.combinationMode;
 
   await withTenant(tenant.id, async (tx) => {
     const [rule] = await tx
@@ -66,25 +80,28 @@ export async function createRuleWithRequirements(input: CreateRuleWithRequiremen
         costCenterId: input.costCenterId,
         minValue: input.minValue || "0",
         maxValue: input.maxValue,
-        combinationMode: input.combinationMode,
+        combinationMode,
+        ruleType: input.ruleType,
         priority: input.priority,
         createdBy: user.id,
         updatedBy: user.id,
       })
       .returning();
 
-    await tx.insert(approvalRuleRequirements).values(
-      steps.flatMap((step, i) =>
-        step.map((req) => ({
-          tenantId: tenant.id,
-          ruleId: rule.id,
-          approverRoleId: req.approverRoleId,
-          groupNo: i + 1,
-          groupSequence: i + 1,
-          minApprovalsInGroup: req.minApprovalsInGroup,
-        })),
-      ),
-    );
+    if (steps.length > 0) {
+      await tx.insert(approvalRuleRequirements).values(
+        steps.flatMap((step, i) =>
+          step.map((req) => ({
+            tenantId: tenant.id,
+            ruleId: rule.id,
+            approverRoleId: req.approverRoleId,
+            groupNo: i + 1,
+            groupSequence: i + 1,
+            minApprovalsInGroup: req.minApprovalsInGroup,
+          })),
+        ),
+      );
+    }
 
     await logAction(tx, {
       tenantId: tenant.id,
@@ -92,7 +109,7 @@ export async function createRuleWithRequirements(input: CreateRuleWithRequiremen
       action: "approval_rule.created",
       entityType: "approval_rule",
       entityId: rule.id,
-      metadata: { name, stepCount: steps.length, combinationMode: input.combinationMode, priority: input.priority },
+      metadata: { name, ruleType: input.ruleType, stepCount: steps.length, combinationMode, priority: input.priority },
     });
   });
 

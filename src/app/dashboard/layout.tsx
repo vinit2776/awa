@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getCurrentUserAndTenant } from "@/db/session";
 import { clearAppSessionCookie } from "@/db/userSession";
@@ -25,12 +26,12 @@ export default async function DashboardLayout({ children }: LayoutProps<"/dashbo
     <div className="flex flex-1">
       <aside className="flex w-60 shrink-0 flex-col justify-between border-r border-sidebar-border bg-sidebar p-4">
         <div className="flex flex-col gap-6">
-          <div className="flex items-center gap-2 px-1">
+          <Link href="/dashboard" className="flex items-center gap-2 px-1">
             <span className="flex size-7 items-center justify-center rounded-md bg-sidebar-primary font-serif text-sm text-sidebar-primary-foreground">
               A
             </span>
             <span className="font-serif text-lg text-sidebar-foreground">AWA</span>
-          </div>
+          </Link>
           <DashboardNav showAdmin={showAdmin} />
         </div>
 

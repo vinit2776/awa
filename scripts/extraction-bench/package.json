@@ -1,0 +1,13 @@
+{
+  "name": "extraction-bench",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node --env-file=.env run.mjs"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "latest",
+    "pdf-lib": "^1.17.1",
+    "pdf-parse": "latest"
+  }
+}
