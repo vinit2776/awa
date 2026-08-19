@@ -1,12 +1,12 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Paperclip } from "lucide-react";
+import { Paperclip, ThumbsDown, ThumbsUp } from "lucide-react";
 import { customerStatusLabel, getTicketForCustomer, type SupportTicketStatus } from "@/db/supportDesk";
 import { Breadcrumbs } from "@/components/ui/breadcrumbs";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { StatusPill, TypeTag, formatDateTime } from "../ui";
-import { confirmTicketResolved, escalateTicket, reopenTicketAction, replyToTicket } from "../actions";
+import { confirmTicketResolved, escalateTicket, rateTicketAction, reopenTicketAction, replyToTicket } from "../actions";
 
 export default async function SupportTicketPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -175,6 +175,50 @@ export default async function SupportTicketPage({ params }: { params: Promise<{ 
                   </div>
                 </form>
               </details>
+            )
+          )}
+
+          {(ticket.status === "resolved" || isClosed) && (
+            ticket.csatRating ? (
+              <p className="rounded-lg border border-border p-3 text-xs text-muted-foreground">
+                You rated this {ticket.csatRating === "positive" ? "helpful" : "unhelpful"}
+                {ticket.csatComment ? ` — “${ticket.csatComment}”` : ""}. Thank you.
+              </p>
+            ) : (
+              <form
+                action={rateTicketAction}
+                className="flex flex-col gap-2 rounded-lg border border-border bg-card p-4"
+              >
+                <input type="hidden" name="ticketId" value={ticket.id} />
+                <p className="text-sm font-medium">Was this handled well?</p>
+                <p className="text-xs text-muted-foreground">
+                  One question, asked once. It goes to the people who run support, not to the person who
+                  answered you.
+                </p>
+                <input
+                  name="comment"
+                  placeholder="Anything you'd add? (optional)"
+                  className="rounded-lg border border-input bg-background px-3 py-1.5 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                />
+                <div className="flex gap-2">
+                  <button
+                    type="submit"
+                    name="rating"
+                    value="positive"
+                    className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
+                  >
+                    <ThumbsUp className="size-3.5" /> Yes
+                  </button>
+                  <button
+                    type="submit"
+                    name="rating"
+                    value="negative"
+                    className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
+                  >
+                    <ThumbsDown className="size-3.5" /> No
+                  </button>
+                </div>
+              </form>
             )
           )}
 

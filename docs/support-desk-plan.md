@@ -4,7 +4,7 @@ In-app support ticketing: customers report bugs, feature requests and feedback f
 wherever they are in the app; a platform-side support team triages, responds, resolves
 and escalates against a TAT clock. Active in every tenant, no feature flag.
 
-> **Status: Phases A, B and C built.**
+> **Status: Phases A–D built.**
 > Migration `0014_support_desk.sql` is applied to the dev database. Report widget,
 > `/dashboard/support`, `/dashboard/support/[id]`, `/platform/support`,
 > `/platform/support/[id]`, attachments, and the events audit trail are all in.
@@ -13,8 +13,12 @@ and escalates against a TAT clock. Active in every tenant, no feature flag.
 > pausing while `awaiting_customer`, and breach shown in the queue. Phase C added the
 > escalation matrix, the hourly sweep at `/api/cron/support-sla-sweep`, auto-close after
 > the 7-day confirmation window, and the customer's one-shot escalate control (migration
-> `0017`). Phase D (console error capture, saved replies, CSAT, per-tenant SLA overrides,
-> business-hours calendars) is not started.
+> `0017`). Phase D (migration `0018`) added console error capture on bug reports, saved
+> replies in the support composer, CSAT on resolve, and per-tenant SLA overrides at
+> `/platform/support/sla`. Three Phase D items are deliberately not built: business-hours
+> calendars (the plan already defers them), the weekly digest (dead on arrival until an
+> email provider is configured in production), and vendor-portal reporting (a different
+> auth model).
 >
 > Decisions **D1** (email provider) and **D4** (publish TAT) are still open and were built
 > to the recommended default. **D2** (paste + file picker) and **D3** (reporter + tenant
