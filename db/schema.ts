@@ -37,6 +37,7 @@ export const requisitionStatus = pgEnum("requisition_status", [
 ]);
 export const fulfillmentType = pgEnum("fulfillment_type", ["goods", "service"]);
 export const combinationMode = pgEnum("combination_mode", ["additive", "exclusive"]);
+export const approvalRuleType = pgEnum("approval_rule_type", ["requires_approval", "auto_approve"]);
 export const approvalSource = pgEnum("approval_source", ["rule", "ad_hoc"]);
 export const approvalStatus = pgEnum("approval_status", ["pending", "approved", "rejected", "delegated"]);
 export const approvalAction = pgEnum("approval_action", [
@@ -278,6 +279,11 @@ export const purchaseRequisitions = pgTable("purchase_requisitions", {
   // invoice this requisition's lines were extracted from, if any — see
   // db/documentStorage.ts and db/documentExtraction.ts.
   sourceDocumentKey: text("source_document_key"),
+  // Vendor/document/tax detail read off that document — display-only,
+  // never written back to the vendors table. Shape: ExtractedDocumentMeta
+  // in db/documentExtraction.ts. Empty object when no document was
+  // attached or extraction found nothing.
+  extractedDocumentMeta: jsonb("extracted_document_meta").notNull().default({}),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   submittedAt: timestamp("submitted_at", { withTimezone: true }),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
@@ -294,8 +300,33 @@ export const purchaseRequisitionLines = pgTable("purchase_requisition_lines", {
   quantity: numeric("quantity", { precision: 14, scale: 3 }).notNull().default("1"),
   uom: text("uom").notNull().default("each"),
   estimatedUnitPrice: numeric("estimated_unit_price", { precision: 14, scale: 2 }).notNull().default("0"),
+  // Whether estimatedUnitPrice is a real quoted/invoiced price (set true by
+  // document extraction) or a requester's guess/ceiling (the default) —
+  // display-only, never fed into approval-rule or budget arithmetic, which
+  // already treat this column as "the number" regardless of confidence.
+  priceConfirmed: boolean("price_confirmed").notNull().default(false),
   lineTotal: numeric("line_total", { precision: 14, scale: 2 }).notNull().default("0"),
 });
+
+// A requester's answer of "no, this is a different purchase" to a possible-
+// duplicate warning (db/duplicateDetection.ts), recorded so an approver can
+// see it later. Append-only (0022_requisition_duplicate_acknowledgements.sql)
+// — same discipline as audit_log and approval_decision_log — this is a
+// record of what a person said at a moment in time.
+export const requisitionDuplicateAcknowledgements = pgTable("requisition_duplicate_acknowledgements", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  tenantId: uuid("tenant_id").notNull().references(() => tenants.id),
+  requisitionId: uuid("requisition_id").notNull().references(() => purchaseRequisitions.id),
+  duplicateOfRequisitionId: uuid("duplicate_of_requisition_id").notNull().references(() => purchaseRequisitions.id),
+  acknowledgedByUserId: uuid("acknowledged_by_user_id").notNull().references(() => users.id),
+  // The whole value of this record — not null, so it never quietly becomes
+  // the common case. See the migration for the full reasoning.
+  reason: text("reason").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [
+  index().on(t.tenantId, t.requisitionId),
+  index().on(t.tenantId),
+]);
 
 export const approvalRules = pgTable("approval_rules", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -308,6 +339,10 @@ export const approvalRules = pgTable("approval_rules", {
   maxValue: numeric("max_value", { precision: 14, scale: 2 }),
   currency: text("currency").notNull().default("INR"),
   combinationMode: combinationMode("combination_mode").notNull().default("additive"),
+  // "auto_approve" rules carry zero approval_rule_requirements rows on
+  // purpose — a deliberate outcome, distinct from the accidental
+  // auto-approval that already happens when no rule matches at all.
+  ruleType: approvalRuleType("rule_type").notNull().default("requires_approval"),
   priority: integer("priority").notNull().default(0),
   active: boolean("active").notNull().default(true),
   effectiveFrom: timestamp("effective_from", { withTimezone: true }).notNull().defaultNow(),

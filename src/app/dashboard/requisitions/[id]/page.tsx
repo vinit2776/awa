@@ -2,11 +2,15 @@ import { eq } from "drizzle-orm";
 import { notFound } from "next/navigation";
 import { getCurrentUserAndTenant } from "@/db/session";
 import { withTenant } from "@/db/withTenant";
+import { getRequisitionDocumentUrl } from "@/db/documentStorage";
+import type { ExtractedDocumentMeta } from "@/db/documentExtraction";
+import { getDuplicateAcknowledgements } from "@/db/duplicateDetection";
 import {
   purchaseRequisitions as purchaseRequisitionsTable,
   purchaseRequisitionLines as purchaseRequisitionLinesTable,
   requisitionApprovalRequirements as requirementsTable,
   approvalRules as approvalRulesTable,
+  catalogCategories as catalogCategoriesTable,
   catalogItems as catalogItemsTable,
   rfqs as rfqsTable,
   vendorQuotations as quotationsTable,
@@ -24,6 +28,10 @@ import { Info, Term } from "@/components/ui/help";
 import { computeStage, approvalStepDetail, PAYMENT_CAPTIONS } from "@/lib/lifecycle";
 import { requisitionLabel } from "@/lib/requisitionSummary";
 import { LifecycleStatus } from "@/components/ui/lifecycle-status";
+import { DocumentDetailsPanel } from "../wizard/DocumentDetailsPanel";
+import { TaxBreakdownPanel } from "../wizard/TaxBreakdownPanel";
+import { DocumentPreview } from "../wizard/DocumentPreview";
+import { AttachDocumentPanel } from "./AttachDocumentPanel";
 
 /**
  * The requisition record — what a requestor opens to find out what
@@ -37,7 +45,7 @@ import { LifecycleStatus } from "@/components/ui/lifecycle-status";
  */
 export default async function RequisitionDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const { tenant } = await getCurrentUserAndTenant();
+  const { user, tenant } = await getCurrentUserAndTenant();
 
   const data = await withTenant(tenant.id, async (tx) => {
     const [requisition] = await tx.select().from(purchaseRequisitionsTable).where(eq(purchaseRequisitionsTable.id, id));
@@ -55,6 +63,7 @@ export default async function RequisitionDetailPage({ params }: { params: Promis
     return {
       requisition,
       lines: await tx.select().from(purchaseRequisitionLinesTable).where(eq(purchaseRequisitionLinesTable.requisitionId, id)),
+      categories: await tx.select().from(catalogCategoriesTable),
       catalogItems: await tx.select().from(catalogItemsTable),
       rfq,
       quotations,
@@ -67,14 +76,26 @@ export default async function RequisitionDetailPage({ params }: { params: Promis
       costCenters: await tx.select().from(costCentersTable),
       requirementRows: await tx.select().from(requirementsTable).where(eq(requirementsTable.requisitionId, id)),
       approvalRules: await tx.select().from(approvalRulesTable),
+      // Same read the approver's decision card uses — the requester and
+      // anyone else looking at this record should see the same history
+      // of what was flagged and why it was waved through, not a
+      // different (or absent) version of it.
+      duplicateAcknowledgements: await getDuplicateAcknowledgements(tx, id),
     };
   });
 
   if (!data) notFound();
   const {
-    requisition, lines, catalogItems, rfq, quotations, po, invoice, payment,
-    users, vendors, departments, costCenters, requirementRows, approvalRules,
+    requisition, lines, categories, catalogItems, rfq, quotations, po, invoice, payment,
+    users, vendors, departments, costCenters, requirementRows, approvalRules, duplicateAcknowledgements,
   } = data;
+
+  const documentMeta = requisition.extractedDocumentMeta as ExtractedDocumentMeta;
+  const hasDocumentMeta = Boolean(
+    documentMeta && (documentMeta.vendorName || documentMeta.documentNumber || documentMeta.taxBreakdown?.length),
+  );
+  const documentPreviewUrl = requisition.sourceDocumentKey ? await getRequisitionDocumentUrl(requisition.sourceDocumentKey) : null;
+  const isDraftOwner = requisition.status === "draft" && requisition.requestorId === user.id;
 
   const userName = (userId: string | null) => users.find((u) => u.id === userId)?.fullName ?? "—";
   const vendorName = (vendorId: string) => vendors.find((v) => v.id === vendorId)?.name ?? "—";
@@ -196,7 +217,10 @@ export default async function RequisitionDetailPage({ params }: { params: Promis
                 <td className="py-2 capitalize">{line.fulfillmentType}</td>
                 <td className="py-2">{line.quantity}</td>
                 <td className="py-2">{line.uom}</td>
-                <td className="py-2">{line.estimatedUnitPrice}</td>
+                <td className="py-2">
+                  {line.estimatedUnitPrice}
+                  {!line.priceConfirmed && <span className="text-muted-foreground"> (est.)</span>}
+                </td>
                 <td className="py-2">
                   {(Number(line.quantity) * Number(line.estimatedUnitPrice)).toFixed(2)}
                 </td>
@@ -205,6 +229,63 @@ export default async function RequisitionDetailPage({ params }: { params: Promis
           </tbody>
         </table>
       </div>
+
+      {duplicateAcknowledgements.length > 0 && (
+        <div className="flex flex-col gap-2 rounded-lg border border-warning/45 bg-warning/10 px-3.5 py-2.5">
+          <p className="text-sm font-medium text-warning-foreground">
+            Flagged as a possible duplicate at submission
+          </p>
+          {duplicateAcknowledgements.map((ack) => (
+            <div key={ack.id} className="text-xs text-muted-foreground">
+              <p>
+                Matched{" "}
+                <a
+                  href={`/dashboard/requisitions/${ack.duplicateOfRequisitionId}`}
+                  className="underline"
+                >
+                  {ack.duplicateOfRequestorName}&apos;s requisition
+                </a>{" "}
+                ({ack.duplicateOfStatus.replace(/_/g, " ")}
+                {ack.duplicateOfSubmittedAt
+                  ? `, ${new Date(ack.duplicateOfSubmittedAt).toLocaleDateString(undefined, { day: "numeric", month: "short" })}`
+                  : ""}
+                ).
+              </p>
+              <p className="mt-0.5">
+                {ack.acknowledgedByName} said: &ldquo;{ack.reason}&rdquo;
+              </p>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {(hasDocumentMeta || documentPreviewUrl || isDraftOwner) && (
+        <div className="flex flex-col gap-3">
+          <h2 className="text-sm font-medium text-muted-foreground">Source document</h2>
+          {hasDocumentMeta && <DocumentDetailsPanel meta={documentMeta} />}
+          {hasDocumentMeta && <TaxBreakdownPanel meta={documentMeta} />}
+          {requisition.sourceDocumentKey && documentPreviewUrl && (
+            <DocumentPreview sourceKey={requisition.sourceDocumentKey} initialUrl={documentPreviewUrl} />
+          )}
+          {isDraftOwner && (
+            <AttachDocumentPanel
+              requisitionId={requisition.id}
+              initialLines={lines.map((l) => ({
+                catalogItemId: l.catalogItemId,
+                freeTextDescription: l.freeTextDescription,
+                categoryId: l.categoryId,
+                fulfillmentType: l.fulfillmentType,
+                quantity: l.quantity,
+                uom: l.uom,
+                estimatedUnitPrice: l.estimatedUnitPrice,
+                priceConfirmed: l.priceConfirmed,
+              }))}
+              categories={categories}
+              catalogItems={catalogItems}
+            />
+          )}
+        </div>
+      )}
 
       <dl className="flex flex-col gap-3 text-sm">
         <div>

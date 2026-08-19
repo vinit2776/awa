@@ -8,8 +8,13 @@ import { previewApprovalChain, type ApprovalPreview } from "@/db/approvalPreview
 import { logAction } from "@/db/audit";
 import { resolveApprovals } from "@/db/approvals";
 import { notifyUser } from "@/db/notifications";
-import { getRequisitionUploadUrl, getRequisitionDocumentBytes } from "@/db/documentStorage";
-import { extractLineItemsFromDocument } from "@/db/documentExtraction";
+import { getRequisitionUploadUrl, getRequisitionDocumentBytes, getRequisitionDocumentUrl } from "@/db/documentStorage";
+import { extractLineItemsFromDocument, type ExtractedDocumentMeta } from "@/db/documentExtraction";
+import { getItemPurchaseHistory, type ItemPurchaseHistoryEntry } from "@/db/itemHistory";
+import { getOpenCommitmentsForItem, type OpenCommitments } from "@/db/itemCommitments";
+import { findSimilarCatalogItems, type SimilarCatalogItem } from "@/db/catalogMatch";
+import { judgeCatalogMatch } from "@/db/catalogMatchJudge";
+import { findPossibleDuplicates, recordDuplicateAcknowledgements, type PossibleDuplicate } from "@/db/duplicateDetection";
 import { purchaseRequisitions, purchaseRequisitionLines } from "@/db/schema";
 
 export type LineInput = {
@@ -20,6 +25,9 @@ export type LineInput = {
   quantity: string;
   uom: string;
   estimatedUnitPrice: string;
+  // Whether estimatedUnitPrice is a real quoted/invoiced price or a
+  // requester's guess/ceiling — see db/schema.ts's priceConfirmed column.
+  priceConfirmed: boolean;
 };
 
 export async function createRequisition(input: {
@@ -29,7 +37,13 @@ export async function createRequisition(input: {
   lines: LineInput[];
   submit: boolean;
   sourceDocumentKey?: string | null;
-}) {
+  extractedDocumentMeta?: ExtractedDocumentMeta | null;
+  // What the requester said, on the review step's duplicate-warning panel,
+  // about why each detected possible-duplicate isn't one. Only ever a
+  // hint to this function, never trusted on its own — see the re-check
+  // below.
+  duplicateAcknowledgements?: { duplicateOfRequisitionId: string; reason: string }[];
+}): Promise<{ error?: string; id?: string; needsAcknowledgement?: PossibleDuplicate[] }> {
   const { user, tenant } = await getCurrentUserAndTenant();
 
   const validLines = input.lines.filter(
@@ -42,6 +56,50 @@ export async function createRequisition(input: {
     lineTotal: (Number(l.quantity) * Number(l.estimatedUnitPrice)).toFixed(2),
   }));
   const total = linesWithTotals.reduce((sum, l) => sum + Number(l.lineTotal), 0).toFixed(2);
+
+  /**
+   * Warn, record, never block (db/duplicateDetection.ts) — but "record"
+   * needs a reason, and refusing silence is not the blocking that was
+   * rejected. Only checked when submitting: a draft is not live yet,
+   * nobody else can see it, and forcing a reason on it would just be
+   * friction with nothing behind it.
+   *
+   * Re-runs findPossibleDuplicates itself rather than trusting
+   * input.duplicateAcknowledgements' shape of "which duplicates exist" —
+   * the client's list is only ever used below to look up a reason by id,
+   * never to decide what needs one. This is also what catches the race:
+   * if somebody else submitted a matching requisition between this
+   * requester's review step and now, it shows up here as freshly
+   * unacknowledged even though the client never saw it.
+   *
+   * Runs before any insert, so there is nothing to roll back when it
+   * comes back non-empty.
+   */
+  let acknowledgementsToRecord: { duplicateOfRequisitionId: string; reason: string }[] = [];
+  if (input.submit) {
+    const catalogItemIds = [...new Set(validLines.map((l) => l.catalogItemId).filter((id): id is string => !!id))];
+    if (catalogItemIds.length > 0) {
+      const possibleDuplicates = await withTenant(tenant.id, (tx) =>
+        findPossibleDuplicates(tx, { catalogItemIds, excludeRequisitionId: null }),
+      );
+
+      const reasonByRequisitionId = new Map(
+        (input.duplicateAcknowledgements ?? [])
+          .filter((ack) => ack.reason.trim().length > 0)
+          .map((ack) => [ack.duplicateOfRequisitionId, ack.reason.trim()]),
+      );
+
+      const needsAcknowledgement = possibleDuplicates.filter((d) => !reasonByRequisitionId.has(d.requisitionId));
+      if (needsAcknowledgement.length > 0) {
+        return { needsAcknowledgement };
+      }
+
+      acknowledgementsToRecord = possibleDuplicates.map((d) => ({
+        duplicateOfRequisitionId: d.requisitionId,
+        reason: reasonByRequisitionId.get(d.requisitionId)!,
+      }));
+    }
+  }
 
   const requisitionId = await withTenant(tenant.id, async (tx) => {
     const [requisition] = await tx
@@ -56,6 +114,7 @@ export async function createRequisition(input: {
         status: input.submit ? "submitted" : "draft",
         submittedAt: input.submit ? new Date() : null,
         sourceDocumentKey: input.sourceDocumentKey || null,
+        extractedDocumentMeta: input.extractedDocumentMeta ?? {},
       })
       .returning();
 
@@ -70,6 +129,7 @@ export async function createRequisition(input: {
         quantity: l.quantity,
         uom: l.uom,
         estimatedUnitPrice: l.estimatedUnitPrice,
+        priceConfirmed: l.priceConfirmed,
         lineTotal: l.lineTotal,
       })),
     );
@@ -82,6 +142,15 @@ export async function createRequisition(input: {
       entityId: requisition.id,
       metadata: { total, lineCount: linesWithTotals.length },
     });
+
+    if (acknowledgementsToRecord.length > 0) {
+      await recordDuplicateAcknowledgements(tx, {
+        tenantId: tenant.id,
+        requisitionId: requisition.id,
+        acknowledgedByUserId: user.id,
+        acknowledgements: acknowledgementsToRecord,
+      });
+    }
 
     if (input.submit) {
       await notifyUser(tx, user.id, "requisition_submitted", "Your requisition was submitted", `Total: ${total}`);
@@ -123,6 +192,35 @@ export async function submitRequisition(formData: FormData) {
       entityId: updated.id,
       metadata: {},
     });
+
+    // Known gap: this route takes a draft live without ever visiting the
+    // review step, so there is no duplicate-warning panel here and
+    // nothing to ask the requester for a reason. Building a second
+    // acknowledgement UI for a one-click "submit this draft" action would
+    // be worse than the gap it closes, and blocking here would break
+    // "never block". So this leaves a trace instead: detection still
+    // runs, and if it finds something nobody acknowledged, that goes in
+    // the audit log rather than vanishing silently. See
+    // db/duplicateDetection.ts's docblock for the rule this is only
+    // partially able to honor on this path.
+    const lineRows = await tx
+      .select({ catalogItemId: purchaseRequisitionLines.catalogItemId })
+      .from(purchaseRequisitionLines)
+      .where(eq(purchaseRequisitionLines.requisitionId, updated.id));
+    const catalogItemIds = [...new Set(lineRows.map((l) => l.catalogItemId).filter((id): id is string => !!id))];
+    if (catalogItemIds.length > 0) {
+      const possibleDuplicates = await findPossibleDuplicates(tx, { catalogItemIds, excludeRequisitionId: updated.id });
+      if (possibleDuplicates.length > 0) {
+        await logAction(tx, {
+          tenantId: tenant.id,
+          actorUserId: user.id,
+          action: "requisition.submitted_with_unacknowledged_duplicates",
+          entityType: "purchase_requisition",
+          entityId: updated.id,
+          metadata: { duplicateRequisitionIds: possibleDuplicates.map((d) => d.requisitionId) },
+        });
+      }
+    }
 
     await notifyUser(tx, user.id, "requisition_submitted", "Your requisition was submitted", `Total: ${updated.totalEstimatedValue}`);
     await resolveApprovals(tx, tenant.id, updated.id);
@@ -176,6 +274,7 @@ export async function reviseAndResubmitRequisition(input: {
         quantity: l.quantity,
         uom: l.uom,
         estimatedUnitPrice: l.estimatedUnitPrice,
+        priceConfirmed: l.priceConfirmed,
         lineTotal: l.lineTotal,
       })),
     );
@@ -201,6 +300,25 @@ export async function reviseAndResubmitRequisition(input: {
       metadata: { total, lineCount: linesWithTotals.length },
     });
 
+    // Same known gap as submitRequisition above: revising and
+    // resubmitting also takes a requisition live without passing through
+    // the review step's duplicate-warning panel. Trace it rather than
+    // skip it silently or block a path that was never built to ask.
+    const catalogItemIds = [...new Set(validLines.map((l) => l.catalogItemId).filter((id): id is string => !!id))];
+    if (catalogItemIds.length > 0) {
+      const possibleDuplicates = await findPossibleDuplicates(tx, { catalogItemIds, excludeRequisitionId: existing.id });
+      if (possibleDuplicates.length > 0) {
+        await logAction(tx, {
+          tenantId: tenant.id,
+          actorUserId: user.id,
+          action: "requisition.submitted_with_unacknowledged_duplicates",
+          entityType: "purchase_requisition",
+          entityId: existing.id,
+          metadata: { duplicateRequisitionIds: possibleDuplicates.map((d) => d.requisitionId) },
+        });
+      }
+    }
+
     // Runs a fresh approval resolution rather than trying to carry
     // forward whichever prior decisions are still "valid" — §04 says
     // unaffected approvers' decisions should stand, but doing that
@@ -219,8 +337,8 @@ export async function reviseAndResubmitRequisition(input: {
 }
 
 export type ExtractedRequisitionDraft = {
-  lines: LineInput[];
-  vendorName: string | null;
+  lines: (LineInput & { matchesExistingLineIndex: number | null })[];
+  documentMeta: ExtractedDocumentMeta;
   sourceDocumentKey: string;
   error?: string;
 };
@@ -247,36 +365,254 @@ export async function getRequisitionDocumentUploadUrl(input: {
 /**
  * Step 2: after the browser has PUT the file directly to R2 (see
  * getRequisitionDocumentUploadUrl above), reads it back server-side and
- * attempts to extract line items. Always returns the key (so it can
- * still be attached to the requisition even when extraction fails or
- * isn't configured) plus whatever lines were extracted — empty when
- * extraction isn't available, with `error` explaining why. The caller
- * shows the extracted lines pre-filled into the same editable table
- * manual entry uses; nothing here submits a requisition.
+ * attempts to extract line items plus vendor/document/tax detail. Always
+ * returns the key (so it can still be attached to the requisition even
+ * when extraction fails or isn't configured) plus whatever lines were
+ * extracted — empty when extraction isn't available, with `error`
+ * explaining why. The caller shows the extracted lines pre-filled into
+ * the same editable table manual entry uses; nothing here submits or
+ * persists a requisition.
+ *
+ * `existingLines`, when the caller already has some lines typed (either
+ * mid-wizard or attaching a document to an existing draft), is passed
+ * through to the extractor so it can match new lines against them by
+ * meaning rather than wording. The returned `matchesExistingLineIndex`
+ * is an index into `existingLines` as given — the caller is responsible
+ * for resolving it back against the exact same list it sent.
  */
-export async function extractRequisitionFromDocument(input: { key: string }): Promise<{ error?: string } & Partial<ExtractedRequisitionDraft>> {
+export async function extractRequisitionFromDocument(input: {
+  key: string;
+  existingLines?: { index: number; description: string }[];
+}): Promise<{ error?: string } & Partial<ExtractedRequisitionDraft>> {
   const { tenant } = await getCurrentUserAndTenant();
   if (!input.key.startsWith(`requisitions/${tenant.id}/`)) return { error: "Invalid document reference." };
 
   const { bytes, mimeType, error } = await getRequisitionDocumentBytes(input.key);
   if (error || !bytes) return { error };
 
-  const extraction = await extractLineItemsFromDocument({ bytes, mimeType: mimeType ?? "application/octet-stream" });
+  const extraction = await extractLineItemsFromDocument(
+    { bytes, mimeType: mimeType ?? "application/octet-stream" },
+    { existingLines: input.existingLines ?? [] },
+  );
 
   return {
     sourceDocumentKey: input.key,
-    vendorName: extraction.vendorName,
+    documentMeta: extraction.documentMeta,
     error: extraction.error,
     lines: extraction.lines.map((l) => ({
       catalogItemId: null,
       freeTextDescription: l.description,
       categoryId: null,
-      fulfillmentType: "goods",
+      fulfillmentType: l.fulfillmentType,
       quantity: l.quantity,
       uom: l.uom,
       estimatedUnitPrice: l.estimatedUnitPrice,
+      // A quotation/invoice states a real price, not a guess.
+      priceConfirmed: true,
+      matchesExistingLineIndex: l.matchesExistingLineIndex,
     })),
   };
+}
+
+/**
+ * What this catalog item has actually cost before, so a requester setting
+ * a price/ceiling has something to anchor it to instead of guessing blind.
+ * Thin tenant-scoped wrapper around the same query already shown to
+ * approvers (src/app/dashboard/approvals/page.tsx) — no new DB logic.
+ */
+export async function getCatalogItemPriceHistory(input: { catalogItemId: string }): Promise<ItemPurchaseHistoryEntry[]> {
+  const { tenant } = await getCurrentUserAndTenant();
+  return withTenant(tenant.id, (tx) => getItemPurchaseHistory(tx, input.catalogItemId, 3));
+}
+
+/**
+ * What's already committed for this catalogue item — on order but not
+ * yet received, plus sitting in other requisitions that haven't become a
+ * PO yet. Backs CommitmentHint, so a requester can see "12 already on
+ * order" before adding 10 more. Thin tenant-scoped wrapper, same shape as
+ * getCatalogItemPriceHistory above — no logic lives here, see
+ * db/itemCommitments.ts for the actual query and why the two figures
+ * can't be double-counted or summed across differing uoms.
+ */
+export async function getOpenCommitments(input: { catalogItemId: string }): Promise<OpenCommitments> {
+  const { tenant } = await getCurrentUserAndTenant();
+  return withTenant(tenant.id, (tx) => getOpenCommitmentsForItem(tx, input.catalogItemId));
+}
+
+/**
+ * Backs CatalogMatchHint: after someone finishes typing a free-text line
+ * description, is there a catalogue item this already is? Two-stage,
+ * following the split explained in db/catalogMatch.ts's docblock —
+ * trigram similarity cannot decide identity on its own (measured: same-
+ * item and different-item pairs overlap in score), so it's used only for
+ * cheap recall here, and an LLM (db/catalogMatchJudge.ts) makes the actual
+ * call by reading both descriptions for meaning.
+ *
+ * The judge is skipped entirely when trigram recall finds nothing — an
+ * empty candidate list can't contain a match, so there's no reason to
+ * spend an API call finding that out. When ANTHROPIC_API_KEY isn't
+ * configured, judgeCatalogMatch returns null and this returns null too:
+ * this deliberately does NOT fall back to the top trigram candidate in
+ * that case, because an un-judged trigram hit is exactly the kind of
+ * confidently-wrong suggestion the judge stage exists to filter out (see
+ * the SKF 6205/6305 example in catalogMatch.ts). No suggestion is the
+ * safe default, not "probably right".
+ */
+export async function suggestCatalogItemForLine(description: string): Promise<SimilarCatalogItem | null> {
+  const trimmed = description.trim();
+  if (trimmed.length < 3) return null;
+
+  const { tenant } = await getCurrentUserAndTenant();
+  const candidates = await withTenant(tenant.id, (tx) => findSimilarCatalogItems(tx, trimmed, 5));
+  if (candidates.length === 0) return null;
+
+  return judgeCatalogMatch(trimmed, candidates);
+}
+
+/**
+ * Short-lived preview URL for a document that isn't persisted to a
+ * requisition yet — mid-wizard, or mid-attach-flow before the user has
+ * confirmed. Once a document is persisted, callers should read
+ * `sourceDocumentKey` server-side and call getRequisitionDocumentUrl
+ * directly (as the requisitions list page already does) rather than
+ * round-tripping through this action.
+ */
+export async function getRequisitionDocumentPreviewUrl(input: { key: string }): Promise<{ url?: string; error?: string }> {
+  const { tenant } = await getCurrentUserAndTenant();
+  if (!input.key.startsWith(`requisitions/${tenant.id}/`)) return { error: "Invalid document reference." };
+  return { url: await getRequisitionDocumentUrl(input.key) };
+}
+
+/**
+ * Replaces a draft requisition's line items and recomputes its total.
+ * Draft-owner-only — a requisition that has left "draft" has no line-edit
+ * path here (revision editing after rejection goes through
+ * reviseAndResubmitRequisition instead, which also resubmits).
+ */
+export async function updateDraftLines(input: {
+  requisitionId: string;
+  lines: LineInput[];
+}): Promise<{ error?: string }> {
+  const { user, tenant } = await getCurrentUserAndTenant();
+
+  const validLines = input.lines.filter(
+    (l) => (l.catalogItemId || l.freeTextDescription?.trim()) && Number(l.quantity) > 0,
+  );
+  if (validLines.length === 0) return { error: "Add at least one line item with a quantity greater than zero." };
+
+  const linesWithTotals = validLines.map((l) => ({
+    ...l,
+    lineTotal: (Number(l.quantity) * Number(l.estimatedUnitPrice)).toFixed(2),
+  }));
+  const total = linesWithTotals.reduce((sum, l) => sum + Number(l.lineTotal), 0).toFixed(2);
+
+  await withTenant(tenant.id, async (tx) => {
+    const [existing] = await tx
+      .select()
+      .from(purchaseRequisitions)
+      .where(
+        and(
+          eq(purchaseRequisitions.id, input.requisitionId),
+          eq(purchaseRequisitions.requestorId, user.id),
+          eq(purchaseRequisitions.status, "draft"),
+        ),
+      );
+    if (!existing) return;
+
+    await tx.delete(purchaseRequisitionLines).where(eq(purchaseRequisitionLines.requisitionId, existing.id));
+    await tx.insert(purchaseRequisitionLines).values(
+      linesWithTotals.map((l) => ({
+        tenantId: tenant.id,
+        requisitionId: existing.id,
+        catalogItemId: l.catalogItemId,
+        freeTextDescription: l.freeTextDescription,
+        categoryId: l.categoryId,
+        fulfillmentType: l.fulfillmentType,
+        quantity: l.quantity,
+        uom: l.uom,
+        estimatedUnitPrice: l.estimatedUnitPrice,
+        priceConfirmed: l.priceConfirmed,
+        lineTotal: l.lineTotal,
+      })),
+    );
+    await tx.update(purchaseRequisitions).set({ totalEstimatedValue: total, updatedAt: new Date() }).where(eq(purchaseRequisitions.id, existing.id));
+
+    await logAction(tx, {
+      tenantId: tenant.id,
+      actorUserId: user.id,
+      action: "requisition.lines_updated",
+      entityType: "purchase_requisition",
+      entityId: existing.id,
+      metadata: { total, lineCount: linesWithTotals.length },
+    });
+  });
+
+  revalidatePath(`/dashboard/requisitions/${input.requisitionId}`);
+  return {};
+}
+
+/**
+ * Attaches a source document and its extracted metadata to a draft that
+ * was created without one — "the quotation will get added in time".
+ * Draft-owner-only; never lets a document attach itself once the
+ * requisition has moved past draft. Doesn't touch lines — pair with
+ * updateDraftLines when the extraction also produced lines to apply.
+ */
+export async function attachRequisitionDocument(input: {
+  requisitionId: string;
+  sourceDocumentKey: string;
+  documentMeta: ExtractedDocumentMeta;
+}): Promise<{ error?: string }> {
+  const { user, tenant } = await getCurrentUserAndTenant();
+
+  await withTenant(tenant.id, async (tx) => {
+    const [updated] = await tx
+      .update(purchaseRequisitions)
+      .set({ sourceDocumentKey: input.sourceDocumentKey, extractedDocumentMeta: input.documentMeta, updatedAt: new Date() })
+      .where(
+        and(
+          eq(purchaseRequisitions.id, input.requisitionId),
+          eq(purchaseRequisitions.requestorId, user.id),
+          eq(purchaseRequisitions.status, "draft"),
+        ),
+      )
+      .returning();
+    if (!updated) return;
+
+    await logAction(tx, {
+      tenantId: tenant.id,
+      actorUserId: user.id,
+      action: "requisition.document_attached",
+      entityType: "purchase_requisition",
+      entityId: updated.id,
+      metadata: { key: input.sourceDocumentKey },
+    });
+  });
+
+  revalidatePath(`/dashboard/requisitions/${input.requisitionId}`);
+  return {};
+}
+
+/**
+ * "Has somebody already asked for this?" — called from the form as line
+ * items change, the same way previewApprovers is, and for the same
+ * reason: this must run the exact same code createRequisition's submit-
+ * time gate re-runs, or the review step starts promising something
+ * submission doesn't check. Thin tenant-scoped wrapper, no logic of its
+ * own — see db/duplicateDetection.ts for the actual matching rule.
+ */
+export async function previewDuplicates(input: {
+  catalogItemIds: string[];
+  excludeRequisitionId: string | null;
+}): Promise<PossibleDuplicate[]> {
+  const { tenant } = await getCurrentUserAndTenant();
+
+  return withTenant(tenant.id, (tx) =>
+    findPossibleDuplicates(tx, {
+      catalogItemIds: input.catalogItemIds,
+      excludeRequisitionId: input.excludeRequisitionId,
+    }),
+  );
 }
 
 /**

@@ -74,6 +74,7 @@ export function RuleWizard({
 
   const [steps, setSteps] = useState<WizStep[]>([{ key: nextKey(), roles: [] }]);
   const [conflictChoice, setConflictChoice] = useState<"replace" | "alongside" | null>(null);
+  const [ruleType, setRuleType] = useState<"requires_approval" | "auto_approve">("requires_approval");
 
   const scope = { categoryId: categoryId || null, departmentId: departmentId || null, costCenterId: costCenterId || null, minValue, maxValue: maxValue || null, currency: "INR" };
 
@@ -94,7 +95,11 @@ export function RuleWizard({
   }, [categoryId, departmentId, costCenterId, minValue, maxValue, existingRules]);
 
   const hasConflicts = conflicts.length > 0;
-  const combinationMode: "additive" | "exclusive" = hasConflicts && conflictChoice === "replace" ? "exclusive" : "additive";
+  // Auto-approve is always exclusive — combined additively with another
+  // rule's approvers it would contradict its own "no review needed"
+  // outcome, so there's no choice to offer here.
+  const combinationMode: "additive" | "exclusive" =
+    ruleType === "auto_approve" ? "exclusive" : hasConflicts && conflictChoice === "replace" ? "exclusive" : "additive";
   const priority = combinationMode === "exclusive" ? Math.max(0, ...conflicts.map((c) => c.priority)) + 1 : 0;
 
   function resetWizard() {
@@ -107,6 +112,7 @@ export function RuleWizard({
     setMaxValue("");
     setSteps([{ key: nextKey(), roles: [] }]);
     setConflictChoice(null);
+    setRuleType("requires_approval");
     setError(null);
   }
 
@@ -136,13 +142,18 @@ export function RuleWizard({
   // Every step present must have at least one role — an empty step
   // used to pass validation silently (steps.some, not steps.every) and
   // get dropped at save time with no indication anything was lost.
-  const step2Valid = steps.length > 0 && steps.every((s) => s.roles.length > 0);
+  // Auto-approve rules bypass this by deliberate choice, not by leaving
+  // steps empty by omission.
+  const step2Valid = ruleType === "auto_approve" || (steps.length > 0 && steps.every((s) => s.roles.length > 0));
   const step3Valid = !hasConflicts || conflictChoice !== null;
 
   async function handleSave() {
     setSaving(true);
     setError(null);
-    const payload: WizardStepInput[] = steps.filter((s) => s.roles.length > 0).map((s) => s.roles.map((r) => ({ approverRoleId: r.approverRoleId, minApprovalsInGroup: r.minApprovalsInGroup })));
+    const payload: WizardStepInput[] =
+      ruleType === "auto_approve"
+        ? []
+        : steps.filter((s) => s.roles.length > 0).map((s) => s.roles.map((r) => ({ approverRoleId: r.approverRoleId, minApprovalsInGroup: r.minApprovalsInGroup })));
     const result = await createRuleWithRequirements({
       name,
       categoryId: scope.categoryId,
@@ -153,6 +164,7 @@ export function RuleWizard({
       combinationMode,
       priority,
       steps: payload,
+      ruleType,
     });
     setSaving(false);
     if (result.error) {
@@ -243,68 +255,92 @@ export function RuleWizard({
       {wizStep === 2 && (
         <div className="flex flex-col gap-3">
           <div>
-            <p className="text-sm font-medium">Who needs to approve, and in what order?</p>
-            <p className="text-xs text-muted-foreground">Each step must clear before the next one starts.</p>
+            <p className="text-sm font-medium">Does this need approval?</p>
+            <p className="text-xs text-muted-foreground">Most rules route to someone — but a low-value, routine purchase can skip review entirely.</p>
           </div>
-          {steps.map((s, i) => (
-            <div key={s.key} className="rounded-md border p-3">
-              <div className="mb-2 flex items-center justify-between">
-                <p className="font-mono text-[10px] font-bold uppercase tracking-wide" style={{ color: "var(--primary)" }}>Step {i + 1}</p>
-                {steps.length > 1 && (
-                  <button type="button" onClick={() => removeStep(s.key)} className="text-xs text-muted-foreground hover:text-destructive">
-                    Remove step
-                  </button>
-                )}
-              </div>
-              <div className="flex flex-wrap items-center gap-2">
-                {s.roles.map((r) => (
-                  <span key={r.key} className="inline-flex items-center gap-2 rounded-full px-2.5 py-1 text-xs" style={{ background: "var(--accent)" }}>
-                    <select
-                      value={r.approverRoleId}
-                      onChange={(e) => setRoleField(s.key, r.key, "approverRoleId", e.target.value)}
-                      className="bg-transparent text-xs font-medium"
-                    >
-                      {roles.map((role) => (
-                        <option key={role.id} value={role.id}>{role.displayName}</option>
-                      ))}
-                    </select>
-                    <button type="button" onClick={() => removeRole(s.key, r.key)} className="text-muted-foreground hover:text-foreground" aria-label="Remove role">
-                      ×
-                    </button>
-                  </span>
-                ))}
-                <button type="button" onClick={() => addRoleToStep(s.key)} className="rounded-md border border-dashed px-2 py-1 text-xs text-muted-foreground">
-                  + Add another role to this step
-                </button>
-              </div>
-              {s.roles.length === 0 && (
-                <p className="mt-2 text-xs text-destructive">Add a role to this step, or remove it — an empty step can&apos;t be saved.</p>
-              )}
-              {s.roles.length > 0 && (
-                <details className="mt-2 text-xs text-muted-foreground">
-                  <summary className="cursor-pointer">Advanced: require more than one approver for a role</summary>
-                  <div className="mt-2 flex flex-col gap-1.5">
-                    {s.roles.map((r) => (
-                      <label key={r.key} className="flex items-center gap-2">
-                        {roles.find((role) => role.id === r.approverRoleId)?.displayName}: require
-                        <input
-                          type="number"
-                          min="1"
-                          value={r.minApprovalsInGroup}
-                          onChange={(e) => setRoleField(s.key, r.key, "minApprovalsInGroup", e.target.value)}
-                          className="h-6 w-14 rounded-md border px-1.5 text-xs"
-                        />
-                        approver(s)
-                      </label>
-                    ))}
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              onClick={() => setRuleType("requires_approval")}
+              className="rounded-md border p-3 text-left"
+              style={{ background: "var(--card)", borderColor: ruleType === "requires_approval" ? "var(--primary)" : "var(--border)" }}
+            >
+              <p className="text-sm font-medium">Requires approval</p>
+              <p className="text-xs text-muted-foreground">Route to specific roles, in one or more steps.</p>
+            </button>
+            <button
+              type="button"
+              onClick={() => setRuleType("auto_approve")}
+              className="rounded-md border p-3 text-left"
+              style={{ background: "var(--card)", borderColor: ruleType === "auto_approve" ? "var(--primary)" : "var(--border)" }}
+            >
+              <p className="text-sm font-medium">Auto-approve, no review needed</p>
+              <p className="text-xs text-muted-foreground">Submitting approves it immediately and it goes straight to sourcing.</p>
+            </button>
+          </div>
+          {ruleType === "requires_approval" && (
+            <>
+              {steps.map((s, i) => (
+                <div key={s.key} className="rounded-md border p-3">
+                  <div className="mb-2 flex items-center justify-between">
+                    <p className="font-mono text-[10px] font-bold uppercase tracking-wide" style={{ color: "var(--primary)" }}>Step {i + 1}</p>
+                    {steps.length > 1 && (
+                      <button type="button" onClick={() => removeStep(s.key)} className="text-xs text-muted-foreground hover:text-destructive">
+                        Remove step
+                      </button>
+                    )}
                   </div>
-                </details>
-              )}
-            </div>
-          ))}
-          <button type="button" onClick={addStep} className="w-fit rounded-md border border-dashed px-3 py-1.5 text-xs text-muted-foreground">
-            + Add another step
-          </button>
+                  <div className="flex flex-wrap items-center gap-2">
+                    {s.roles.map((r) => (
+                      <span key={r.key} className="inline-flex items-center gap-2 rounded-full px-2.5 py-1 text-xs" style={{ background: "var(--accent)" }}>
+                        <select
+                          value={r.approverRoleId}
+                          onChange={(e) => setRoleField(s.key, r.key, "approverRoleId", e.target.value)}
+                          className="bg-transparent text-xs font-medium"
+                        >
+                          {roles.map((role) => (
+                            <option key={role.id} value={role.id}>{role.displayName}</option>
+                          ))}
+                        </select>
+                        <button type="button" onClick={() => removeRole(s.key, r.key)} className="text-muted-foreground hover:text-foreground" aria-label="Remove role">
+                          ×
+                        </button>
+                      </span>
+                    ))}
+                    <button type="button" onClick={() => addRoleToStep(s.key)} className="rounded-md border border-dashed px-2 py-1 text-xs text-muted-foreground">
+                      + Add another role to this step
+                    </button>
+                  </div>
+                  {s.roles.length === 0 && (
+                    <p className="mt-2 text-xs text-destructive">Add a role to this step, or remove it — an empty step can&apos;t be saved.</p>
+                  )}
+                  {s.roles.length > 0 && (
+                    <details className="mt-2 text-xs text-muted-foreground">
+                      <summary className="cursor-pointer">Advanced: require more than one approver for a role</summary>
+                      <div className="mt-2 flex flex-col gap-1.5">
+                        {s.roles.map((r) => (
+                          <label key={r.key} className="flex items-center gap-2">
+                            {roles.find((role) => role.id === r.approverRoleId)?.displayName}: require
+                            <input
+                              type="number"
+                              min="1"
+                              value={r.minApprovalsInGroup}
+                              onChange={(e) => setRoleField(s.key, r.key, "minApprovalsInGroup", e.target.value)}
+                              className="h-6 w-14 rounded-md border px-1.5 text-xs"
+                            />
+                            approver(s)
+                          </label>
+                        ))}
+                      </div>
+                    </details>
+                  )}
+                </div>
+              ))}
+              <button type="button" onClick={addStep} className="w-fit rounded-md border border-dashed px-3 py-1.5 text-xs text-muted-foreground">
+                + Add another step
+              </button>
+            </>
+          )}
         </div>
       )}
 
@@ -329,7 +365,7 @@ export function RuleWizard({
                   </div>
                 );
               })}
-              <div className="grid grid-cols-2 gap-2">
+              <div className={cn("grid gap-2", ruleType === "auto_approve" ? "grid-cols-1" : "grid-cols-2")}>
                 <button
                   type="button"
                   onClick={() => setConflictChoice("replace")}
@@ -339,16 +375,24 @@ export function RuleWizard({
                   <p className="text-sm font-medium">Replace it for this range</p>
                   <p className="text-xs text-muted-foreground">Only this new rule applies here — the older rule steps aside for this range.</p>
                 </button>
-                <button
-                  type="button"
-                  onClick={() => setConflictChoice("alongside")}
-                  className="rounded-md border p-3 text-left"
-                  style={{ background: "var(--card)", borderColor: conflictChoice === "alongside" ? "var(--primary)" : "var(--border)" }}
-                >
-                  <p className="text-sm font-medium">Apply alongside it</p>
-                  <p className="text-xs text-muted-foreground">Both rules apply — this purchase needs every approval either rule asks for.</p>
-                </button>
+                {ruleType === "requires_approval" && (
+                  <button
+                    type="button"
+                    onClick={() => setConflictChoice("alongside")}
+                    className="rounded-md border p-3 text-left"
+                    style={{ background: "var(--card)", borderColor: conflictChoice === "alongside" ? "var(--primary)" : "var(--border)" }}
+                  >
+                    <p className="text-sm font-medium">Apply alongside it</p>
+                    <p className="text-xs text-muted-foreground">Both rules apply — this purchase needs every approval either rule asks for.</p>
+                  </button>
+                )}
               </div>
+              {ruleType === "auto_approve" && (
+                <p className="text-xs text-muted-foreground">
+                  Auto-approve can only replace an overlapping rule, not apply alongside it — combining
+                  &quot;no review needed&quot; with another rule&apos;s approvers would contradict itself.
+                </p>
+              )}
             </div>
           )}
         </div>
@@ -362,12 +406,16 @@ export function RuleWizard({
               {describeScope(scope, categories, departments, costCenters)}:
             </p>
             <div className="mt-2.5 flex flex-col gap-1.5 border-t pt-2.5">
-              {activeSteps.map((s, i) => (
-                <p key={s.key} className="text-sm">
-                  <span className="mr-1.5 rounded px-1.5 py-0.5 font-mono text-[10px] font-bold" style={{ background: "var(--accent)", color: "var(--primary)" }}>STEP {i + 1}</span>
-                  {describeSteps(s.roles.map((r) => ({ groupNo: 1, approverRoleId: r.approverRoleId, minApprovalsInGroup: r.minApprovalsInGroup })), roles)}
-                </p>
-              ))}
+              {ruleType === "auto_approve" ? (
+                <p className="text-sm">Auto-approve — no review needed. Submitting goes straight to sourcing.</p>
+              ) : (
+                activeSteps.map((s, i) => (
+                  <p key={s.key} className="text-sm">
+                    <span className="mr-1.5 rounded px-1.5 py-0.5 font-mono text-[10px] font-bold" style={{ background: "var(--accent)", color: "var(--primary)" }}>STEP {i + 1}</span>
+                    {describeSteps(s.roles.map((r) => ({ groupNo: 1, approverRoleId: r.approverRoleId, minApprovalsInGroup: r.minApprovalsInGroup })), roles)}
+                  </p>
+                ))
+              )}
             </div>
             {hasConflicts && (
               <p className="mt-2.5 border-t pt-2.5 text-xs text-muted-foreground">
@@ -376,7 +424,10 @@ export function RuleWizard({
             )}
           </div>
           <p className="text-xs text-muted-foreground">
-            Preview: <Badge variant="neutral">{reviewRequirements.length} approval{reviewRequirements.length === 1 ? "" : "s"} required</Badge>
+            Preview:{" "}
+            <Badge variant="neutral">
+              {ruleType === "auto_approve" ? "Auto-approved" : `${reviewRequirements.length} approval${reviewRequirements.length === 1 ? "" : "s"} required`}
+            </Badge>
           </p>
         </div>
       )}

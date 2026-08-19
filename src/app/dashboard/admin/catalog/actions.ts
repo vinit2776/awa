@@ -1,11 +1,11 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { sql } from "drizzle-orm";
 import { getCurrentUserAndTenant } from "@/db/session";
 import { requireTenantAdmin } from "@/db/permissions";
 import { withTenant } from "@/db/withTenant";
 import { logAction } from "@/db/audit";
+import { findSimilarCatalogItems } from "@/db/catalogMatch";
 import { catalogCategories, catalogItems } from "@/db/schema";
 
 export async function createCategory(formData: FormData) {
@@ -60,25 +60,10 @@ export async function createItem(formData: FormData) {
 }
 
 // Informational "did you mean…" hint only (§07) — no merge/dedup action
-// yet, that's a later phase. Uses the pg_trgm gin index on catalog_items.name.
+// yet, that's a later phase. Uses the pg_trgm gin index on catalog_items.name,
+// via the shared lookup in db/catalogMatch.ts (also used by the requester-
+// facing CatalogMatchHint suggestion on requisition lines).
 export async function searchSimilarItems(query: string) {
-  const trimmed = query.trim();
-  if (trimmed.length < 2) return [];
-
   const { tenant } = await getCurrentUserAndTenant();
-
-  return withTenant(tenant.id, async (tx) => {
-    const rows = await tx
-      .select({
-        id: catalogItems.id,
-        name: catalogItems.name,
-        status: catalogItems.status,
-        similarity: sql<number>`similarity(${catalogItems.name}, ${trimmed})`,
-      })
-      .from(catalogItems)
-      .where(sql`${catalogItems.name} % ${trimmed}`)
-      .orderBy(sql`similarity(${catalogItems.name}, ${trimmed}) desc`)
-      .limit(5);
-    return rows;
-  });
+  return withTenant(tenant.id, (tx) => findSimilarCatalogItems(tx, query, 5));
 }

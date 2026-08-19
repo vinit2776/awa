@@ -180,3 +180,112 @@ export async function issuePurchaseOrder(
 
   return { poId: po.id };
 }
+
+/**
+ * Issues a PO straight from an approved requisition — no RFQ, no
+ * quotation — for a simple purchase where the vendor and price are
+ * already settled. Skips prorateLinesToTotal entirely: with no separate
+ * quotation total to distribute across lines, each line's own confirmed
+ * price (from `linePrices`, defaulting to the requisition's own estimate
+ * for any line not explicitly priced) *is* the issued price, not a share
+ * of something else.
+ */
+export async function issuePurchaseOrderDirect(
+  tx: typeof db,
+  tenantId: string,
+  actorUserId: string,
+  requisitionId: string,
+  vendorId: string,
+  linePrices: { lineId: string; unitPrice: string }[],
+): Promise<{ error?: string; poId?: string }> {
+  const [requisition] = await tx
+    .select()
+    .from(purchaseRequisitions)
+    .where(and(eq(purchaseRequisitions.id, requisitionId), eq(purchaseRequisitions.status, "approved")));
+  if (!requisition) return { error: "This requisition isn't approved and ready for sourcing." };
+
+  const [vendor] = await tx.select().from(vendors).where(and(eq(vendors.id, vendorId), eq(vendors.status, "active")));
+  if (!vendor) return { error: "That vendor isn't available to order from." };
+
+  const requisitionLines = await tx
+    .select()
+    .from(purchaseRequisitionLines)
+    .where(eq(purchaseRequisitionLines.requisitionId, requisitionId));
+  if (requisitionLines.length === 0) return { error: "This requisition has no lines to issue a PO for." };
+
+  const priceByLineId = new Map(linePrices.map((l) => [l.lineId, l.unitPrice]));
+  const lines = requisitionLines.map((l) => {
+    const issuedUnitPrice = Number(priceByLineId.get(l.id) ?? l.estimatedUnitPrice).toFixed(2);
+    const issuedLineTotal = (Number(issuedUnitPrice) * Number(l.quantity)).toFixed(2);
+    return { ...l, issuedUnitPrice, issuedLineTotal };
+  });
+  const totalAmount = lines.reduce((sum, l) => sum + Number(l.issuedLineTotal), 0).toFixed(2);
+
+  const [{ value: existingCount }] = await tx
+    .select({ value: count() })
+    .from(purchaseOrders)
+    .where(eq(purchaseOrders.tenantId, tenantId));
+  const poNumber = `PO-${new Date().getFullYear()}-${String(existingCount + 1).padStart(4, "0")}`;
+  const qrToken = randomBytes(16).toString("hex");
+
+  const canonicalContent = JSON.stringify({
+    poNumber,
+    requisitionId,
+    vendorId,
+    totalAmount,
+    currency: requisition.currency,
+    lines: lines
+      .map((l) => ({ itemId: l.catalogItemId, service: l.freeTextDescription, qty: l.quantity, unitPrice: l.issuedUnitPrice }))
+      .sort((a, b) => (a.itemId ?? a.service ?? "").localeCompare(b.itemId ?? b.service ?? "")),
+  });
+  const documentHash = createHash("sha256").update(canonicalContent).digest("hex");
+
+  const [po] = await tx
+    .insert(purchaseOrders)
+    .values({
+      tenantId,
+      requisitionId,
+      vendorId,
+      poNumber,
+      status: "issued",
+      totalAmount,
+      currency: requisition.currency,
+      documentHash,
+      qrToken,
+      signedBy: actorUserId,
+      signedAt: new Date(),
+    })
+    .returning();
+
+  await tx.insert(purchaseOrderLines).values(
+    lines.map((l) => ({
+      tenantId,
+      poId: po.id,
+      requisitionLineId: l.id,
+      fulfillmentType: l.fulfillmentType,
+      itemId: l.catalogItemId,
+      serviceDescription: l.freeTextDescription,
+      quantity: l.quantity,
+      uom: l.uom,
+      unitPrice: l.issuedUnitPrice,
+      lineTotal: l.issuedLineTotal,
+      status: "issued" as const,
+    })),
+  );
+
+  await tx.update(purchaseRequisitions).set({ status: "converted_to_po" }).where(eq(purchaseRequisitions.id, requisitionId));
+
+  await logAction(tx, {
+    tenantId,
+    actorUserId,
+    action: "purchase_order.issued_direct",
+    entityType: "purchase_order",
+    entityId: po.id,
+    metadata: { poNumber, vendorId, totalAmount },
+  });
+
+  const [contact] = await tx.select().from(vendorUsers).where(eq(vendorUsers.vendorId, vendorId)).limit(1);
+  await notifyVendor(contact?.email ?? null, `Purchase order ${poNumber} from ${vendor.name}`, `PO ${poNumber} has been issued. Total: ${totalAmount} ${requisition.currency}.`);
+
+  return { poId: po.id };
+}

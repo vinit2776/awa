@@ -96,6 +96,7 @@ export default async function EditRequisitionPage({ params }: { params: Promise<
               quantity: l.quantity,
               uom: l.uom,
               estimatedUnitPrice: l.estimatedUnitPrice,
+              priceConfirmed: l.priceConfirmed,
             })),
           },
         }}
