@@ -5,7 +5,7 @@ import { and, eq } from "drizzle-orm";
 import { getCurrentUserAndTenant } from "@/db/session";
 import { withTenant } from "@/db/withTenant";
 import { logAction } from "@/db/audit";
-import { issuePurchaseOrder } from "@/db/po";
+import { issuePurchaseOrder, issuePurchaseOrderDirect } from "@/db/po";
 import { rfqs, rfqVendorInvitations, vendorQuotations } from "@/db/schema";
 
 export async function createRfq(formData: FormData) {
@@ -90,6 +90,33 @@ export async function selectQuotationAndIssuePo(formData: FormData) {
   const { user, tenant } = await getCurrentUserAndTenant();
 
   await withTenant(tenant.id, (tx) => issuePurchaseOrder(tx, tenant.id, user.id, requisitionId, vendorId, quotationId));
+
+  revalidatePath(`/dashboard/sourcing/${requisitionId}`);
+  revalidatePath("/dashboard/sourcing");
+}
+
+/**
+ * Skips the RFQ/quotation process entirely — for a simple purchase where
+ * the vendor and price are already settled. Each requisition line's
+ * confirmed price arrives as a `price_<lineId>` field (one per line, laid
+ * out by the form) rather than a fixed set of named fields, since the
+ * number of lines varies per requisition.
+ */
+export async function issuePoDirectly(formData: FormData) {
+  const requisitionId = String(formData.get("requisitionId") ?? "");
+  const vendorId = String(formData.get("vendorId") ?? "");
+  if (!requisitionId || !vendorId) return;
+
+  const linePrices: { lineId: string; unitPrice: string }[] = [];
+  for (const [key, value] of formData.entries()) {
+    if (key.startsWith("price_")) {
+      linePrices.push({ lineId: key.slice("price_".length), unitPrice: String(value) });
+    }
+  }
+
+  const { user, tenant } = await getCurrentUserAndTenant();
+
+  await withTenant(tenant.id, (tx) => issuePurchaseOrderDirect(tx, tenant.id, user.id, requisitionId, vendorId, linePrices));
 
   revalidatePath(`/dashboard/sourcing/${requisitionId}`);
   revalidatePath("/dashboard/sourcing");

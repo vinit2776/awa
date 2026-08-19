@@ -18,7 +18,7 @@ import { cn } from "@/lib/utils";
 import { computeStage } from "@/lib/lifecycle";
 import { LifecycleStatus } from "@/components/ui/lifecycle-status";
 import { LifecycleRail } from "@/components/ui/lifecycle-rail";
-import { createRfq, inviteVendor, submitQuotation, selectQuotationAndIssuePo } from "./actions";
+import { createRfq, inviteVendor, submitQuotation, selectQuotationAndIssuePo, issuePoDirectly } from "./actions";
 
 export default async function SourcingDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -48,7 +48,8 @@ export default async function SourcingDetailPage({ params }: { params: Promise<{
   const stage = computeStage(requisition, rfq ? [rfq] : [], po ?? undefined, undefined, undefined);
   const vendorName = (vendorId: string) => vendors.find((v) => v.id === vendorId)?.name ?? "—";
   const invitedVendorIds = new Set(invitations.map((i) => i.vendorId));
-  const uninvitedVendors = vendors.filter((v) => v.status === "active" && !invitedVendorIds.has(v.id));
+  const activeVendors = vendors.filter((v) => v.status === "active");
+  const uninvitedVendors = activeVendors.filter((v) => !invitedVendorIds.has(v.id));
 
   return (
     <div className="flex flex-col gap-8 p-8">
@@ -119,73 +120,124 @@ export default async function SourcingDetailPage({ params }: { params: Promise<{
             </a>
           </div>
         </section>
-      ) : !rfq ? (
-        <form action={createRfq}>
-          <input type="hidden" name="requisitionId" value={requisition.id} />
-          <button type="submit" className={cn(buttonVariants())}>Create RFQ</button>
-        </form>
       ) : (
-        <section className="flex flex-col gap-6">
-          <div className="flex flex-col gap-3">
-            <h2 className="text-sm font-medium text-muted-foreground">Invited vendors</h2>
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b text-left text-xs text-muted-foreground">
-                  <th className="py-2 font-normal">Vendor</th>
-                  <th className="py-2 font-normal">Status</th>
-                  <th className="py-2 font-normal">Quotation</th>
-                  <th></th>
-                </tr>
-              </thead>
-              <tbody>
-                {invitations.map((inv) => {
-                  const quotation = quotations.find((q) => q.vendorId === inv.vendorId && q.status !== "rejected");
-                  return (
-                    <tr key={inv.id} className="border-b align-top">
-                      <td className="py-2">{vendorName(inv.vendorId)}</td>
-                      <td className="py-2">{inv.status}</td>
-                      <td className="py-2">
-                        {quotation ? (
-                          `${quotation.totalAmount} ${quotation.currency}${quotation.status === "selected" ? " (selected)" : ""}`
-                        ) : (
-                          <form action={submitQuotation} className="flex items-end gap-1">
-                            <input type="hidden" name="rfqId" value={rfq.id} />
-                            <input type="hidden" name="vendorId" value={inv.vendorId} />
-                            <input type="hidden" name="requisitionId" value={requisition.id} />
-                            <input name="totalAmount" type="number" step="0.01" placeholder="Amount" className="h-7 w-24 rounded-md border px-1.5 text-xs" />
-                            <input name="validUntil" type="date" className="h-7 rounded-md border px-1.5 text-xs" />
-                            <button type="submit" className={cn(buttonVariants({ variant: "outline", size: "sm" }))}>Record quote</button>
-                          </form>
-                        )}
-                      </td>
-                      <td className="py-2">
-                        {quotation && quotation.status === "submitted" && (
-                          <form action={selectQuotationAndIssuePo}>
-                            <input type="hidden" name="requisitionId" value={requisition.id} />
-                            <input type="hidden" name="vendorId" value={inv.vendorId} />
-                            <input type="hidden" name="quotationId" value={quotation.id} />
-                            <button type="submit" className={cn(buttonVariants({ size: "sm" }))}>Select &amp; issue PO</button>
-                          </form>
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-
-            <form action={inviteVendor} className="flex items-end gap-2">
-              <input type="hidden" name="rfqId" value={rfq.id} />
+        <>
+          {!rfq ? (
+            <form action={createRfq}>
               <input type="hidden" name="requisitionId" value={requisition.id} />
-              <select name="vendorId" required className="h-8 rounded-md border px-2 text-sm">
-                {uninvitedVendors.map((v) => (
+              <button type="submit" className={cn(buttonVariants())}>Create RFQ</button>
+            </form>
+          ) : (
+            <section className="flex flex-col gap-6">
+              <div className="flex flex-col gap-3">
+                <h2 className="text-sm font-medium text-muted-foreground">Invited vendors</h2>
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b text-left text-xs text-muted-foreground">
+                      <th className="py-2 font-normal">Vendor</th>
+                      <th className="py-2 font-normal">Status</th>
+                      <th className="py-2 font-normal">Quotation</th>
+                      <th></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {invitations.map((inv) => {
+                      const quotation = quotations.find((q) => q.vendorId === inv.vendorId && q.status !== "rejected");
+                      return (
+                        <tr key={inv.id} className="border-b align-top">
+                          <td className="py-2">{vendorName(inv.vendorId)}</td>
+                          <td className="py-2">{inv.status}</td>
+                          <td className="py-2">
+                            {quotation ? (
+                              `${quotation.totalAmount} ${quotation.currency}${quotation.status === "selected" ? " (selected)" : ""}`
+                            ) : (
+                              <form action={submitQuotation} className="flex items-end gap-1">
+                                <input type="hidden" name="rfqId" value={rfq.id} />
+                                <input type="hidden" name="vendorId" value={inv.vendorId} />
+                                <input type="hidden" name="requisitionId" value={requisition.id} />
+                                <input name="totalAmount" type="number" step="0.01" placeholder="Amount" className="h-7 w-24 rounded-md border px-1.5 text-xs" />
+                                <input name="validUntil" type="date" className="h-7 rounded-md border px-1.5 text-xs" />
+                                <button type="submit" className={cn(buttonVariants({ variant: "outline", size: "sm" }))}>Record quote</button>
+                              </form>
+                            )}
+                          </td>
+                          <td className="py-2">
+                            {quotation && quotation.status === "submitted" && (
+                              <form action={selectQuotationAndIssuePo}>
+                                <input type="hidden" name="requisitionId" value={requisition.id} />
+                                <input type="hidden" name="vendorId" value={inv.vendorId} />
+                                <input type="hidden" name="quotationId" value={quotation.id} />
+                                <button type="submit" className={cn(buttonVariants({ size: "sm" }))}>Select &amp; issue PO</button>
+                              </form>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+
+                <form action={inviteVendor} className="flex items-end gap-2">
+                  <input type="hidden" name="rfqId" value={rfq.id} />
+                  <input type="hidden" name="requisitionId" value={requisition.id} />
+                  <select name="vendorId" required className="h-8 rounded-md border px-2 text-sm">
+                    {uninvitedVendors.map((v) => (
+                      <option key={v.id} value={v.id}>{v.name}</option>
+                    ))}
+                  </select>
+                  <button type="submit" className={cn(buttonVariants({ variant: "outline" }))}>Invite vendor</button>
+                </form>
+              </div>
+            </section>
+          )}
+
+          <section className="flex flex-col gap-3 rounded-md border p-4">
+            <div>
+              <h2 className="text-sm font-medium">Issue PO directly</h2>
+              <p className="text-xs text-muted-foreground">
+                Skip inviting vendors to quote — use this when the vendor and price are already settled.
+              </p>
+            </div>
+            <form action={issuePoDirectly} className="flex flex-col gap-3">
+              <input type="hidden" name="requisitionId" value={requisition.id} />
+              <select name="vendorId" required className="h-8 w-fit rounded-md border px-2 text-sm">
+                <option value="">Select vendor…</option>
+                {activeVendors.map((v) => (
                   <option key={v.id} value={v.id}>{v.name}</option>
                 ))}
               </select>
-              <button type="submit" className={cn(buttonVariants({ variant: "outline" }))}>Invite vendor</button>
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b text-left text-xs text-muted-foreground">
+                    <th className="py-2 font-normal">Item</th>
+                    <th className="py-2 font-normal">Qty</th>
+                    <th className="py-2 font-normal">Confirmed price</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {lines.map((l) => (
+                    <tr key={l.id} className="border-b">
+                      <td className="py-2">{l.freeTextDescription ?? "Catalog item"}</td>
+                      <td className="py-2">{l.quantity} {l.uom}</td>
+                      <td className="py-2">
+                        <input
+                          name={`price_${l.id}`}
+                          type="number"
+                          step="0.01"
+                          defaultValue={l.estimatedUnitPrice}
+                          className="h-8 w-24 rounded-md border px-2 text-sm"
+                        />
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              <button type="submit" className={cn(buttonVariants({ variant: "outline" }), "w-fit")}>
+                Issue PO directly
+              </button>
             </form>
-          </div>
-        </section>
+          </section>
+        </>
       )}
 
       <Link href="/dashboard/sourcing" className="text-xs text-muted-foreground hover:text-foreground w-fit">

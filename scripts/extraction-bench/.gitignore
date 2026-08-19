@@ -1,0 +1,4 @@
+node_modules/
+.env
+sample-docs/*
+!sample-docs/.gitkeep

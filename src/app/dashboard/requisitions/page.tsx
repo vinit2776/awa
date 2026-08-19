@@ -192,9 +192,14 @@ export default async function RequisitionsPage({
                 : `Every requisition in ${tenant.name}, wherever it currently is.`}
             </p>
           </div>
-          <Link href="/dashboard/requisitions/new" className={cn(buttonVariants())}>
-            New requisition
-          </Link>
+          <div className="flex shrink-0 gap-2">
+            <Link href="/dashboard/requisitions/quick" className={cn(buttonVariants({ variant: "outline" }))}>
+              Quick purchase
+            </Link>
+            <Link href="/dashboard/requisitions/new" className={cn(buttonVariants())}>
+              New requisition
+            </Link>
+          </div>
         </div>
       </div>
 
