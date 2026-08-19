@@ -1,10 +1,11 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { Fragment, useMemo, useState } from "react";
 import { Term } from "@/components/ui/help";
 import { SearchableSelect } from "@/components/ui/combobox";
 import { PriceHistoryHint } from "./PriceHistoryHint";
 import { CatalogMatchHint } from "./CatalogMatchHint";
+import { CommitmentHint } from "./CommitmentHint";
 import type { Line, Category, CatalogItem } from "./types";
 
 export function LineItemsTable({
@@ -65,28 +66,28 @@ export function LineItemsTable({
               categoryId: item.categoryId,
             });
           return (
-            <tr key={line.key} className="border-b align-top">
-              <td className="py-2 pr-2">
-                {showPicker ? (
-                  <>
-                    <SearchableSelect
-                      options={catalogOptions}
-                      value={line.catalogItemId ?? ""}
-                      onChange={(id) => {
-                        const item = catalogItems.find((i) => i.id === id);
-                        updateLine(line.key, {
-                          catalogItemId: id || null,
-                          freeTextDescription: id ? null : line.freeTextDescription,
-                          uom: item?.uom ?? line.uom,
-                          categoryId: item?.categoryId ?? line.categoryId,
-                        });
-                      }}
-                      placeholder="Search catalog…"
-                      emptyOptionLabel="— custom item —"
-                      className="w-40"
-                    />
-                    {!line.catalogItemId && (
-                      <>
+            <Fragment key={line.key}>
+              <tr className="align-top">
+                <td className="py-2 pr-2">
+                  {showPicker ? (
+                    <>
+                      <SearchableSelect
+                        options={catalogOptions}
+                        value={line.catalogItemId ?? ""}
+                        onChange={(id) => {
+                          const item = catalogItems.find((i) => i.id === id);
+                          updateLine(line.key, {
+                            catalogItemId: id || null,
+                            freeTextDescription: id ? null : line.freeTextDescription,
+                            uom: item?.uom ?? line.uom,
+                            categoryId: item?.categoryId ?? line.categoryId,
+                          });
+                        }}
+                        placeholder="Search catalog…"
+                        emptyOptionLabel="— custom item —"
+                        className="w-40"
+                      />
+                      {!line.catalogItemId && (
                         <input
                           value={line.freeTextDescription ?? ""}
                           onChange={(e) => updateLine(line.key, { freeTextDescription: e.target.value })}
@@ -94,32 +95,110 @@ export function LineItemsTable({
                           placeholder="Describe the item"
                           className="mt-1 h-8 w-40 rounded-md border px-2 text-sm"
                         />
-                        <CatalogMatchHint
-                          description={line.freeTextDescription}
-                          catalogItemId={line.catalogItemId}
-                          dismissed={line.catalogMatchDismissed}
-                          checkSignal={catalogCheckSignals[line.key] ?? 0}
-                          onDismiss={() => updateLine(line.key, { catalogMatchDismissed: true })}
-                          onAccept={acceptCatalogMatch}
-                        />
-                      </>
-                    )}
-                  </>
-                ) : (
-                  <div className="flex flex-col items-start gap-0.5">
+                      )}
+                    </>
+                  ) : (
+                    <div className="flex flex-col items-start gap-0.5">
+                      <input
+                        value={line.freeTextDescription ?? ""}
+                        onChange={(e) => updateLine(line.key, { freeTextDescription: e.target.value })}
+                        onBlur={() => triggerCatalogCheck(line.key)}
+                        className="h-8 w-40 rounded-md border px-2 text-sm"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setPickerOpen((prev) => new Set(prev).add(line.key))}
+                        className="text-xs text-muted-foreground underline underline-offset-2 hover:text-foreground"
+                      >
+                        or pick from catalog
+                      </button>
+                    </div>
+                  )}
+                </td>
+                <td className="py-2 pr-2">
+                  <select
+                    value={line.categoryId ?? ""}
+                    onChange={(e) => updateLine(line.key, { categoryId: e.target.value || null })}
+                    className="h-8 w-32 rounded-md border px-2 text-sm"
+                  >
+                    <option value="">—</option>
+                    {categories.map((c) => (
+                      <option key={c.id} value={c.id}>{c.name}</option>
+                    ))}
+                  </select>
+                </td>
+                <td className="py-2 pr-2">
+                  <select
+                    value={line.fulfillmentType}
+                    onChange={(e) => updateLine(line.key, { fulfillmentType: e.target.value as "goods" | "service" })}
+                    className="h-8 w-24 rounded-md border px-2 text-sm"
+                  >
+                    <option value="goods">Goods</option>
+                    <option value="service">Service</option>
+                  </select>
+                </td>
+                <td className="py-2 pr-2">
+                  <input
+                    type="number"
+                    step="0.001"
+                    min="0"
+                    value={line.quantity}
+                    onChange={(e) => updateLine(line.key, { quantity: e.target.value })}
+                    className="h-8 w-20 rounded-md border px-2 text-sm"
+                  />
+                </td>
+                <td className="py-2 pr-2">
+                  <input
+                    value={line.uom}
+                    onChange={(e) => updateLine(line.key, { uom: e.target.value })}
+                    className="h-8 w-16 rounded-md border px-2 text-sm"
+                  />
+                </td>
+                <td className="py-2 pr-2">
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={line.estimatedUnitPrice}
+                    onChange={(e) => updateLine(line.key, { estimatedUnitPrice: e.target.value })}
+                    placeholder="Exact price, or your ceiling"
+                    className="h-8 w-28 rounded-md border px-2 text-sm"
+                  />
+                  <label className="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground">
                     <input
-                      value={line.freeTextDescription ?? ""}
-                      onChange={(e) => updateLine(line.key, { freeTextDescription: e.target.value })}
-                      onBlur={() => triggerCatalogCheck(line.key)}
-                      className="h-8 w-40 rounded-md border px-2 text-sm"
+                      type="checkbox"
+                      checked={line.priceConfirmed}
+                      onChange={(e) => updateLine(line.key, { priceConfirmed: e.target.checked })}
+                      className="size-3.5"
                     />
+                    Confirmed price
+                  </label>
+                </td>
+                <td className="py-2 pr-2 text-sm">
+                  {(Number(line.quantity || 0) * Number(line.estimatedUnitPrice || 0)).toFixed(2)}
+                </td>
+                <td className="py-2">
+                  {lines.length > 1 && (
                     <button
                       type="button"
-                      onClick={() => setPickerOpen((prev) => new Set(prev).add(line.key))}
-                      className="text-xs text-muted-foreground underline underline-offset-2 hover:text-foreground"
+                      onClick={() => removeLine(line.key)}
+                      className="text-xs text-muted-foreground hover:text-foreground"
                     >
-                      or pick from catalog
+                      Remove
                     </button>
+                  )}
+                </td>
+              </tr>
+              {/* Hints live in a full-width sub-row rather than their cramped
+                  columns above, so a wide hint doesn't stretch the column it
+                  refers to. No vertical padding/border here, so a line with
+                  no active hints (the common case — every hint self-hides)
+                  collapses to zero height; the border that used to sit on
+                  the main row moves down here so the pair still reads as
+                  one bordered row when empty. */}
+              <tr className="border-b">
+                <td colSpan={8} className="py-0">
+                  <div className="flex flex-wrap items-start gap-x-4 gap-y-1 max-w-2xl">
                     <CatalogMatchHint
                       description={line.freeTextDescription}
                       catalogItemId={line.catalogItemId}
@@ -128,88 +207,16 @@ export function LineItemsTable({
                       onDismiss={() => updateLine(line.key, { catalogMatchDismissed: true })}
                       onAccept={acceptCatalogMatch}
                     />
+                    <CommitmentHint catalogItemId={line.catalogItemId} />
+                    <PriceHistoryHint
+                      catalogItemId={line.catalogItemId}
+                      currentPrice={line.estimatedUnitPrice}
+                      onUsePrice={(price) => updateLine(line.key, { estimatedUnitPrice: price, priceConfirmed: false })}
+                    />
                   </div>
-                )}
-              </td>
-              <td className="py-2 pr-2">
-                <select
-                  value={line.categoryId ?? ""}
-                  onChange={(e) => updateLine(line.key, { categoryId: e.target.value || null })}
-                  className="h-8 w-32 rounded-md border px-2 text-sm"
-                >
-                  <option value="">—</option>
-                  {categories.map((c) => (
-                    <option key={c.id} value={c.id}>{c.name}</option>
-                  ))}
-                </select>
-              </td>
-              <td className="py-2 pr-2">
-                <select
-                  value={line.fulfillmentType}
-                  onChange={(e) => updateLine(line.key, { fulfillmentType: e.target.value as "goods" | "service" })}
-                  className="h-8 w-24 rounded-md border px-2 text-sm"
-                >
-                  <option value="goods">Goods</option>
-                  <option value="service">Service</option>
-                </select>
-              </td>
-              <td className="py-2 pr-2">
-                <input
-                  type="number"
-                  step="0.001"
-                  min="0"
-                  value={line.quantity}
-                  onChange={(e) => updateLine(line.key, { quantity: e.target.value })}
-                  className="h-8 w-20 rounded-md border px-2 text-sm"
-                />
-              </td>
-              <td className="py-2 pr-2">
-                <input
-                  value={line.uom}
-                  onChange={(e) => updateLine(line.key, { uom: e.target.value })}
-                  className="h-8 w-16 rounded-md border px-2 text-sm"
-                />
-              </td>
-              <td className="py-2 pr-2">
-                <input
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  value={line.estimatedUnitPrice}
-                  onChange={(e) => updateLine(line.key, { estimatedUnitPrice: e.target.value })}
-                  placeholder="Exact price, or your ceiling"
-                  className="h-8 w-28 rounded-md border px-2 text-sm"
-                />
-                <label className="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground">
-                  <input
-                    type="checkbox"
-                    checked={line.priceConfirmed}
-                    onChange={(e) => updateLine(line.key, { priceConfirmed: e.target.checked })}
-                    className="size-3.5"
-                  />
-                  Confirmed price
-                </label>
-                <PriceHistoryHint
-                  catalogItemId={line.catalogItemId}
-                  currentPrice={line.estimatedUnitPrice}
-                  onUsePrice={(price) => updateLine(line.key, { estimatedUnitPrice: price, priceConfirmed: false })}
-                />
-              </td>
-              <td className="py-2 pr-2 text-sm">
-                {(Number(line.quantity || 0) * Number(line.estimatedUnitPrice || 0)).toFixed(2)}
-              </td>
-              <td className="py-2">
-                {lines.length > 1 && (
-                  <button
-                    type="button"
-                    onClick={() => removeLine(line.key)}
-                    className="text-xs text-muted-foreground hover:text-foreground"
-                  >
-                    Remove
-                  </button>
-                )}
-              </td>
-            </tr>
+                </td>
+              </tr>
+            </Fragment>
           );
         })}
       </tbody>

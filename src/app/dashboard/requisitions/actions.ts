@@ -11,6 +11,7 @@ import { notifyUser } from "@/db/notifications";
 import { getRequisitionUploadUrl, getRequisitionDocumentBytes, getRequisitionDocumentUrl } from "@/db/documentStorage";
 import { extractLineItemsFromDocument, type ExtractedDocumentMeta } from "@/db/documentExtraction";
 import { getItemPurchaseHistory, type ItemPurchaseHistoryEntry } from "@/db/itemHistory";
+import { getOpenCommitmentsForItem, type OpenCommitments } from "@/db/itemCommitments";
 import { findSimilarCatalogItems, type SimilarCatalogItem } from "@/db/catalogMatch";
 import { judgeCatalogMatch } from "@/db/catalogMatchJudge";
 import { purchaseRequisitions, purchaseRequisitionLines } from "@/db/schema";
@@ -315,6 +316,20 @@ export async function extractRequisitionFromDocument(input: {
 export async function getCatalogItemPriceHistory(input: { catalogItemId: string }): Promise<ItemPurchaseHistoryEntry[]> {
   const { tenant } = await getCurrentUserAndTenant();
   return withTenant(tenant.id, (tx) => getItemPurchaseHistory(tx, input.catalogItemId, 3));
+}
+
+/**
+ * What's already committed for this catalogue item — on order but not
+ * yet received, plus sitting in other requisitions that haven't become a
+ * PO yet. Backs CommitmentHint, so a requester can see "12 already on
+ * order" before adding 10 more. Thin tenant-scoped wrapper, same shape as
+ * getCatalogItemPriceHistory above — no logic lives here, see
+ * db/itemCommitments.ts for the actual query and why the two figures
+ * can't be double-counted or summed across differing uoms.
+ */
+export async function getOpenCommitments(input: { catalogItemId: string }): Promise<OpenCommitments> {
+  const { tenant } = await getCurrentUserAndTenant();
+  return withTenant(tenant.id, (tx) => getOpenCommitmentsForItem(tx, input.catalogItemId));
 }
 
 /**

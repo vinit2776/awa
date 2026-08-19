@@ -43,7 +43,7 @@ export function PriceHistoryHint({
   const variance = pct !== null && Math.abs(pct) >= 1 ? pct : null;
 
   return (
-    <p className="mt-1 max-w-[14rem] text-xs text-muted-foreground">
+    <p className="mt-1 text-xs text-muted-foreground">
       Last paid {last.unitPrice} ({last.vendorName}, {formatRelative(last.date)})
       {variance !== null && (
         <span className={variance > 0 ? "text-amber-600" : "text-emerald-600"}>

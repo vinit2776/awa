@@ -96,7 +96,7 @@ export function CatalogMatchHint({
   if (!match) return null;
 
   return (
-    <div className="mt-1 flex max-w-[16rem] flex-wrap items-center gap-1 rounded-md border border-primary/25 bg-primary/6 px-2 py-1.5 text-xs">
+    <div className="mt-1 flex flex-wrap items-center gap-1 rounded-md border border-primary/25 bg-primary/6 px-2 py-1.5 text-xs">
       <p>
         Is this <span className="font-medium">&ldquo;{match.name}&rdquo;</span> from the catalogue?
       </p>
