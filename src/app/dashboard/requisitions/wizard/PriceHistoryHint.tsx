@@ -39,7 +39,12 @@ export function PriceHistoryHint({
   const last = history[0];
   const previous = Number(last.unitPrice);
   const now = Number(currentPrice);
-  const pct = previous && Number.isFinite(previous) && Number.isFinite(now) ? ((now - previous) / previous) * 100 : null;
+  // A zero/empty current price isn't a "100% lower" price — it's "no answer yet".
+  // Comparing against it produces a meaningless variance, so we suppress the
+  // variance clause (not the whole hint) until the user has typed a real,
+  // positive number. Don't reinstate a comparison against 0 here.
+  const hasEnteredPrice = now > 0 && Number.isFinite(now);
+  const pct = previous && Number.isFinite(previous) && hasEnteredPrice ? ((now - previous) / previous) * 100 : null;
   const variance = pct !== null && Math.abs(pct) >= 1 ? pct : null;
 
   return (

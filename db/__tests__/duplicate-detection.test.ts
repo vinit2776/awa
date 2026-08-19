@@ -107,8 +107,10 @@ describe("findPossibleDuplicates", () => {
     );
     expect(results.some((r) => r.requisitionId === requisition.id)).toBe(true);
     const match = results.find((r) => r.requisitionId === requisition.id);
+    expect(match?.requestorId).toBe(requestorB.id);
     expect(match?.requestorName).toBe("Bala Requestor");
     expect(match?.status).toBe("submitted");
+    expect(match?.totalEstimatedValue).toBe("500.00");
     expect(match?.matchedItems).toEqual([{ catalogItemId: item.id, quantity: "3.000", uom: "each" }]);
   });
 

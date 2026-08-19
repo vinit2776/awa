@@ -17,9 +17,15 @@ export type DuplicateMatchedItem = {
 
 export type PossibleDuplicate = {
   requisitionId: string;
+  requestorId: string;
   requestorName: string;
   status: "submitted" | "pending_approval" | "approved" | "converted_to_po";
   submittedAt: Date | null;
+  // Requisition-level total, not a per-line figure — this is what lets the
+  // UI tell apart several matches from the same requestor on the same day
+  // that would otherwise render as identical text (same person, same item,
+  // same status). See DuplicateWarningPanel's per-person grouping.
+  totalEstimatedValue: string;
   matchedItems: DuplicateMatchedItem[];
 };
 
@@ -79,6 +85,8 @@ export async function findPossibleDuplicates(
       uom: purchaseRequisitionLines.uom,
       status: purchaseRequisitions.status,
       submittedAt: purchaseRequisitions.submittedAt,
+      totalEstimatedValue: purchaseRequisitions.totalEstimatedValue,
+      requestorId: purchaseRequisitions.requestorId,
       requestorName: users.fullName,
     })
     .from(purchaseRequisitionLines)
@@ -114,9 +122,11 @@ export async function findPossibleDuplicates(
     if (!entry) {
       entry = {
         requisitionId: row.requisitionId,
+        requestorId: row.requestorId,
         requestorName: row.requestorName,
         status: row.status as PossibleDuplicate["status"],
         submittedAt: row.submittedAt,
+        totalEstimatedValue: row.totalEstimatedValue,
         matchedItems: [],
       };
       byRequisition.set(row.requisitionId, entry);
