@@ -12,6 +12,12 @@ export type Line = LineInput & {
   // presentation (collapsed text input vs. the full catalog picker),
   // not treated as a "typing" signal so the two never flip mid-keystroke.
   fromExtraction?: boolean;
+  // Client-side only, never sent to a server action — set once the user
+  // says "it's different" on CatalogMatchHint's suggestion for this line.
+  // Without this, a "no" would only last until the next keystroke, since
+  // CatalogMatchHint re-queries on every description change and would
+  // otherwise re-suggest the same item immediately.
+  catalogMatchDismissed?: boolean;
 };
 
 export const emptyLine = (): Line => ({

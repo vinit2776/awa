@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { Term } from "@/components/ui/help";
 import { SearchableSelect } from "@/components/ui/combobox";
 import { PriceHistoryHint } from "./PriceHistoryHint";
+import { CatalogMatchHint } from "./CatalogMatchHint";
 import type { Line, Category, CatalogItem } from "./types";
 
 export function LineItemsTable({
@@ -25,6 +26,13 @@ export function LineItemsTable({
   // A dozen-plus catalog items is already too many to scan in a closed
   // dropdown — searchable beats a scrollable native <select> here.
   const catalogOptions = useMemo(() => catalogItems.map((i) => ({ value: i.id, label: i.name })), [catalogItems]);
+  // Bumped per line key on the description input's onBlur, to tell
+  // CatalogMatchHint "the user finished typing, check now" — see that
+  // component's docblock for why this is blur-triggered rather than
+  // debounced-while-typing (the lookup now costs an LLM call).
+  const [catalogCheckSignals, setCatalogCheckSignals] = useState<Record<string, number>>({});
+  const triggerCatalogCheck = (key: string) =>
+    setCatalogCheckSignals((prev) => ({ ...prev, [key]: (prev[key] ?? 0) + 1 }));
 
   return (
     <table className="w-full text-sm">
@@ -45,6 +53,17 @@ export function LineItemsTable({
       <tbody>
         {lines.map((line) => {
           const showPicker = !line.fromExtraction || pickerOpen.has(line.key);
+          // Same field-population logic as SearchableSelect's onChange
+          // below — accepting a suggestion is just "the user picked this
+          // catalogue item", so it must leave the line in the identical
+          // state a manual pick would, uom/categoryId/free-text clear included.
+          const acceptCatalogMatch = (item: { id: string; uom: string; categoryId: string | null }) =>
+            updateLine(line.key, {
+              catalogItemId: item.id,
+              freeTextDescription: null,
+              uom: item.uom,
+              categoryId: item.categoryId,
+            });
           return (
             <tr key={line.key} className="border-b align-top">
               <td className="py-2 pr-2">
@@ -67,12 +86,23 @@ export function LineItemsTable({
                       className="w-40"
                     />
                     {!line.catalogItemId && (
-                      <input
-                        value={line.freeTextDescription ?? ""}
-                        onChange={(e) => updateLine(line.key, { freeTextDescription: e.target.value })}
-                        placeholder="Describe the item"
-                        className="mt-1 h-8 w-40 rounded-md border px-2 text-sm"
-                      />
+                      <>
+                        <input
+                          value={line.freeTextDescription ?? ""}
+                          onChange={(e) => updateLine(line.key, { freeTextDescription: e.target.value })}
+                          onBlur={() => triggerCatalogCheck(line.key)}
+                          placeholder="Describe the item"
+                          className="mt-1 h-8 w-40 rounded-md border px-2 text-sm"
+                        />
+                        <CatalogMatchHint
+                          description={line.freeTextDescription}
+                          catalogItemId={line.catalogItemId}
+                          dismissed={line.catalogMatchDismissed}
+                          checkSignal={catalogCheckSignals[line.key] ?? 0}
+                          onDismiss={() => updateLine(line.key, { catalogMatchDismissed: true })}
+                          onAccept={acceptCatalogMatch}
+                        />
+                      </>
                     )}
                   </>
                 ) : (
@@ -80,6 +110,7 @@ export function LineItemsTable({
                     <input
                       value={line.freeTextDescription ?? ""}
                       onChange={(e) => updateLine(line.key, { freeTextDescription: e.target.value })}
+                      onBlur={() => triggerCatalogCheck(line.key)}
                       className="h-8 w-40 rounded-md border px-2 text-sm"
                     />
                     <button
@@ -89,6 +120,14 @@ export function LineItemsTable({
                     >
                       or pick from catalog
                     </button>
+                    <CatalogMatchHint
+                      description={line.freeTextDescription}
+                      catalogItemId={line.catalogItemId}
+                      dismissed={line.catalogMatchDismissed}
+                      checkSignal={catalogCheckSignals[line.key] ?? 0}
+                      onDismiss={() => updateLine(line.key, { catalogMatchDismissed: true })}
+                      onAccept={acceptCatalogMatch}
+                    />
                   </div>
                 )}
               </td>

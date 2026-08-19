@@ -36,7 +36,19 @@ Carried forward from gaps already flagged in `README.md` / `SETUP.md` — not a 
       integration is built (`db/email.ts`, used by `db/notifications.ts` and `db/vendorAuth.ts`) — without those
       two variables it logs what it would have sent and carries on, so this is now an account task rather than a
       code task. Deliberately left unset in CI: the suites exercise the notification paths against fixture
-      addresses.
+      addresses. Setting the variables is not evidence mail is actually being delivered, since that failure mode
+      is silent by design — so trigger a real notification in production and confirm it's received, not just a
+      green env-var checklist. This matters most for approvers: in a paperless process there's no paper on a
+      desk to signal waiting work, so a swallowed notification means an approval never surfaces to its owner.
+- [ ] Set `ANTHROPIC_API_KEY` in Vercel, then positively confirm both features it powers rather than trusting
+      that setting the key is enough — this app is deliberately built so an unconfigured or failing integration
+      degrades quietly instead of breaking, which means the absence of errors is never evidence something works.
+      Requisition document extraction (`db/documentExtraction.ts`) degrades visibly: without a key the user sees
+      "Document extraction isn't configured yet" and can enter lines by hand, so confirm it by uploading a
+      document and watching lines actually get extracted. Catalogue-match suggestions on requisition lines
+      (`db/catalogMatchJudge.ts`) degrade invisibly — without a key the match hint just never appears, nothing
+      logged, nothing shown — so confirm it deliberately by typing a free-text line matching a catalogue item
+      and watching the suggestion appear.
 - [ ] Decide role-based UI permission gating (flagged as a known gap in `README.md`).
 - [ ] Turn on GitHub branch protection on `main` (PR + passing CI required) per the shipping policy above — blocked on GitHub Pro/Team (or making the repo public); currently unavailable on the private free-plan repo.
 - [ ] Confirm `db/__tests__/rls-isolation.test.ts` is green — this is the test that actually proves tenant isolation holds; treat a failure here as a launch blocker, not a flaky test to skip.

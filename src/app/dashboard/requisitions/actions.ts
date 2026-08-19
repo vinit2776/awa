@@ -11,6 +11,8 @@ import { notifyUser } from "@/db/notifications";
 import { getRequisitionUploadUrl, getRequisitionDocumentBytes, getRequisitionDocumentUrl } from "@/db/documentStorage";
 import { extractLineItemsFromDocument, type ExtractedDocumentMeta } from "@/db/documentExtraction";
 import { getItemPurchaseHistory, type ItemPurchaseHistoryEntry } from "@/db/itemHistory";
+import { findSimilarCatalogItems, type SimilarCatalogItem } from "@/db/catalogMatch";
+import { judgeCatalogMatch } from "@/db/catalogMatchJudge";
 import { purchaseRequisitions, purchaseRequisitionLines } from "@/db/schema";
 
 export type LineInput = {
@@ -313,6 +315,36 @@ export async function extractRequisitionFromDocument(input: {
 export async function getCatalogItemPriceHistory(input: { catalogItemId: string }): Promise<ItemPurchaseHistoryEntry[]> {
   const { tenant } = await getCurrentUserAndTenant();
   return withTenant(tenant.id, (tx) => getItemPurchaseHistory(tx, input.catalogItemId, 3));
+}
+
+/**
+ * Backs CatalogMatchHint: after someone finishes typing a free-text line
+ * description, is there a catalogue item this already is? Two-stage,
+ * following the split explained in db/catalogMatch.ts's docblock —
+ * trigram similarity cannot decide identity on its own (measured: same-
+ * item and different-item pairs overlap in score), so it's used only for
+ * cheap recall here, and an LLM (db/catalogMatchJudge.ts) makes the actual
+ * call by reading both descriptions for meaning.
+ *
+ * The judge is skipped entirely when trigram recall finds nothing — an
+ * empty candidate list can't contain a match, so there's no reason to
+ * spend an API call finding that out. When ANTHROPIC_API_KEY isn't
+ * configured, judgeCatalogMatch returns null and this returns null too:
+ * this deliberately does NOT fall back to the top trigram candidate in
+ * that case, because an un-judged trigram hit is exactly the kind of
+ * confidently-wrong suggestion the judge stage exists to filter out (see
+ * the SKF 6205/6305 example in catalogMatch.ts). No suggestion is the
+ * safe default, not "probably right".
+ */
+export async function suggestCatalogItemForLine(description: string): Promise<SimilarCatalogItem | null> {
+  const trimmed = description.trim();
+  if (trimmed.length < 3) return null;
+
+  const { tenant } = await getCurrentUserAndTenant();
+  const candidates = await withTenant(tenant.id, (tx) => findSimilarCatalogItems(tx, trimmed, 5));
+  if (candidates.length === 0) return null;
+
+  return judgeCatalogMatch(trimmed, candidates);
 }
 
 /**
