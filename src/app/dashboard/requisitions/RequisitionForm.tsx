@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
   previewApprovers,
+  previewDuplicates,
   createRequisition,
   reviseAndResubmitRequisition,
   getRequisitionDocumentUploadUrl,
@@ -13,6 +14,7 @@ import {
 import { cn } from "@/lib/utils";
 import type { ApprovalPreview } from "@/db/approvalPreview";
 import type { ExtractedDocumentMeta } from "@/db/documentExtraction";
+import type { PossibleDuplicate } from "@/db/duplicateDetection";
 import { Step1Document } from "./wizard/Step1Document";
 import { Step2Basics } from "./wizard/Step2Basics";
 import { Step3LineItems } from "./wizard/Step3LineItems";
@@ -71,6 +73,8 @@ export function RequisitionForm({
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const [preview, setPreview] = useState<ApprovalPreview | null>(null);
+  const [duplicates, setDuplicates] = useState<PossibleDuplicate[]>([]);
+  const [duplicateReasons, setDuplicateReasons] = useState<Record<string, string>>({});
 
   const [sourceDocumentKey, setSourceDocumentKey] = useState<string | null>(null);
   const [documentMeta, setDocumentMeta] = useState<ExtractedDocumentMeta | null>(null);
@@ -211,6 +215,40 @@ export function RequisitionForm({
     };
   }, [departmentId, costCenterId, total, categoryKey]);
 
+  // Same "fetch on the identifiers that actually matter, guard against a
+  // stale response" shape as the approver preview above — keyed on the
+  // set of catalogue items on the form, since that's the only thing
+  // findPossibleDuplicates matches on (see db/duplicateDetection.ts:
+  // deliberately no fuzzy-matching on free text).
+  const catalogItemIdsKey = [...new Set(lines.map((l) => l.catalogItemId).filter((id): id is string => !!id))]
+    .sort()
+    .join(",");
+  useEffect(() => {
+    let cancelled = false;
+    const catalogItemIds = catalogItemIdsKey.split(",").filter(Boolean);
+    // No early return on an empty id list — findPossibleDuplicates
+    // already answers "[]" for that itself, and resolving through the
+    // same async path (rather than a synchronous setState here) keeps
+    // this from cascading a render mid-effect.
+    void previewDuplicates({ catalogItemIds, excludeRequisitionId: revision?.requisitionId ?? null })
+      .then((result) => {
+        if (!cancelled) setDuplicates(result);
+      })
+      .catch(() => {
+        // A preview that can't be fetched shows nothing rather than
+        // guessing — submitting still works, and the server re-runs this
+        // same check before anything is persisted.
+        if (!cancelled) setDuplicates([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [catalogItemIdsKey, revision?.requisitionId]);
+
+  const itemName = (catalogItemId: string) => catalogItems.find((i) => i.id === catalogItemId)?.name ?? null;
+  const setDuplicateReason = (duplicateOfRequisitionId: string, reason: string) =>
+    setDuplicateReasons((prev) => ({ ...prev, [duplicateOfRequisitionId]: reason }));
+
   const submit = (shouldSubmit: boolean) => {
     setError(null);
     startTransition(async () => {
@@ -225,7 +263,7 @@ export function RequisitionForm({
         priceConfirmed: l.priceConfirmed,
       }));
 
-      const result = revision
+      const result: { error?: string; id?: string; needsAcknowledgement?: PossibleDuplicate[] } = revision
         ? await reviseAndResubmitRequisition({
             requisitionId: revision.requisitionId,
             departmentId: departmentId || null,
@@ -241,7 +279,21 @@ export function RequisitionForm({
             submit: shouldSubmit,
             sourceDocumentKey,
             extractedDocumentMeta: documentMeta,
+            duplicateAcknowledgements: Object.entries(duplicateReasons)
+              .filter(([, reason]) => reason.trim().length > 0)
+              .map(([duplicateOfRequisitionId, reason]) => ({ duplicateOfRequisitionId, reason: reason.trim() })),
           });
+
+      if ("needsAcknowledgement" in result && result.needsAcknowledgement) {
+        // The server is the authority — this may be a duplicate the
+        // preview never showed (somebody else submitted a match in the
+        // time between review and now). Show what it found and ask,
+        // rather than a generic error: this is a prompt, not a failure.
+        setDuplicates(result.needsAcknowledgement);
+        setError("Say why each flagged item isn't a duplicate before submitting.");
+        goToStep("review");
+        return;
+      }
 
       if (result.error) {
         setError(result.error);
@@ -325,6 +377,11 @@ export function RequisitionForm({
           error={error}
           onSave={() => submit(false)}
           onSubmit={() => submit(true)}
+          duplicates={duplicates}
+          itemName={itemName}
+          duplicateReasons={duplicateReasons}
+          onDuplicateReasonChange={setDuplicateReason}
+          onEditLines={() => goToStep("lines")}
         />
       )}
 

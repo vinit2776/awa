@@ -1,4 +1,5 @@
 import { and, eq, inArray, ne, or, sql } from "drizzle-orm";
+import { alias } from "drizzle-orm/pg-core";
 import type { db } from "./client";
 import { logAction } from "./audit";
 import {
@@ -170,4 +171,66 @@ export async function recordDuplicateAcknowledgements(
       metadata: { duplicateOfRequisitionId: ack.duplicateOfRequisitionId, reason: ack.reason },
     });
   }
+}
+
+export type DuplicateAcknowledgement = {
+  id: string;
+  duplicateOfRequisitionId: string;
+  duplicateOfRequestorName: string;
+  duplicateOfSubmittedAt: Date | null;
+  duplicateOfStatus: string;
+  acknowledgedByName: string;
+  reason: string;
+  createdAt: Date;
+};
+
+/**
+ * The read side of recordDuplicateAcknowledgements — what actually makes
+ * the feature worth having. A reason recorded and never shown to the
+ * person deciding whether to approve is indistinguishable from no reason
+ * at all; this is what surfaces it on the approver's decision card
+ * (src/app/dashboard/approvals/page.tsx) and on the requisition's own
+ * record (src/app/dashboard/requisitions/[id]/page.tsx), so both the
+ * approver and the requester see the same history.
+ *
+ * Denormalizes the other requisition's requestor/status/date and the
+ * acknowledging user's name in the query itself, rather than returning
+ * bare ids for the caller to re-look-up — both call sites already have
+ * a lot of other data joined in per-row loops, and this keeps this read
+ * self-contained the way findPossibleDuplicates's own row shape is.
+ *
+ * Two aliases of the same tables are needed because a single row here
+ * touches two different requisitions (the one that owns the
+ * acknowledgement, and the one it was raised against) and two different
+ * users (who acknowledged, and who requested the other one) — a plain
+ * join would collide on both.
+ */
+export async function getDuplicateAcknowledgements(
+  tx: typeof db,
+  requisitionId: string,
+): Promise<DuplicateAcknowledgement[]> {
+  const duplicateOfRequisitions = alias(purchaseRequisitions, "duplicate_of_requisitions");
+  const duplicateOfRequestors = alias(users, "duplicate_of_requestors");
+  const acknowledgers = alias(users, "acknowledgers");
+
+  return tx
+    .select({
+      id: requisitionDuplicateAcknowledgements.id,
+      duplicateOfRequisitionId: requisitionDuplicateAcknowledgements.duplicateOfRequisitionId,
+      duplicateOfRequestorName: duplicateOfRequestors.fullName,
+      duplicateOfSubmittedAt: duplicateOfRequisitions.submittedAt,
+      duplicateOfStatus: duplicateOfRequisitions.status,
+      acknowledgedByName: acknowledgers.fullName,
+      reason: requisitionDuplicateAcknowledgements.reason,
+      createdAt: requisitionDuplicateAcknowledgements.createdAt,
+    })
+    .from(requisitionDuplicateAcknowledgements)
+    .innerJoin(
+      duplicateOfRequisitions,
+      eq(duplicateOfRequisitions.id, requisitionDuplicateAcknowledgements.duplicateOfRequisitionId),
+    )
+    .innerJoin(duplicateOfRequestors, eq(duplicateOfRequestors.id, duplicateOfRequisitions.requestorId))
+    .innerJoin(acknowledgers, eq(acknowledgers.id, requisitionDuplicateAcknowledgements.acknowledgedByUserId))
+    .where(eq(requisitionDuplicateAcknowledgements.requisitionId, requisitionId))
+    .orderBy(requisitionDuplicateAcknowledgements.createdAt);
 }

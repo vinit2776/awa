@@ -3,6 +3,7 @@ import { getCurrentUserAndTenant } from "@/db/session";
 import { withTenant } from "@/db/withTenant";
 import { getCommittedByCostCenter } from "@/db/budget";
 import { getItemPurchaseHistory, type ItemPurchaseHistoryEntry } from "@/db/itemHistory";
+import { getDuplicateAcknowledgements, type DuplicateAcknowledgement } from "@/db/duplicateDetection";
 import { getRequisitionDocumentUrl } from "@/db/documentStorage";
 import {
   requisitionApprovalRequirements as requirementsTable,
@@ -126,6 +127,19 @@ export default async function ApprovalsInboxPage({
   }
 
   const itemName = (id: string | null) => catalogItems.find((i) => i.id === id)?.name ?? null;
+
+  // The point of the whole duplicate-detection feature: a reason recorded
+  // at submission and never shown to the person deciding is worth
+  // nothing. Loaded only for what's actually in front of this approver
+  // right now, same discipline as itemHistoryById above.
+  const duplicateAcknowledgementsByRequisition = new Map<string, DuplicateAcknowledgement[]>();
+  if (requisitionIds.length > 0) {
+    await withTenant(tenant.id, async (tx) => {
+      for (const id of requisitionIds) {
+        duplicateAcknowledgementsByRequisition.set(id, await getDuplicateAcknowledgements(tx, id));
+      }
+    });
+  }
 
   /**
    * Who this goes to after you approve. Approving is the one decision
@@ -341,6 +355,34 @@ export default async function ApprovalsInboxPage({
                       </div>
                     );
                   })}
+                </div>
+              )}
+
+              {(duplicateAcknowledgementsByRequisition.get(req.requisitionId) ?? []).length > 0 && (
+                <div className="flex flex-col gap-2 rounded-lg border border-warning/45 bg-warning/10 px-3.5 py-2.5">
+                  <p className="text-sm font-medium text-warning-foreground">
+                    Flagged as a possible duplicate at submission
+                  </p>
+                  {(duplicateAcknowledgementsByRequisition.get(req.requisitionId) ?? []).map((ack) => (
+                    <div key={ack.id} className="text-xs text-muted-foreground">
+                      <p>
+                        Matched{" "}
+                        <a
+                          href={`/dashboard/requisitions/${ack.duplicateOfRequisitionId}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="underline"
+                        >
+                          {ack.duplicateOfRequestorName}&apos;s requisition
+                        </a>{" "}
+                        ({ack.duplicateOfStatus.replace(/_/g, " ")}
+                        {ack.duplicateOfSubmittedAt ? `, ${new Date(ack.duplicateOfSubmittedAt).toLocaleDateString(undefined, { day: "numeric", month: "short" })}` : ""}).
+                      </p>
+                      <p className="mt-0.5">
+                        {ack.acknowledgedByName} said: &ldquo;{ack.reason}&rdquo;
+                      </p>
+                    </div>
+                  ))}
                 </div>
               )}
 

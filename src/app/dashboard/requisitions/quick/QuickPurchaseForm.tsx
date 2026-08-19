@@ -1,12 +1,14 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { createRequisition, type LineInput } from "../actions";
+import { createRequisition, previewDuplicates, type LineInput } from "../actions";
+import type { PossibleDuplicate } from "@/db/duplicateDetection";
 import { Step2Basics } from "../wizard/Step2Basics";
 import { LineItemsTable } from "../wizard/LineItemsTable";
+import { DuplicateWarningPanel } from "../wizard/DuplicateWarningPanel";
 import { emptyLine, type Line, type Department, type CostCenter, type Category, type CatalogItem } from "../wizard/types";
 
 /**
@@ -37,12 +39,43 @@ export function QuickPurchaseForm({
   const [lines, setLines] = useState<Line[]>([emptyLine()]);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+  const [duplicates, setDuplicates] = useState<PossibleDuplicate[]>([]);
+  const [duplicateReasons, setDuplicateReasons] = useState<Record<string, string>>({});
 
   const updateLine = (key: string, patch: Partial<Line>) => setLines((prev) => prev.map((l) => (l.key === key ? { ...l, ...patch } : l)));
   const total = useMemo(
     () => lines.reduce((sum, l) => sum + Number(l.quantity || 0) * Number(l.estimatedUnitPrice || 0), 0),
     [lines],
   );
+
+  // The short route is not an exemption from the duplicate check — same
+  // fetch-on-catalogue-item shape as RequisitionForm's Step4Review panel,
+  // just rendered inline since this form has no review step to hang it
+  // on. See DuplicateWarningPanel and db/duplicateDetection.ts.
+  const catalogItemIdsKey = [...new Set(lines.map((l) => l.catalogItemId).filter((id): id is string => !!id))]
+    .sort()
+    .join(",");
+  useEffect(() => {
+    let cancelled = false;
+    const catalogItemIds = catalogItemIdsKey.split(",").filter(Boolean);
+    // No early return on an empty id list — see RequisitionForm's twin
+    // effect for why: findPossibleDuplicates already answers "[]" for
+    // that itself.
+    void previewDuplicates({ catalogItemIds, excludeRequisitionId: null })
+      .then((result) => {
+        if (!cancelled) setDuplicates(result);
+      })
+      .catch(() => {
+        if (!cancelled) setDuplicates([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [catalogItemIdsKey]);
+
+  const itemName = (catalogItemId: string) => catalogItems.find((i) => i.id === catalogItemId)?.name ?? null;
+  const setDuplicateReason = (duplicateOfRequisitionId: string, reason: string) =>
+    setDuplicateReasons((prev) => ({ ...prev, [duplicateOfRequisitionId]: reason }));
 
   const submit = (shouldSubmit: boolean) => {
     setError(null);
@@ -64,7 +97,16 @@ export function QuickPurchaseForm({
         justification,
         lines: cleanLines,
         submit: shouldSubmit,
+        duplicateAcknowledgements: Object.entries(duplicateReasons)
+          .filter(([, reason]) => reason.trim().length > 0)
+          .map(([duplicateOfRequisitionId, reason]) => ({ duplicateOfRequisitionId, reason: reason.trim() })),
       });
+
+      if (result.needsAcknowledgement) {
+        setDuplicates(result.needsAcknowledgement);
+        setError("Say why each flagged item isn't a duplicate before submitting.");
+        return;
+      }
 
       if (result.error) {
         setError(result.error);
@@ -107,6 +149,13 @@ export function QuickPurchaseForm({
           className="w-full max-w-2xl rounded-md border px-2 py-1 text-sm"
         />
       </div>
+
+      <DuplicateWarningPanel
+        duplicates={duplicates}
+        itemName={itemName}
+        reasons={duplicateReasons}
+        onReasonChange={setDuplicateReason}
+      />
 
       {error && <p className="text-sm text-destructive">{error}</p>}
 

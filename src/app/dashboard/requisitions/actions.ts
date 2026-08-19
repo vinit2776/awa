@@ -14,6 +14,7 @@ import { getItemPurchaseHistory, type ItemPurchaseHistoryEntry } from "@/db/item
 import { getOpenCommitmentsForItem, type OpenCommitments } from "@/db/itemCommitments";
 import { findSimilarCatalogItems, type SimilarCatalogItem } from "@/db/catalogMatch";
 import { judgeCatalogMatch } from "@/db/catalogMatchJudge";
+import { findPossibleDuplicates, recordDuplicateAcknowledgements, type PossibleDuplicate } from "@/db/duplicateDetection";
 import { purchaseRequisitions, purchaseRequisitionLines } from "@/db/schema";
 
 export type LineInput = {
@@ -37,7 +38,12 @@ export async function createRequisition(input: {
   submit: boolean;
   sourceDocumentKey?: string | null;
   extractedDocumentMeta?: ExtractedDocumentMeta | null;
-}) {
+  // What the requester said, on the review step's duplicate-warning panel,
+  // about why each detected possible-duplicate isn't one. Only ever a
+  // hint to this function, never trusted on its own — see the re-check
+  // below.
+  duplicateAcknowledgements?: { duplicateOfRequisitionId: string; reason: string }[];
+}): Promise<{ error?: string; id?: string; needsAcknowledgement?: PossibleDuplicate[] }> {
   const { user, tenant } = await getCurrentUserAndTenant();
 
   const validLines = input.lines.filter(
@@ -50,6 +56,50 @@ export async function createRequisition(input: {
     lineTotal: (Number(l.quantity) * Number(l.estimatedUnitPrice)).toFixed(2),
   }));
   const total = linesWithTotals.reduce((sum, l) => sum + Number(l.lineTotal), 0).toFixed(2);
+
+  /**
+   * Warn, record, never block (db/duplicateDetection.ts) — but "record"
+   * needs a reason, and refusing silence is not the blocking that was
+   * rejected. Only checked when submitting: a draft is not live yet,
+   * nobody else can see it, and forcing a reason on it would just be
+   * friction with nothing behind it.
+   *
+   * Re-runs findPossibleDuplicates itself rather than trusting
+   * input.duplicateAcknowledgements' shape of "which duplicates exist" —
+   * the client's list is only ever used below to look up a reason by id,
+   * never to decide what needs one. This is also what catches the race:
+   * if somebody else submitted a matching requisition between this
+   * requester's review step and now, it shows up here as freshly
+   * unacknowledged even though the client never saw it.
+   *
+   * Runs before any insert, so there is nothing to roll back when it
+   * comes back non-empty.
+   */
+  let acknowledgementsToRecord: { duplicateOfRequisitionId: string; reason: string }[] = [];
+  if (input.submit) {
+    const catalogItemIds = [...new Set(validLines.map((l) => l.catalogItemId).filter((id): id is string => !!id))];
+    if (catalogItemIds.length > 0) {
+      const possibleDuplicates = await withTenant(tenant.id, (tx) =>
+        findPossibleDuplicates(tx, { catalogItemIds, excludeRequisitionId: null }),
+      );
+
+      const reasonByRequisitionId = new Map(
+        (input.duplicateAcknowledgements ?? [])
+          .filter((ack) => ack.reason.trim().length > 0)
+          .map((ack) => [ack.duplicateOfRequisitionId, ack.reason.trim()]),
+      );
+
+      const needsAcknowledgement = possibleDuplicates.filter((d) => !reasonByRequisitionId.has(d.requisitionId));
+      if (needsAcknowledgement.length > 0) {
+        return { needsAcknowledgement };
+      }
+
+      acknowledgementsToRecord = possibleDuplicates.map((d) => ({
+        duplicateOfRequisitionId: d.requisitionId,
+        reason: reasonByRequisitionId.get(d.requisitionId)!,
+      }));
+    }
+  }
 
   const requisitionId = await withTenant(tenant.id, async (tx) => {
     const [requisition] = await tx
@@ -93,6 +143,15 @@ export async function createRequisition(input: {
       metadata: { total, lineCount: linesWithTotals.length },
     });
 
+    if (acknowledgementsToRecord.length > 0) {
+      await recordDuplicateAcknowledgements(tx, {
+        tenantId: tenant.id,
+        requisitionId: requisition.id,
+        acknowledgedByUserId: user.id,
+        acknowledgements: acknowledgementsToRecord,
+      });
+    }
+
     if (input.submit) {
       await notifyUser(tx, user.id, "requisition_submitted", "Your requisition was submitted", `Total: ${total}`);
       await resolveApprovals(tx, tenant.id, requisition.id);
@@ -133,6 +192,35 @@ export async function submitRequisition(formData: FormData) {
       entityId: updated.id,
       metadata: {},
     });
+
+    // Known gap: this route takes a draft live without ever visiting the
+    // review step, so there is no duplicate-warning panel here and
+    // nothing to ask the requester for a reason. Building a second
+    // acknowledgement UI for a one-click "submit this draft" action would
+    // be worse than the gap it closes, and blocking here would break
+    // "never block". So this leaves a trace instead: detection still
+    // runs, and if it finds something nobody acknowledged, that goes in
+    // the audit log rather than vanishing silently. See
+    // db/duplicateDetection.ts's docblock for the rule this is only
+    // partially able to honor on this path.
+    const lineRows = await tx
+      .select({ catalogItemId: purchaseRequisitionLines.catalogItemId })
+      .from(purchaseRequisitionLines)
+      .where(eq(purchaseRequisitionLines.requisitionId, updated.id));
+    const catalogItemIds = [...new Set(lineRows.map((l) => l.catalogItemId).filter((id): id is string => !!id))];
+    if (catalogItemIds.length > 0) {
+      const possibleDuplicates = await findPossibleDuplicates(tx, { catalogItemIds, excludeRequisitionId: updated.id });
+      if (possibleDuplicates.length > 0) {
+        await logAction(tx, {
+          tenantId: tenant.id,
+          actorUserId: user.id,
+          action: "requisition.submitted_with_unacknowledged_duplicates",
+          entityType: "purchase_requisition",
+          entityId: updated.id,
+          metadata: { duplicateRequisitionIds: possibleDuplicates.map((d) => d.requisitionId) },
+        });
+      }
+    }
 
     await notifyUser(tx, user.id, "requisition_submitted", "Your requisition was submitted", `Total: ${updated.totalEstimatedValue}`);
     await resolveApprovals(tx, tenant.id, updated.id);
@@ -211,6 +299,25 @@ export async function reviseAndResubmitRequisition(input: {
       entityId: existing.id,
       metadata: { total, lineCount: linesWithTotals.length },
     });
+
+    // Same known gap as submitRequisition above: revising and
+    // resubmitting also takes a requisition live without passing through
+    // the review step's duplicate-warning panel. Trace it rather than
+    // skip it silently or block a path that was never built to ask.
+    const catalogItemIds = [...new Set(validLines.map((l) => l.catalogItemId).filter((id): id is string => !!id))];
+    if (catalogItemIds.length > 0) {
+      const possibleDuplicates = await findPossibleDuplicates(tx, { catalogItemIds, excludeRequisitionId: existing.id });
+      if (possibleDuplicates.length > 0) {
+        await logAction(tx, {
+          tenantId: tenant.id,
+          actorUserId: user.id,
+          action: "requisition.submitted_with_unacknowledged_duplicates",
+          entityType: "purchase_requisition",
+          entityId: existing.id,
+          metadata: { duplicateRequisitionIds: possibleDuplicates.map((d) => d.requisitionId) },
+        });
+      }
+    }
 
     // Runs a fresh approval resolution rather than trying to carry
     // forward whichever prior decisions are still "valid" — §04 says
@@ -484,6 +591,28 @@ export async function attachRequisitionDocument(input: {
 
   revalidatePath(`/dashboard/requisitions/${input.requisitionId}`);
   return {};
+}
+
+/**
+ * "Has somebody already asked for this?" — called from the form as line
+ * items change, the same way previewApprovers is, and for the same
+ * reason: this must run the exact same code createRequisition's submit-
+ * time gate re-runs, or the review step starts promising something
+ * submission doesn't check. Thin tenant-scoped wrapper, no logic of its
+ * own — see db/duplicateDetection.ts for the actual matching rule.
+ */
+export async function previewDuplicates(input: {
+  catalogItemIds: string[];
+  excludeRequisitionId: string | null;
+}): Promise<PossibleDuplicate[]> {
+  const { tenant } = await getCurrentUserAndTenant();
+
+  return withTenant(tenant.id, (tx) =>
+    findPossibleDuplicates(tx, {
+      catalogItemIds: input.catalogItemIds,
+      excludeRequisitionId: input.excludeRequisitionId,
+    }),
+  );
 }
 
 /**

@@ -2,6 +2,8 @@ import { buttonVariants } from "@/components/ui/button";
 import { Info } from "@/components/ui/help";
 import { cn } from "@/lib/utils";
 import type { ApprovalPreview } from "@/db/approvalPreview";
+import type { PossibleDuplicate } from "@/db/duplicateDetection";
+import { DuplicateWarningPanel } from "./DuplicateWarningPanel";
 
 export function Step4Review({
   justification,
@@ -12,6 +14,11 @@ export function Step4Review({
   error,
   onSave,
   onSubmit,
+  duplicates,
+  itemName,
+  duplicateReasons,
+  onDuplicateReasonChange,
+  onEditLines,
 }: {
   justification: string;
   setJustification: (v: string) => void;
@@ -21,6 +28,11 @@ export function Step4Review({
   error: string | null;
   onSave: () => void;
   onSubmit: () => void;
+  duplicates: PossibleDuplicate[];
+  itemName: (catalogItemId: string) => string | null;
+  duplicateReasons: Record<string, string>;
+  onDuplicateReasonChange: (duplicateOfRequisitionId: string, reason: string) => void;
+  onEditLines: () => void;
 }) {
   return (
     <div className="flex flex-col gap-4">
@@ -67,6 +79,14 @@ export function Step4Review({
           )}
         </div>
       )}
+
+      <DuplicateWarningPanel
+        duplicates={duplicates}
+        itemName={itemName}
+        reasons={duplicateReasons}
+        onReasonChange={onDuplicateReasonChange}
+        onEditLines={onEditLines}
+      />
 
       <div className="flex flex-col gap-1">
         <label className="text-xs text-muted-foreground">Justification</label>

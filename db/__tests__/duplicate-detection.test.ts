@@ -2,7 +2,7 @@ import { eq, sql } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { adminDb } from "../adminClient";
 import { withTenant } from "../withTenant";
-import { findPossibleDuplicates, recordDuplicateAcknowledgements } from "../duplicateDetection";
+import { findPossibleDuplicates, recordDuplicateAcknowledgements, getDuplicateAcknowledgements } from "../duplicateDetection";
 import {
   tenants,
   users,
@@ -200,5 +200,39 @@ describe("recordDuplicateAcknowledgements", () => {
     expect(rows[0].duplicateOfRequisitionId).toBe(original.id);
     expect(rows[0].acknowledgedByUserId).toBe(requestorA.id);
     expect(rows[0].reason).toBe("Different project, separate cost centre.");
+  });
+});
+
+describe("getDuplicateAcknowledgements", () => {
+  it("reads back what was recorded, with the other requisition and acknowledging user resolved to names", async () => {
+    const original = await makeRequisitionWithLine("submitted");
+    const newOne = await makeRequisitionWithLine("draft");
+
+    await withTenant(tenant.id, (tx) =>
+      recordDuplicateAcknowledgements(tx, {
+        tenantId: tenant.id,
+        requisitionId: newOne.id,
+        acknowledgedByUserId: requestorA.id,
+        acknowledgements: [{ duplicateOfRequisitionId: original.id, reason: "Replaces a damaged unit, not a repeat order." }],
+      }),
+    );
+
+    const results = await withTenant(tenant.id, (tx) => getDuplicateAcknowledgements(tx, newOne.id));
+
+    expect(results).toHaveLength(1);
+    expect(results[0].duplicateOfRequisitionId).toBe(original.id);
+    // original's line was created via requestorB in makeRequisitionWithLine.
+    expect(results[0].duplicateOfRequestorName).toBe("Bala Requestor");
+    expect(results[0].duplicateOfStatus).toBe("submitted");
+    expect(results[0].acknowledgedByName).toBe("Asha Requestor");
+    expect(results[0].reason).toBe("Replaces a damaged unit, not a repeat order.");
+  });
+
+  it("returns nothing for a requisition with no acknowledgements", async () => {
+    const requisition = await makeRequisitionWithLine("draft");
+
+    const results = await withTenant(tenant.id, (tx) => getDuplicateAcknowledgements(tx, requisition.id));
+
+    expect(results).toEqual([]);
   });
 });

@@ -4,6 +4,7 @@ import { getCurrentUserAndTenant } from "@/db/session";
 import { withTenant } from "@/db/withTenant";
 import { getRequisitionDocumentUrl } from "@/db/documentStorage";
 import type { ExtractedDocumentMeta } from "@/db/documentExtraction";
+import { getDuplicateAcknowledgements } from "@/db/duplicateDetection";
 import {
   purchaseRequisitions as purchaseRequisitionsTable,
   purchaseRequisitionLines as purchaseRequisitionLinesTable,
@@ -75,13 +76,18 @@ export default async function RequisitionDetailPage({ params }: { params: Promis
       costCenters: await tx.select().from(costCentersTable),
       requirementRows: await tx.select().from(requirementsTable).where(eq(requirementsTable.requisitionId, id)),
       approvalRules: await tx.select().from(approvalRulesTable),
+      // Same read the approver's decision card uses — the requester and
+      // anyone else looking at this record should see the same history
+      // of what was flagged and why it was waved through, not a
+      // different (or absent) version of it.
+      duplicateAcknowledgements: await getDuplicateAcknowledgements(tx, id),
     };
   });
 
   if (!data) notFound();
   const {
     requisition, lines, categories, catalogItems, rfq, quotations, po, invoice, payment,
-    users, vendors, departments, costCenters, requirementRows, approvalRules,
+    users, vendors, departments, costCenters, requirementRows, approvalRules, duplicateAcknowledgements,
   } = data;
 
   const documentMeta = requisition.extractedDocumentMeta as ExtractedDocumentMeta;
@@ -223,6 +229,35 @@ export default async function RequisitionDetailPage({ params }: { params: Promis
           </tbody>
         </table>
       </div>
+
+      {duplicateAcknowledgements.length > 0 && (
+        <div className="flex flex-col gap-2 rounded-lg border border-warning/45 bg-warning/10 px-3.5 py-2.5">
+          <p className="text-sm font-medium text-warning-foreground">
+            Flagged as a possible duplicate at submission
+          </p>
+          {duplicateAcknowledgements.map((ack) => (
+            <div key={ack.id} className="text-xs text-muted-foreground">
+              <p>
+                Matched{" "}
+                <a
+                  href={`/dashboard/requisitions/${ack.duplicateOfRequisitionId}`}
+                  className="underline"
+                >
+                  {ack.duplicateOfRequestorName}&apos;s requisition
+                </a>{" "}
+                ({ack.duplicateOfStatus.replace(/_/g, " ")}
+                {ack.duplicateOfSubmittedAt
+                  ? `, ${new Date(ack.duplicateOfSubmittedAt).toLocaleDateString(undefined, { day: "numeric", month: "short" })}`
+                  : ""}
+                ).
+              </p>
+              <p className="mt-0.5">
+                {ack.acknowledgedByName} said: &ldquo;{ack.reason}&rdquo;
+              </p>
+            </div>
+          ))}
+        </div>
+      )}
 
       {(hasDocumentMeta || documentPreviewUrl || isDraftOwner) && (
         <div className="flex flex-col gap-3">
