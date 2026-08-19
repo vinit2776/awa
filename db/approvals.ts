@@ -13,6 +13,109 @@ import {
 } from "./schema";
 
 /**
+ * The scope an approval rule is matched against. Deliberately the plain
+ * values rather than a requisition row: the requisition form needs to
+ * know who a submission will go to *before* there is a requisition to
+ * read, and the alternative — a second copy of this matching logic for
+ * the preview — would drift from the real one and quietly start lying.
+ */
+export type ApprovalScope = {
+  currency: string;
+  totalEstimatedValue: string;
+  departmentId: string | null;
+  costCenterId: string | null;
+  lineCategoryIds: string[];
+};
+
+/**
+ * Active rules matching a scope, priority-desc, with the exclusive cut
+ * applied: rules are walked priority-desc and the first `exclusive` rule
+ * keeps itself and everything already collected, dropping everything
+ * below it.
+ */
+export async function findMatchingRules(tx: typeof db, tenantId: string, scope: ApprovalScope) {
+  const candidateRules = await tx
+    .select()
+    .from(approvalRules)
+    .where(
+      and(
+        eq(approvalRules.tenantId, tenantId),
+        eq(approvalRules.active, true),
+        eq(approvalRules.currency, scope.currency),
+        sql`${approvalRules.effectiveFrom} <= now()`,
+        or(isNull(approvalRules.effectiveTo), sql`${approvalRules.effectiveTo} >= now()`),
+        sql`${approvalRules.minValue} <= ${scope.totalEstimatedValue}`,
+        or(isNull(approvalRules.maxValue), sql`${approvalRules.maxValue} >= ${scope.totalEstimatedValue}`),
+        // A null scope value can only match a rule that leaves that
+        // dimension open. The `?? ""` this replaces bound an empty string
+        // to a uuid parameter, which Postgres rejects outright — so
+        // submitting a requisition with no department or no cost centre
+        // (both nullable, and both selectable as "—" on the form) threw
+        // instead of resolving approvals. The category dimension below
+        // always had this shape; these two did not.
+        scope.departmentId
+          ? or(isNull(approvalRules.departmentId), eq(approvalRules.departmentId, scope.departmentId))
+          : isNull(approvalRules.departmentId),
+        scope.costCenterId
+          ? or(isNull(approvalRules.costCenterId), eq(approvalRules.costCenterId, scope.costCenterId))
+          : isNull(approvalRules.costCenterId),
+        scope.lineCategoryIds.length > 0
+          ? or(isNull(approvalRules.categoryId), inArray(approvalRules.categoryId, scope.lineCategoryIds))
+          : isNull(approvalRules.categoryId),
+      ),
+    )
+    .orderBy(sql`${approvalRules.priority} desc`);
+
+  const matchingRules: (typeof candidateRules)[number][] = [];
+  for (const rule of candidateRules) {
+    matchingRules.push(rule);
+    if (rule.combinationMode === "exclusive") break;
+  }
+  return matchingRules;
+}
+
+/**
+ * The N most scope-specific eligible holders of a role — cost-centre
+ * scope beats department beats global — excluding the requestor, who is
+ * never eligible to approve their own requisition (§02).
+ */
+export async function selectApprovers(
+  tx: typeof db,
+  params: {
+    roleId: string;
+    excludeUserId: string;
+    departmentId: string | null;
+    costCenterId: string | null;
+    take: number;
+  },
+) {
+  const eligible = await tx
+    .select({ userId: userRoles.userId, scopeType: userRoles.scopeType })
+    .from(userRoles)
+    .where(
+      and(
+        eq(userRoles.roleId, params.roleId),
+        ne(userRoles.userId, params.excludeUserId),
+        // Same empty-string-as-uuid hazard as above: a role scoped to a
+        // department can only be eligible when the requisition has one.
+        or(
+          eq(userRoles.scopeType, "global"),
+          ...(params.departmentId
+            ? [and(eq(userRoles.scopeType, "department"), eq(userRoles.scopeId, params.departmentId))]
+            : []),
+          ...(params.costCenterId
+            ? [and(eq(userRoles.scopeType, "cost_center"), eq(userRoles.scopeId, params.costCenterId))]
+            : []),
+        ),
+      ),
+    );
+
+  const specificity = { cost_center: 0, department: 1, global: 2 } as const;
+  eligible.sort((a, b) => specificity[a.scopeType] - specificity[b.scopeType]);
+  return eligible.slice(0, params.take);
+}
+
+/**
  * Runs at submit time. Matches active approval_rules against the
  * requisition (value range + currency, department/cost-center/category
  * wildcards), resolves each matched rule's role requirements to actual
@@ -64,32 +167,13 @@ export async function resolveApprovals(tx: typeof db, tenantId: string, requisit
     .where(eq(purchaseRequisitionLines.requisitionId, requisitionId));
   const lineCategoryIds = [...new Set(lines.map((l) => l.categoryId).filter((id): id is string => id !== null))];
 
-  const candidateRules = await tx
-    .select()
-    .from(approvalRules)
-    .where(
-      and(
-        eq(approvalRules.tenantId, tenantId),
-        eq(approvalRules.active, true),
-        eq(approvalRules.currency, requisition.currency),
-        sql`${approvalRules.effectiveFrom} <= now()`,
-        or(isNull(approvalRules.effectiveTo), sql`${approvalRules.effectiveTo} >= now()`),
-        sql`${approvalRules.minValue} <= ${requisition.totalEstimatedValue}`,
-        or(isNull(approvalRules.maxValue), sql`${approvalRules.maxValue} >= ${requisition.totalEstimatedValue}`),
-        or(isNull(approvalRules.departmentId), eq(approvalRules.departmentId, requisition.departmentId ?? "")),
-        or(isNull(approvalRules.costCenterId), eq(approvalRules.costCenterId, requisition.costCenterId ?? "")),
-        lineCategoryIds.length > 0
-          ? or(isNull(approvalRules.categoryId), inArray(approvalRules.categoryId, lineCategoryIds))
-          : isNull(approvalRules.categoryId),
-      ),
-    )
-    .orderBy(sql`${approvalRules.priority} desc`);
-
-  const matchingRules: (typeof candidateRules)[number][] = [];
-  for (const rule of candidateRules) {
-    matchingRules.push(rule);
-    if (rule.combinationMode === "exclusive") break;
-  }
+  const matchingRules = await findMatchingRules(tx, tenantId, {
+    currency: requisition.currency,
+    totalEstimatedValue: requisition.totalEstimatedValue,
+    departmentId: requisition.departmentId,
+    costCenterId: requisition.costCenterId,
+    lineCategoryIds,
+  });
 
   if (matchingRules.length === 0) {
     await autoApprove(tx, tenantId, requisition.id, "no matching approval rule");
@@ -106,25 +190,14 @@ export async function resolveApprovals(tx: typeof db, tenantId: string, requisit
       .where(eq(approvalRuleRequirements.ruleId, rule.id));
 
     for (const req of ruleRequirements) {
-      const eligible = await tx
-        .select({ userId: userRoles.userId, scopeType: userRoles.scopeType })
-        .from(userRoles)
-        .where(
-          and(
-            eq(userRoles.roleId, req.approverRoleId),
-            ne(userRoles.userId, requisition.requestorId),
-            or(
-              eq(userRoles.scopeType, "global"),
-              and(eq(userRoles.scopeType, "department"), eq(userRoles.scopeId, requisition.departmentId ?? "")),
-              and(eq(userRoles.scopeType, "cost_center"), eq(userRoles.scopeId, requisition.costCenterId ?? "")),
-            ),
-          ),
-        );
+      const selected = await selectApprovers(tx, {
+        roleId: req.approverRoleId,
+        excludeUserId: requisition.requestorId,
+        departmentId: requisition.departmentId,
+        costCenterId: requisition.costCenterId,
+        take: req.minApprovalsInGroup,
+      });
 
-      const specificity = { cost_center: 0, department: 1, global: 2 } as const;
-      eligible.sort((a, b) => specificity[a.scopeType] - specificity[b.scopeType]);
-
-      const selected = eligible.slice(0, req.minApprovalsInGroup);
       for (const { userId } of selected) {
         const key = `${userId}:${req.groupNo}`;
         if (seen.has(key)) continue;

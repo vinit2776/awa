@@ -9,7 +9,6 @@ import {
   Truck,
   Receipt,
   Wallet,
-  RefreshCw,
   BarChart3,
   Settings,
   LifeBuoy,
@@ -18,20 +17,23 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
+// "Lifecycle" used to sit between Payments and Reports. It was a second
+// requisition list with the requestorId filter left off — one table, two
+// nav entries, which reads as two different things to somebody meeting
+// the app for the first time. It is a scope filter on Requisitions now.
 const NAV_ITEMS: { href: string; label: string; icon: LucideIcon }[] = [
-  { href: "/dashboard/requisitions", label: "My requests", icon: ClipboardList },
+  { href: "/dashboard/requisitions", label: "Requisitions", icon: ClipboardList },
   { href: "/dashboard/approvals", label: "Approvals", icon: CircleCheckBig },
   { href: "/dashboard/sourcing", label: "Sourcing", icon: Search },
   { href: "/dashboard/fulfillment", label: "Fulfillment", icon: Truck },
   { href: "/dashboard/invoices", label: "Invoices", icon: Receipt },
   { href: "/dashboard/payments", label: "Payments", icon: Wallet },
-  { href: "/dashboard/lifecycle", label: "Lifecycle", icon: RefreshCw },
   { href: "/dashboard/reports", label: "Reports", icon: BarChart3 },
   { href: "/dashboard/queries", label: "Queries", icon: MessageCircleQuestion },
   { href: "/dashboard/support", label: "Support", icon: LifeBuoy },
 ];
 
-const ADMIN_NAV_ITEM = { href: "/dashboard/admin/departments", label: "Admin", icon: Settings };
+const ADMIN_NAV_ITEM = { href: "/dashboard/admin", label: "Admin", icon: Settings };
 
 export function DashboardNav({ showAdmin }: { showAdmin: boolean }) {
   const pathname = usePathname();

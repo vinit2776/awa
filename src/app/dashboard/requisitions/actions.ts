@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { and, eq } from "drizzle-orm";
 import { getCurrentUserAndTenant } from "@/db/session";
 import { withTenant } from "@/db/withTenant";
+import { previewApprovalChain, type ApprovalPreview } from "@/db/approvalPreview";
 import { logAction } from "@/db/audit";
 import { resolveApprovals } from "@/db/approvals";
 import { notifyUser } from "@/db/notifications";
@@ -276,4 +277,36 @@ export async function extractRequisitionFromDocument(input: { key: string }): Pr
       estimatedUnitPrice: l.estimatedUnitPrice,
     })),
   };
+}
+
+/**
+ * Who this requisition will go to if submitted as it currently stands.
+ *
+ * Called from the form as the department, cost centre or line values
+ * change. Read-only — previewApprovalChain() reuses the real engine's
+ * matching rather than reimplementing it, so what this says and what
+ * submitting does cannot drift apart.
+ */
+export async function previewApprovers(input: {
+  departmentId: string | null;
+  costCenterId: string | null;
+  totalEstimatedValue: string;
+  categoryIds: string[];
+}): Promise<ApprovalPreview> {
+  const { user, tenant } = await getCurrentUserAndTenant();
+
+  return withTenant(tenant.id, (tx) =>
+    previewApprovalChain(
+      tx,
+      tenant.id,
+      {
+        currency: "INR",
+        totalEstimatedValue: input.totalEstimatedValue,
+        departmentId: input.departmentId,
+        costCenterId: input.costCenterId,
+        lineCategoryIds: [...new Set(input.categoryIds.filter(Boolean))],
+      },
+      user.id,
+    ),
+  );
 }

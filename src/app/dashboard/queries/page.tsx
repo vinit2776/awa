@@ -2,30 +2,49 @@ import Link from "next/link";
 import { listMyQueries } from "@/db/clarifications";
 import { Breadcrumbs } from "@/components/ui/breadcrumbs";
 import { cn } from "@/lib/utils";
+import { entityLabel } from "@/lib/entityLinks";
+import { ListControls, ListFilter } from "@/components/ui/list-controls";
 import { formatRelative } from "../support/ui";
-
-const ENTITY_LABEL: Record<string, string> = {
-  requisition: "Requisition",
-  purchase_order: "Purchase order",
-  invoice: "Invoice",
-  goods_receipt: "Goods receipt",
-  quotation: "Quotation",
-};
-
-const ENTITY_HREF: Record<string, (id: string) => string> = {
-  requisition: (id) => `/dashboard/requisitions/${id}`,
-  purchase_order: (id) => `/dashboard/sourcing/${id}`,
-  invoice: (id) => `/dashboard/invoices/${id}`,
-  goods_receipt: (id) => `/dashboard/fulfillment/${id}`,
-  quotation: (id) => `/dashboard/sourcing/${id}`,
-};
 
 /**
  * The personal inbox. This is what stops queries dying inside a record nobody
  * revisits — "Asked of me" is the actionable half and leads.
  */
-export default async function QueriesPage() {
-  const { askedOfMe, iAsked } = await listMyQueries();
+export default async function QueriesPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ q?: string; status?: string }>;
+}) {
+  const params = await searchParams;
+  const q = typeof params.q === "string" ? params.q.trim().toLowerCase() : "";
+  const statusFilter =
+    params.status === "open" || params.status === "answered" || params.status === "resolved"
+      ? params.status
+      : null;
+
+  const all = await listMyQueries();
+
+  // Both lists are already scoped to this person by listMyQueries(), and a
+  // personal inbox is small, so filtering here beats another round trip
+  // and a second copy of the matching rules.
+  // Structurally typed, not `typeof all.askedOfMe[number]`: that list is an
+  // inner join so counterpartName is non-null, while "I asked" is a left
+  // join and can be null. One predicate has to accept both.
+  const matches = (row: {
+    clarification: { question: string; status: string; entityType: string };
+    counterpartName: string | null;
+  }) => {
+    if (statusFilter && row.clarification.status !== statusFilter) return false;
+    if (!q) return true;
+    return (
+      row.clarification.question.toLowerCase().includes(q) ||
+      (row.counterpartName ?? "").toLowerCase().includes(q) ||
+      entityLabel(row.clarification.entityType).toLowerCase().includes(q)
+    );
+  };
+
+  const askedOfMe = all.askedOfMe.filter(matches);
+  const iAsked = all.iAsked.filter(matches);
   const openIAsked = iAsked.filter(
     (r) => r.clarification.status === "open" || r.clarification.status === "answered",
   );
@@ -42,20 +61,41 @@ export default async function QueriesPage() {
         </p>
       </div>
 
+      <ListControls
+        q={typeof params.q === "string" ? params.q : ""}
+        searchPlaceholder="Question, person, record…"
+        searchMatches="the question itself, the other person's name, and the kind of record it was raised on"
+        clearHref={q || statusFilter ? "/dashboard/queries" : undefined}
+        count={askedOfMe.length + iAsked.length}
+      >
+        <ListFilter
+          name="status"
+          label="Status"
+          value={statusFilter ?? ""}
+          options={[
+            { value: "", label: "All" },
+            { value: "open", label: "Open" },
+            { value: "answered", label: "Answered" },
+            { value: "resolved", label: "Resolved" },
+          ]}
+        />
+      </ListControls>
+
       <section className="flex flex-col gap-3">
         <h2 className="text-xs uppercase tracking-wide text-muted-foreground">
           Asked of me · {askedOfMe.length}
         </h2>
         {askedOfMe.length === 0 ? (
           <p className="rounded-lg border border-border p-6 text-center text-sm text-muted-foreground">
-            Nothing waiting on you.
+            {q || statusFilter ? "Nothing waiting on you matches that." : "Nothing waiting on you."}
           </p>
         ) : (
           <ul className="flex flex-col gap-2">
-            {askedOfMe.map(({ clarification, counterpartName }) => (
+            {askedOfMe.map(({ clarification, counterpartName, href }) => (
               <QueryRow
                 key={clarification.id}
                 clarification={clarification}
+                href={href}
                 counterpart={`${counterpartName} asked`}
                 emphasise
               />
@@ -75,10 +115,11 @@ export default async function QueriesPage() {
           </p>
         ) : (
           <ul className="flex flex-col gap-2">
-            {iAsked.map(({ clarification, counterpartName }) => (
+            {iAsked.map(({ clarification, counterpartName, href }) => (
               <QueryRow
                 key={clarification.id}
                 clarification={clarification}
+                href={href}
                 counterpart={counterpartName ? `asked ${counterpartName}` : "asked anyone"}
               />
             ))}
@@ -93,14 +134,15 @@ type Row = Awaited<ReturnType<typeof listMyQueries>>["askedOfMe"][number]["clari
 
 function QueryRow({
   clarification,
+  href,
   counterpart,
   emphasise,
 }: {
   clarification: Row;
+  href: string;
   counterpart: string;
   emphasise?: boolean;
 }) {
-  const href = ENTITY_HREF[clarification.entityType]?.(clarification.entityId) ?? "/dashboard";
 
   return (
     <li
@@ -110,7 +152,7 @@ function QueryRow({
       )}
     >
       <div className="flex flex-wrap items-center gap-2 text-xs">
-        <span className="font-medium">{ENTITY_LABEL[clarification.entityType] ?? clarification.entityType}</span>
+        <span className="font-medium">{entityLabel(clarification.entityType)}</span>
         {clarification.blocksProgress &&
           (clarification.status === "open" || clarification.status === "answered") && (
             <span className="rounded border border-input px-1.5 py-0.5 text-muted-foreground">Blocking</span>

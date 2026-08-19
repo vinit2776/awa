@@ -2,6 +2,7 @@ import { and, desc, eq, inArray, or } from "drizzle-orm";
 import type { db } from "./client";
 import { withTenant } from "./withTenant";
 import { LIVE_STATUSES, type ClarificationEntityType } from "./clarificationRules";
+import { CLARIFICATION_FALLBACK_HREF, resolveClarificationHrefs } from "./clarificationLinks";
 import { getCurrentUserAndTenant } from "./session";
 import { logAction } from "./audit";
 import { notifyUser } from "./notifications";
@@ -94,7 +95,22 @@ export async function listMyQueries() {
       .where(eq(transactionClarifications.raisedByUserId, user.id))
       .orderBy(desc(transactionClarifications.createdAt));
 
-    return { askedOfMe, iAsked, viewerId: user.id };
+    // Resolved here rather than at each call site: three of the five
+    // entity types need a join to reach a page that exists, so a caller
+    // holding only (entityType, entityId) cannot build a working link.
+    const hrefs = await resolveClarificationHrefs(
+      tx,
+      [...askedOfMe, ...iAsked].map((r) => ({
+        entityType: r.clarification.entityType,
+        entityId: r.clarification.entityId,
+      })),
+    );
+    const withHref = <T extends { clarification: { entityType: ClarificationEntityType; entityId: string } }>(row: T) => ({
+      ...row,
+      href: hrefs.get(`${row.clarification.entityType}:${row.clarification.entityId}`) ?? CLARIFICATION_FALLBACK_HREF,
+    });
+
+    return { askedOfMe: askedOfMe.map(withHref), iAsked: iAsked.map(withHref), viewerId: user.id };
   });
 }
 

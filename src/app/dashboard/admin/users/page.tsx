@@ -17,6 +17,7 @@ import {
 } from "@/db/schema";
 import { buttonVariants } from "@/components/ui/button";
 import { Breadcrumbs } from "@/components/ui/breadcrumbs";
+import { ListControls, ListFilter } from "@/components/ui/list-controls";
 import { cn } from "@/lib/utils";
 
 async function inviteUserAction(formData: FormData) {
@@ -133,9 +134,15 @@ async function revokeRole(formData: FormData) {
 export default async function UsersPage({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string; linkForUserId?: string }>;
+  searchParams: Promise<{ error?: string; linkForUserId?: string; q?: string; status?: string; role?: string }>;
 }) {
-  const { error, linkForUserId } = await searchParams;
+  const { error, linkForUserId, ...filters } = await searchParams;
+  const q = typeof filters.q === "string" ? filters.q.trim().toLowerCase() : "";
+  const statusFilter =
+    filters.status === "invited" || filters.status === "active" || filters.status === "disabled"
+      ? filters.status
+      : null;
+  const roleFilter = typeof filters.role === "string" && filters.role ? filters.role : null;
   const { tenant } = await getCurrentUserAndTenant();
 
   const [tenantUsers, roles, departments, costCenters, assignments] = await withTenant(
@@ -148,6 +155,17 @@ export default async function UsersPage({
       await tx.select().from(userRolesTable).where(eq(userRolesTable.tenantId, tenant.id)),
     ],
   );
+
+  // The people list is bounded by the size of the organisation and already
+  // fully loaded, so it filters here. Role matching needs the assignments
+  // that are loaded alongside it anyway.
+  const rolesFor = (userId: string) => assignments.filter((a) => a.userId === userId).map((a) => a.roleId);
+  const visibleUsers = tenantUsers.filter((u) => {
+    if (statusFilter && u.status !== statusFilter) return false;
+    if (roleFilter && !rolesFor(u.id).includes(roleFilter)) return false;
+    if (!q) return true;
+    return u.fullName.toLowerCase().includes(q) || u.email.toLowerCase().includes(q);
+  });
 
   // Recomputed on every render rather than stored — a set-password token
   // is only ever the current one for this user, so "generate" and
@@ -193,6 +211,35 @@ export default async function UsersPage({
           </div>
         )}
 
+        <ListControls
+          q={typeof filters.q === "string" ? filters.q : ""}
+          searchPlaceholder="Name or email…"
+          searchMatches="the person's name and email address"
+          clearHref={q || statusFilter || roleFilter ? "/dashboard/admin/users" : undefined}
+          count={visibleUsers.length}
+        >
+          <ListFilter
+            name="status"
+            label="Status"
+            value={statusFilter ?? ""}
+            options={[
+              { value: "", label: "All" },
+              { value: "invited", label: "Invited" },
+              { value: "active", label: "Active" },
+              { value: "disabled", label: "Disabled" },
+            ]}
+          />
+          <ListFilter
+            name="role"
+            label="Role"
+            value={roleFilter ?? ""}
+            options={[
+              { value: "", label: "Any role" },
+              ...roles.map((r) => ({ value: r.id, label: r.displayName })),
+            ]}
+          />
+        </ListControls>
+
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b text-left text-xs text-muted-foreground">
@@ -203,7 +250,7 @@ export default async function UsersPage({
             </tr>
           </thead>
           <tbody>
-            {tenantUsers.map((u) => (
+            {visibleUsers.map((u) => (
               <tr key={u.id} className="border-b">
                 <td className="py-2">{u.fullName}</td>
                 <td className="py-2 text-muted-foreground">{u.email}</td>

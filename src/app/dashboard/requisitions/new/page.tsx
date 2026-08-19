@@ -30,7 +30,7 @@ export default async function NewRequisitionPage() {
         <Breadcrumbs
           items={[
             { label: "Dashboard", href: "/dashboard" },
-            { label: "My requests", href: "/dashboard/requisitions" },
+            { label: "Requisitions", href: "/dashboard/requisitions" },
             { label: "New requisition" },
           ]}
         />

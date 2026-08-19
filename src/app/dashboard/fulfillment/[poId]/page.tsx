@@ -21,8 +21,9 @@ import { resolveMilestoneValue } from "@/db/serviceMilestones";
 import { buttonVariants } from "@/components/ui/button";
 import { Breadcrumbs } from "@/components/ui/breadcrumbs";
 import { cn } from "@/lib/utils";
-import { poStage } from "@/app/dashboard/lifecycle/stage";
-import { LifecycleStatus } from "@/app/dashboard/lifecycle/LifecycleStatus";
+import { poStage, PAYMENT_CAPTIONS } from "@/lib/lifecycle";
+import { LifecycleStatus } from "@/components/ui/lifecycle-status";
+import { LifecycleRail } from "@/components/ui/lifecycle-rail";
 import { advanceReturn, defineMilestone, initiateReturn, submitGoodsReceipt, submitMilestoneAcceptance, submitServiceAcceptance } from "./actions";
 
 export default async function FulfillmentDetailPage({
@@ -125,6 +126,20 @@ export default async function FulfillmentDetailPage({
           </div>
           <LifecycleStatus stage={poStage(po, invoice, payment)} className="shrink-0 items-end text-right" />
         </div>
+      </div>
+
+      {/* Receiving is the stage most often done by somebody who touches
+          AWA once a month — a storeman, not a buyer. The rail is how they
+          see that recording this is what unblocks the invoice behind it. */}
+      <div className="rounded-lg border border-border p-4">
+        <LifecycleRail
+          stage={poStage(po, invoice, payment)}
+          captions={{
+            purchase_order: po.poNumber,
+            invoice: invoice ? invoice.invoiceNumber : "Not submitted",
+            payment: payment ? PAYMENT_CAPTIONS[payment.status] : "—",
+          }}
+        />
       </div>
 
       {error && <p className="text-sm text-destructive">{error}</p>}

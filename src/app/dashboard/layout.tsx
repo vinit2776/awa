@@ -54,7 +54,10 @@ export default async function DashboardLayout({ children }: LayoutProps<"/dashbo
         </div>
       </aside>
 
-      <main className="flex flex-1 flex-col">{children}</main>
+      {/* min-w-0 matters: as a flex item this defaults to min-width:auto,
+          so a wide table inside pushes the whole page sideways instead of
+          scrolling within its own container. */}
+      <main className="flex min-w-0 flex-1 flex-col">{children}</main>
     </div>
   );
 }

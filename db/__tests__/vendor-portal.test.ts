@@ -21,6 +21,14 @@ import {
   vendors,
 } from "../schema";
 
+// findVendorLoginMatches() searches vendor_users.email across every tenant
+// (resolving the tenant is the point of the lookup), so these addresses are
+// GLOBAL keys on the shared dev database — a fixed one would pick up a
+// concurrent run's rows and blow the match counts. Same per-run suffix as the
+// slugs; see db/__tests__/po-verify.test.ts for the qr_token version.
+const suffix = crypto.randomUUID().slice(0, 8);
+const contact = (name: string) => `${name}-${suffix}@example.com`;
+
 let tenantA: typeof tenants.$inferSelect;
 let tenantB: typeof tenants.$inferSelect;
 let vendorA: typeof vendors.$inferSelect;
@@ -28,7 +36,6 @@ let vendorB: typeof vendors.$inferSelect;
 let requestor: typeof users.$inferSelect;
 
 beforeAll(async () => {
-  const suffix = crypto.randomUUID().slice(0, 8);
   [tenantA] = await adminDb.insert(tenants).values({ name: "Vendor Portal Co A", slug: `vendor-portal-co-a-${suffix}` }).returning();
   [tenantB] = await adminDb.insert(tenants).values({ name: "Vendor Portal Co B", slug: `vendor-portal-co-b-${suffix}` }).returning();
   [vendorA] = await withTenant(tenantA.id, (tx) => tx.insert(vendors).values({ tenantId: tenantA.id, name: "Acme Supplies" }).returning());
@@ -69,29 +76,29 @@ describe("magic link / session tokens", () => {
 
 describe("findVendorLoginMatches", () => {
   it("returns no matches for an email with no vendor_users row", async () => {
-    const matches = await findVendorLoginMatches("nobody@example.com");
+    const matches = await findVendorLoginMatches(contact("nobody"));
     expect(matches).toHaveLength(0);
   });
 
   it("returns every tenant a vendor contact's email is registered under", async () => {
     await withTenant(tenantA.id, (tx) =>
-      tx.insert(vendorUsers).values({ tenantId: tenantA.id, vendorId: vendorA.id, email: "shared@example.com", fullName: "Shared Contact", status: "active" }),
+      tx.insert(vendorUsers).values({ tenantId: tenantA.id, vendorId: vendorA.id, email: contact("shared"), fullName: "Shared Contact", status: "active" }),
     );
     await withTenant(tenantB.id, (tx) =>
-      tx.insert(vendorUsers).values({ tenantId: tenantB.id, vendorId: vendorB.id, email: "shared@example.com", fullName: "Shared Contact", status: "active" }),
+      tx.insert(vendorUsers).values({ tenantId: tenantB.id, vendorId: vendorB.id, email: contact("shared"), fullName: "Shared Contact", status: "active" }),
     );
 
-    const matches = await findVendorLoginMatches("shared@example.com");
+    const matches = await findVendorLoginMatches(contact("shared"));
     expect(matches).toHaveLength(2);
     expect(matches.map((m) => m.tenantName).sort()).toEqual(["Vendor Portal Co A", "Vendor Portal Co B"]);
   });
 
   it("excludes a disabled vendor contact", async () => {
     await withTenant(tenantA.id, (tx) =>
-      tx.insert(vendorUsers).values({ tenantId: tenantA.id, vendorId: vendorA.id, email: "disabled@example.com", fullName: "Disabled Contact", status: "disabled" }),
+      tx.insert(vendorUsers).values({ tenantId: tenantA.id, vendorId: vendorA.id, email: contact("disabled"), fullName: "Disabled Contact", status: "disabled" }),
     );
 
-    const matches = await findVendorLoginMatches("disabled@example.com");
+    const matches = await findVendorLoginMatches(contact("disabled"));
     expect(matches).toHaveLength(0);
   });
 });
@@ -99,7 +106,7 @@ describe("findVendorLoginMatches", () => {
 describe("vendor session lifecycle", () => {
   it("activates an invited contact on first session resolution and resolves their session", async () => {
     const [invited] = await withTenant(tenantA.id, (tx) =>
-      tx.insert(vendorUsers).values({ tenantId: tenantA.id, vendorId: vendorA.id, email: "invitee@example.com", fullName: "Invitee Contact" }).returning(),
+      tx.insert(vendorUsers).values({ tenantId: tenantA.id, vendorId: vendorA.id, email: contact("invitee"), fullName: "Invitee Contact" }).returning(),
     );
     expect(invited.status).toBe("invited");
 
@@ -116,7 +123,7 @@ describe("vendor session lifecycle", () => {
 
   it("resolves no session for a disabled vendor contact even with a validly signed token", async () => {
     const [disabled] = await withTenant(tenantA.id, (tx) =>
-      tx.insert(vendorUsers).values({ tenantId: tenantA.id, vendorId: vendorA.id, email: "revoked@example.com", fullName: "Revoked Contact", status: "disabled" }).returning(),
+      tx.insert(vendorUsers).values({ tenantId: tenantA.id, vendorId: vendorA.id, email: contact("revoked"), fullName: "Revoked Contact", status: "disabled" }).returning(),
     );
 
     const session = await resolveVendorSession(makeVendorSessionToken(disabled.id));
@@ -125,7 +132,7 @@ describe("vendor session lifecycle", () => {
 
   it("resolves no session for a tampered token", async () => {
     const [active] = await withTenant(tenantA.id, (tx) =>
-      tx.insert(vendorUsers).values({ tenantId: tenantA.id, vendorId: vendorA.id, email: "active@example.com", fullName: "Active Contact", status: "active" }).returning(),
+      tx.insert(vendorUsers).values({ tenantId: tenantA.id, vendorId: vendorA.id, email: contact("active"), fullName: "Active Contact", status: "active" }).returning(),
     );
     const token = makeVendorSessionToken(active.id);
     const tampered = token.slice(0, -2) + (token.slice(-2) === "aa" ? "bb" : "aa");
@@ -136,7 +143,7 @@ describe("vendor session lifecycle", () => {
 describe("vendor PO confirmation", () => {
   it("lists issued POs but not drafts, confirms exactly once, and logs it", async () => {
     const [vendorUser] = await withTenant(tenantA.id, (tx) =>
-      tx.insert(vendorUsers).values({ tenantId: tenantA.id, vendorId: vendorA.id, email: "poconfirm@example.com", fullName: "PO Confirm Contact", status: "active" }).returning(),
+      tx.insert(vendorUsers).values({ tenantId: tenantA.id, vendorId: vendorA.id, email: contact("poconfirm"), fullName: "PO Confirm Contact", status: "active" }).returning(),
     );
 
     const { draftPoId, issuedPoId } = await withTenant(tenantA.id, async (tx) => {

@@ -24,6 +24,11 @@ import {
  * this report cares about.
  */
 
+// tenants.slug is globally unique, so a fixed slug collides outright with a
+// concurrent run on the shared dev database. Same per-run suffix every other
+// suite in this directory uses.
+const suffix = crypto.randomUUID().slice(0, 8);
+
 let tenant: typeof tenants.$inferSelect;
 let requestor: typeof users.$inferSelect;
 let deptA: typeof departments.$inferSelect;
@@ -31,7 +36,7 @@ let deptB: typeof departments.$inferSelect;
 let cc: typeof costCenters.$inferSelect;
 
 beforeAll(async () => {
-  [tenant] = await adminDb.insert(tenants).values({ name: "Reports Co", slug: "reports-co" }).returning();
+  [tenant] = await adminDb.insert(tenants).values({ name: "Reports Co", slug: `reports-co-${suffix}` }).returning();
   [requestor] = await adminDb.insert(users).values({ tenantId: tenant.id, email: "reports-requestor@example.com", fullName: "Reba Requestor", status: "active" }).returning();
   await withTenant(tenant.id, async (tx) => {
     [deptA] = await tx.insert(departments).values({ tenantId: tenant.id, name: "Reports Dept A" }).returning();
@@ -94,7 +99,7 @@ describe("getApprovalsReport", () => {
   });
 
   it("returns an empty report for a tenant with no approved requisitions", async () => {
-    const [emptyTenant] = await adminDb.insert(tenants).values({ name: "Empty Reports Co", slug: "empty-reports-co" }).returning();
+    const [emptyTenant] = await adminDb.insert(tenants).values({ name: "Empty Reports Co", slug: `empty-reports-co-${suffix}` }).returning();
     try {
       const report = await withTenant(emptyTenant.id, (tx) => getApprovalsReport(tx));
       expect(report.totalValue).toBe(0);

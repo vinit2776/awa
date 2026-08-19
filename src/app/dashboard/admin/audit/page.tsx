@@ -1,19 +1,39 @@
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, gte, ilike, inArray, lte, or, sql } from "drizzle-orm";
 import { getCurrentUserAndTenant } from "@/db/session";
 import { withTenant } from "@/db/withTenant";
 import { auditLog as auditLogTable, users as usersTable } from "@/db/schema";
+import { ListControls, ListFilter } from "@/components/ui/list-controls";
 
 const PAGE_SIZE = 100;
 
 export default async function AuditLogPage({
   searchParams,
 }: {
-  searchParams: Promise<{ action?: string; entityType?: string }>;
+  searchParams: Promise<{ action?: string; entityType?: string; q?: string; from?: string; to?: string }>;
 }) {
-  const { action, entityType } = await searchParams;
+  const { action, entityType, q: rawQ, from, to } = await searchParams;
+  const q = typeof rawQ === "string" ? rawQ.trim() : "";
   const { tenant } = await getCurrentUserAndTenant();
 
-  const [entries, tenantUsers, actions, entityTypes] = await withTenant(tenant.id, async (tx) => [
+  const [entries, tenantUsers, actions, entityTypes] = await withTenant(tenant.id, async (tx) => {
+    // Search has to happen in SQL here, unlike the other admin lists: this
+    // query is capped at PAGE_SIZE, so filtering the returned rows would
+    // silently search only the most recent hundred and report "no matches"
+    // for something that is plainly in the log.
+    const actorIds = q
+      ? (await tx.select({ id: usersTable.id }).from(usersTable).where(ilike(usersTable.fullName, `%${q}%`))).map((u) => u.id)
+      : [];
+
+    const searchCondition = q
+      ? or(
+          ...(actorIds.length ? [inArray(auditLogTable.actorUserId, actorIds)] : []),
+          // The other thing anybody has to hand is the id of the record
+          // they are asking about, so match that as text.
+          sql`${auditLogTable.entityId}::text ilike ${`%${q}%`}`,
+        )
+      : undefined;
+
+    return [
     await tx
       .select()
       .from(auditLogTable)
@@ -21,6 +41,11 @@ export default async function AuditLogPage({
         and(
           action ? eq(auditLogTable.action, action) : undefined,
           entityType ? eq(auditLogTable.entityType, entityType) : undefined,
+          from ? gte(auditLogTable.occurredAt, new Date(from)) : undefined,
+          // Inclusive of the whole "to" day, not midnight at its start —
+          // a date range that silently excludes today is worse than none.
+          to ? lte(auditLogTable.occurredAt, new Date(`${to}T23:59:59.999Z`)) : undefined,
+          searchCondition,
         ),
       )
       .orderBy(desc(auditLogTable.occurredAt))
@@ -31,57 +56,60 @@ export default async function AuditLogPage({
       .selectDistinct({ entityType: auditLogTable.entityType })
       .from(auditLogTable)
       .orderBy(auditLogTable.entityType),
-  ]);
+    ] as const;
+  });
 
   const actorName = (userId: string | null) => {
     if (!userId) return "System";
     return tenantUsers.find((u) => u.id === userId)?.fullName ?? userId;
   };
 
-  const filtered = Boolean(action || entityType);
+  const filtered = Boolean(action || entityType || q || from || to);
 
   return (
     <div className="flex flex-col gap-6">
       <div>
         <h1 className="font-serif text-lg text-foreground">Audit log</h1>
         <p className="text-sm text-muted-foreground">
-          Most recent {entries.length} action{entries.length === 1 ? "" : "s"} in {tenant.name}
+          Every action taken in {tenant.name}, newest first — who did it, to what, and when.
+          {entries.length === PAGE_SIZE && " Showing the most recent 100; narrow the filters to see further back."}
         </p>
       </div>
 
-      <form className="flex flex-wrap items-end gap-2" action="/dashboard/admin/audit">
+      <ListControls
+        q={q}
+        searchPlaceholder="Who did it, or a record ID…"
+        searchMatches="the name of whoever performed the action, and the ID of the record it was performed on"
+        clearHref={filtered ? "/dashboard/admin/audit" : undefined}
+        count={entries.length}
+      >
+        <ListFilter
+          name="action"
+          label="Action"
+          value={action ?? ""}
+          options={[{ value: "", label: "All actions" }, ...actions.map((a) => ({ value: a.action, label: a.action }))]}
+        />
+        <ListFilter
+          name="entityType"
+          label="Entity type"
+          value={entityType ?? ""}
+          options={[
+            { value: "", label: "All entity types" },
+            ...entityTypes.map((e) => ({ value: e.entityType, label: e.entityType })),
+          ]}
+        />
         <div className="flex flex-col gap-1">
-          <label htmlFor="action" className="text-xs text-muted-foreground">Action</label>
-          <select id="action" name="action" defaultValue={action ?? ""} className="h-8 rounded-md border px-2 text-sm">
-            <option value="">All actions</option>
-            {actions.map((a) => (
-              <option key={a.action} value={a.action}>{a.action}</option>
-            ))}
-          </select>
+          <label htmlFor="from" className="text-xs text-muted-foreground">From</label>
+          <input id="from" name="from" type="date" defaultValue={from ?? ""} className="h-8 rounded-md border px-2 text-sm" />
         </div>
         <div className="flex flex-col gap-1">
-          <label htmlFor="entityType" className="text-xs text-muted-foreground">Entity type</label>
-          <select
-            id="entityType"
-            name="entityType"
-            defaultValue={entityType ?? ""}
-            className="h-8 rounded-md border px-2 text-sm"
-          >
-            <option value="">All entity types</option>
-            {entityTypes.map((e) => (
-              <option key={e.entityType} value={e.entityType}>{e.entityType}</option>
-            ))}
-          </select>
+          <label htmlFor="to" className="text-xs text-muted-foreground">To</label>
+          <input id="to" name="to" type="date" defaultValue={to ?? ""} className="h-8 rounded-md border px-2 text-sm" />
         </div>
-        <button type="submit" className="h-8 rounded-md border px-3 text-sm">Filter</button>
-        {filtered && (
-          <a href="/dashboard/admin/audit" className="h-8 rounded-md border px-3 text-sm leading-8">
-            Clear
-          </a>
-        )}
-      </form>
+      </ListControls>
 
-      <table className="w-full text-sm">
+      <div className="overflow-x-auto">
+      <table className="w-full min-w-3xl text-sm">
         <thead>
           <tr className="border-b text-left text-xs text-muted-foreground">
             <th className="py-2 font-normal">When</th>
@@ -111,6 +139,7 @@ export default async function AuditLogPage({
           ))}
         </tbody>
       </table>
+      </div>
 
       {entries.length === 0 && (
         <p className="text-sm text-muted-foreground">

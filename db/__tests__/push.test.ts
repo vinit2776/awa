@@ -12,11 +12,17 @@ vi.mock("web-push", () => ({
   },
 }));
 
+// push_subscriptions.endpoint is unique across the whole table, not per
+// tenant (a browser endpoint is globally distinct by nature) — so on the
+// shared dev database a fixed endpoint collides with a concurrent run's
+// insert rather than resolving to the wrong row.
+const suffix = crypto.randomUUID().slice(0, 8);
+const endpoint = (name: string) => `https://push.example.com/${name}-${suffix}`;
+
 let tenant: typeof tenants.$inferSelect;
 let user: typeof users.$inferSelect;
 
 beforeAll(async () => {
-  const suffix = crypto.randomUUID().slice(0, 8);
   [tenant] = await adminDb.insert(tenants).values({ name: "Push Test Co", slug: `push-test-co-${suffix}` }).returning();
   [user] = await adminDb.insert(users).values({ tenantId: tenant.id, email: "push@example.com", fullName: "Push User", status: "active" }).returning();
 });
@@ -42,8 +48,8 @@ describe("sendPushToUser", () => {
     const { sendPushToUser } = await import("../push");
 
     await withTenant(tenant.id, async (tx) => {
-      await tx.insert(pushSubscriptions).values({ tenantId: tenant.id, userId: user.id, endpoint: "https://push.example.com/a", p256dh: "key-a", auth: "auth-a" });
-      await tx.insert(pushSubscriptions).values({ tenantId: tenant.id, userId: user.id, endpoint: "https://push.example.com/b", p256dh: "key-b", auth: "auth-b" });
+      await tx.insert(pushSubscriptions).values({ tenantId: tenant.id, userId: user.id, endpoint: endpoint("a"), p256dh: "key-a", auth: "auth-a" });
+      await tx.insert(pushSubscriptions).values({ tenantId: tenant.id, userId: user.id, endpoint: endpoint("b"), p256dh: "key-b", auth: "auth-b" });
 
       await sendPushToUser(tx, user.id, { title: "Test", body: "Body" });
     });
@@ -56,7 +62,7 @@ describe("sendPushToUser", () => {
     const { sendPushToUser } = await import("../push");
 
     const [sub] = await withTenant(tenant.id, (tx) =>
-      tx.insert(pushSubscriptions).values({ tenantId: tenant.id, userId: user.id, endpoint: "https://push.example.com/dead", p256dh: "key", auth: "auth" }).returning(),
+      tx.insert(pushSubscriptions).values({ tenantId: tenant.id, userId: user.id, endpoint: endpoint("dead"), p256dh: "key", auth: "auth" }).returning(),
     );
 
     await withTenant(tenant.id, (tx) => sendPushToUser(tx, user.id, { title: "Test", body: "Body" }));
@@ -70,7 +76,7 @@ describe("sendPushToUser", () => {
     const { sendPushToUser } = await import("../push");
 
     const [sub] = await withTenant(tenant.id, (tx) =>
-      tx.insert(pushSubscriptions).values({ tenantId: tenant.id, userId: user.id, endpoint: "https://push.example.com/transient", p256dh: "key", auth: "auth" }).returning(),
+      tx.insert(pushSubscriptions).values({ tenantId: tenant.id, userId: user.id, endpoint: endpoint("transient"), p256dh: "key", auth: "auth" }).returning(),
     );
 
     await withTenant(tenant.id, (tx) => sendPushToUser(tx, user.id, { title: "Test", body: "Body" }));
@@ -84,7 +90,7 @@ describe("sendPushToUser", () => {
     const { sendPushToUser } = await import("../push");
 
     const [otherUser] = await adminDb.insert(users).values({ tenantId: tenant.id, email: "other@example.com", fullName: "Other User", status: "active" }).returning();
-    await withTenant(tenant.id, (tx) => tx.insert(pushSubscriptions).values({ tenantId: tenant.id, userId: otherUser.id, endpoint: "https://push.example.com/other", p256dh: "key", auth: "auth" }));
+    await withTenant(tenant.id, (tx) => tx.insert(pushSubscriptions).values({ tenantId: tenant.id, userId: otherUser.id, endpoint: endpoint("other"), p256dh: "key", auth: "auth" }));
 
     await withTenant(tenant.id, (tx) => sendPushToUser(tx, user.id, { title: "Test", body: "Body" }));
 
