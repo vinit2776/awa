@@ -310,7 +310,7 @@ export const purchaseRequisitionLines = pgTable("purchase_requisition_lines", {
 
 // A requester's answer of "no, this is a different purchase" to a possible-
 // duplicate warning (db/duplicateDetection.ts), recorded so an approver can
-// see it later. Append-only (0021_requisition_duplicate_acknowledgements.sql)
+// see it later. Append-only (0022_requisition_duplicate_acknowledgements.sql)
 // — same discipline as audit_log and approval_decision_log — this is a
 // record of what a person said at a moment in time.
 export const requisitionDuplicateAcknowledgements = pgTable("requisition_duplicate_acknowledgements", {
