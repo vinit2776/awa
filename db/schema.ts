@@ -640,6 +640,15 @@ export const supportResolutionOutcome = pgEnum("support_resolution_outcome", [
 ]);
 export const supportMessageVisibility = pgEnum("support_message_visibility", ["customer", "support_only"]);
 export const supportActorKind = pgEnum("support_actor_kind", ["customer", "support", "system"]);
+export const supportCsatRating = pgEnum("support_csat_rating", ["positive", "negative"]);
+
+/** One captured browser error. Message is truncated app-side before storage. */
+export type ConsoleErrorEntry = {
+  message: string;
+  source?: string;
+  line?: number;
+  at: string;
+};
 
 export const supportTickets = pgTable("support_tickets", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -680,6 +689,13 @@ export const supportTickets = pgTable("support_tickets", {
   // resolution clock pauses for that span (0016). first_response_due_at has no
   // equivalent: first response never pauses.
   awaitingCustomerSince: timestamp("awaiting_customer_since", { withTimezone: true }),
+  // Last few window.onerror / unhandledrejection entries from the reporter's
+  // browser (0018). Written once at report time and read whole — a child table
+  // would buy nothing.
+  consoleErrors: jsonb("console_errors").$type<ConsoleErrorEntry[]>(),
+  csatRating: supportCsatRating("csat_rating"),
+  csatComment: text("csat_comment"),
+  csatAt: timestamp("csat_at", { withTimezone: true }),
   relatedTicketId: uuid("related_ticket_id").references((): AnyPgColumn => supportTickets.id),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
@@ -860,4 +876,34 @@ export const supportEscalationMatrix = pgTable("support_escalation_matrix", {
   index().on(t.trigger, t.level),
   check("escalation_level_range", sql`${t.level} between 1 and 2`),
   check("escalation_grace_non_negative", sql`${t.afterMinutes} >= 0`),
+]);
+
+export const supportSavedReplies = pgTable("support_saved_replies", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  title: text("title").notNull().unique(),
+  body: text("body").notNull(),
+  // Empty array = offer for every ticket type, same convention as
+  // support_agents.handles_types.
+  appliesTo: supportTicketType("applies_to").array().notNull().default([]),
+  active: boolean("active").notNull().default(true),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [index().on(t.active)]);
+
+// Tenant-scoped, unlike supportSlaPolicies — a negotiated SLA belongs to one
+// customer. RLS applies here.
+export const supportSlaOverrides = pgTable("support_sla_overrides", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  tenantId: uuid("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+  ticketType: supportTicketType("ticket_type").notNull(),
+  priority: supportTicketPriority("priority").notNull(),
+  firstResponseMinutes: integer("first_response_minutes").notNull(),
+  resolutionMinutes: integer("resolution_minutes"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [
+  unique().on(t.tenantId, t.ticketType, t.priority),
+  index().on(t.tenantId, t.ticketType, t.priority),
+  check("sla_override_first_response_positive", sql`${t.firstResponseMinutes} > 0`),
+  check("sla_override_resolution_positive", sql`${t.resolutionMinutes} is null or ${t.resolutionMinutes} > 0`),
 ]);

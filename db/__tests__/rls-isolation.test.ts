@@ -17,6 +17,7 @@ import {
   supportTicketEvents,
   transactionClarifications,
   transactionClarificationMessages,
+  supportSlaOverrides,
 } from "../schema";
 
 /**
@@ -68,6 +69,7 @@ beforeAll(async () => {
       .values({ tenantId: tenantA.id, entityType: "requisition", entityId: req.id, raisedByUserId: user.id, question: "Q A" })
       .returning();
     await tx.insert(transactionClarificationMessages).values({ tenantId: tenantA.id, clarificationId: clarA.id, authorUserId: user.id, body: "reply A" });
+    await tx.insert(supportSlaOverrides).values({ tenantId: tenantA.id, ticketType: "bug", priority: "urgent", firstResponseMinutes: 30 });
   });
 
   await withTenant(tenantB.id, async (tx) => {
@@ -96,6 +98,7 @@ beforeAll(async () => {
       .values({ tenantId: tenantB.id, entityType: "requisition", entityId: req.id, raisedByUserId: user.id, question: "Q B" })
       .returning();
     await tx.insert(transactionClarificationMessages).values({ tenantId: tenantB.id, clarificationId: clarB.id, authorUserId: user.id, body: "reply B" });
+    await tx.insert(supportSlaOverrides).values({ tenantId: tenantB.id, ticketType: "bug", priority: "urgent", firstResponseMinutes: 30 });
   });
 });
 
@@ -106,6 +109,7 @@ afterAll(async () => {
   // from app_runtime, but adminDb is the owner role, so cleanup can still
   // remove it — the revoke constrains the application, not the migration role.
   const cleanupTables = [
+    supportSlaOverrides,
     transactionClarificationMessages,
     transactionClarifications,
     supportTicketEvents,
@@ -145,6 +149,7 @@ describe("RLS isolation", () => {
     { name: "support_ticket_events", table: supportTicketEvents },
     { name: "transaction_clarifications", table: transactionClarifications },
     { name: "transaction_clarification_messages", table: transactionClarificationMessages },
+    { name: "support_sla_overrides", table: supportSlaOverrides },
   ])("withTenant(A) querying $name sees only A's rows, never B's", async ({ table }) => {
     const rows = await withTenant(tenantA.id, (tx) => tx.select().from(table as typeof departments));
     expect(rows.length).toBeGreaterThan(0);

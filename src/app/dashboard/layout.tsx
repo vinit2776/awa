@@ -10,6 +10,7 @@ import { isStorageConfigured } from "@/db/storage";
 import { DashboardNav } from "./DashboardNav";
 import { PushNotifications } from "./PushNotifications";
 import { ReportWidget } from "./ReportWidget";
+import { ErrorCapture } from "./ErrorCapture";
 
 
 export default async function DashboardLayout({ children }: LayoutProps<"/dashboard">) {
@@ -24,6 +25,7 @@ export default async function DashboardLayout({ children }: LayoutProps<"/dashbo
 
   return (
     <div className="flex flex-1">
+      <ErrorCapture />
       <aside className="flex w-60 shrink-0 flex-col justify-between border-r border-sidebar-border bg-sidebar p-4">
         <div className="flex flex-col gap-6">
           <Link href="/dashboard" className="flex items-center gap-2 px-1">

@@ -2,7 +2,12 @@ import { and, eq, sql } from "drizzle-orm";
 import { db as database } from "./client";
 import { adminDb } from "./adminClient";
 import { logEmailResult, sendEmail } from "./email";
-import { platformAdmins, supportAgents, supportSlaPolicies, supportTickets } from "./schema";
+import type { db } from "./client";
+import type { ConsoleErrorEntry } from "./schema";
+import { platformAdmins, supportAgents, supportSlaOverrides, supportSlaPolicies, supportTickets } from "./schema";
+
+/** The transaction handle handed out by withTenant(). */
+type TenantScopedTx = typeof db;
 
 /**
  * The auth-free half of the support desk: routing and the TAT clock.
@@ -36,7 +41,34 @@ export async function resolveSlaTargets(
   type: SupportTicketType,
   priority: SupportTicketPriority,
   from: Date,
+  /**
+   * A tenant-scoped transaction. Required to see support_sla_overrides, which
+   * unlike support_sla_policies carries a tenant_id and so is behind RLS — read
+   * without a tenant scope it returns nothing, silently falling back to the
+   * global policy. Optional so callers with no negotiated-SLA concern (and the
+   * tests) can skip it.
+   */
+  tx?: TenantScopedTx,
 ): Promise<SlaTargets> {
+  const minutesFrom = (m: number) => new Date(from.getTime() + m * 60_000);
+
+  // A negotiated override wins outright. Checked first so a customer with a
+  // tighter contractual SLA never silently gets the standard one.
+  if (tx) {
+    const [override] = await tx
+      .select()
+      .from(supportSlaOverrides)
+      .where(and(eq(supportSlaOverrides.ticketType, type), eq(supportSlaOverrides.priority, priority)))
+      .limit(1);
+
+    if (override) {
+      return {
+        firstResponseDueAt: minutesFrom(override.firstResponseMinutes),
+        resolutionDueAt: override.resolutionMinutes === null ? null : minutesFrom(override.resolutionMinutes),
+      };
+    }
+  }
+
   const [policy] = await database
     .select()
     .from(supportSlaPolicies)
@@ -46,13 +78,11 @@ export async function resolveSlaTargets(
   if (!policy) return { firstResponseDueAt: null, resolutionDueAt: null };
 
   return {
-    firstResponseDueAt: new Date(from.getTime() + policy.firstResponseMinutes * 60_000),
+    firstResponseDueAt: minutesFrom(policy.firstResponseMinutes),
     // Deliberately stays null for feature requests and feedback: a backlog item
     // has no honest resolution target, and inventing one would make every such
     // ticket a permanent breach.
-    resolutionDueAt: policy.resolutionMinutes === null
-      ? null
-      : new Date(from.getTime() + policy.resolutionMinutes * 60_000),
+    resolutionDueAt: policy.resolutionMinutes === null ? null : minutesFrom(policy.resolutionMinutes),
   };
 }
 
@@ -241,4 +271,39 @@ export async function updateAgentRouting(
       maxOpen: settings.maxOpen && settings.maxOpen > 0 ? settings.maxOpen : null,
     })
     .where(eq(supportAgents.id, agentId));
+}
+
+// =========================================================================
+// Console error capture — the trust boundary
+// =========================================================================
+
+const MAX_STORED_CONSOLE_ERRORS = 20;
+
+/**
+ * The buffer arrives as a JSON string from a client the server does not
+ * control, so it is parsed defensively and reshaped field by field rather than
+ * stored as-is. A report must never fail because the payload was malformed —
+ * the ticket is the thing that matters, the diagnostics are a bonus.
+ */
+export function parseConsoleErrors(raw: string | null | undefined): ConsoleErrorEntry[] | null {
+  if (!raw) return null;
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return null;
+
+    const entries = parsed
+      .filter((e): e is Record<string, unknown> => typeof e === "object" && e !== null)
+      .map((e) => ({
+        message: String(e.message ?? "").slice(0, 300),
+        source: e.source ? String(e.source).slice(0, 120) : undefined,
+        line: typeof e.line === "number" ? e.line : undefined,
+        at: typeof e.at === "string" ? e.at : new Date().toISOString(),
+      }))
+      .filter((e) => e.message.length > 0)
+      .slice(-MAX_STORED_CONSOLE_ERRORS);
+
+    return entries.length > 0 ? entries : null;
+  } catch {
+    return null;
+  }
 }

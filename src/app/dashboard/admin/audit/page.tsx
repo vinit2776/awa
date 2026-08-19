@@ -108,7 +108,8 @@ export default async function AuditLogPage({
         </div>
       </ListControls>
 
-      <table className="w-full text-sm">
+      <div className="overflow-x-auto">
+      <table className="w-full min-w-3xl text-sm">
         <thead>
           <tr className="border-b text-left text-xs text-muted-foreground">
             <th className="py-2 font-normal">When</th>
@@ -138,6 +139,7 @@ export default async function AuditLogPage({
           ))}
         </tbody>
       </table>
+      </div>
 
       {entries.length === 0 && (
         <p className="text-sm text-muted-foreground">

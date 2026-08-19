@@ -1,15 +1,17 @@
 import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import type { db } from "./client";
+import { db as database } from "./client";
 import { adminDb } from "./adminClient";
 import { withTenant } from "./withTenant";
 import { getCurrentUserAndTenant } from "./session";
 import { getCurrentPlatformAdmin } from "./platformSession";
 import { isTenantAdmin } from "./permissions";
-import { alertSuperAdminsOfUnassigned, pickAssignee, resolveSlaTargets } from "./supportRouting";
+import { alertSuperAdminsOfUnassigned, parseConsoleErrors, pickAssignee, resolveSlaTargets } from "./supportRouting";
 export { slaState, type SlaState } from "./supportRouting";
 import { notifyUser } from "./notifications";
 import {
   platformAdmins,
+  supportSavedReplies,
   supportTicketAttachments,
   supportTicketEvents,
   supportTicketMessages,
@@ -110,6 +112,8 @@ export type ReportInput = {
   appVersion?: string | null;
   userAgent?: string | null;
   viewport?: string | null;
+  /** JSON from the client's error ring buffer; parsed and capped here. */
+  consoleErrors?: string | null;
 };
 
 export async function createTicket(input: ReportInput) {
@@ -121,14 +125,19 @@ export async function createTicket(input: ReportInput) {
     throw new Error("A report needs both a subject and a description.");
   }
 
-  // Both of these run BEFORE the transaction opens, and neither can be moved
-  // inside it: pickAssignee counts an agent's tickets across every tenant, which
-  // withTenant would filter down to this one customer and get wrong.
+  // pickAssignee runs BEFORE the transaction and cannot move inside it: it
+  // counts an agent's tickets across every tenant, which withTenant would filter
+  // down to this one customer and get wrong.
+  //
+  // resolveSlaTargets is the mirror image — it must run INSIDE, because
+  // support_sla_overrides is tenant-scoped and behind RLS. Called without a
+  // tenant scope it sees nothing and silently falls back to the global policy,
+  // quietly ignoring a customer's negotiated SLA.
   const now = new Date();
-  const targets = await resolveSlaTargets(input.type, "normal", now);
   const assignedToAdminId = await pickAssignee(tenant.id, input.type);
 
   const ticket = await withTenant(tenant.id, async (tx) => {
+    const targets = await resolveSlaTargets(input.type, "normal", now, tx);
     const [ticket] = await tx
       .insert(supportTickets)
       .values({
@@ -151,6 +160,7 @@ export async function createTicket(input: ReportInput) {
         appVersion: input.appVersion ?? null,
         userAgent: input.userAgent ?? null,
         viewport: input.viewport ?? null,
+        consoleErrors: parseConsoleErrors(input.consoleErrors),
       })
       .returning();
 
@@ -428,6 +438,64 @@ export async function customerEscalate(ticketId: string, reason: string) {
       metadata: { reason: text },
     });
   });
+}
+
+/**
+ * CSAT, offered once a ticket is resolved or closed.
+ *
+ * Only the person who raised it may rate — a colleague with read access under
+ * D3 didn't live through the problem. Rating is one-shot for the same reason
+ * escalation is: a score that can be revised until it reads well isn't a
+ * measurement.
+ */
+export async function rateTicket(ticketId: string, rating: "positive" | "negative", comment: string) {
+  const { user, tenant } = await getCurrentUserAndTenant();
+
+  await withTenant(tenant.id, async (tx) => {
+    const [ticket] = await tx
+      .select()
+      .from(supportTickets)
+      .where(and(eq(supportTickets.id, ticketId), eq(supportTickets.tenantId, tenant.id)))
+      .limit(1);
+
+    if (!ticket) throw new Error("Ticket not found.");
+    if (ticket.reportedByUserId !== user.id) throw new Error("Only the person who raised this can rate it.");
+    if (ticket.status !== "resolved" && ticket.status !== "closed") {
+      throw new Error("You can rate this once it's resolved.");
+    }
+    if (ticket.csatRating) throw new Error("You've already rated this one.");
+
+    await tx
+      .update(supportTickets)
+      // csat_at is set alongside the rating, not defaulted — a check constraint
+      // requires both or neither, so "did they answer?" always has an answer.
+      .set({ csatRating: rating, csatComment: comment.trim() || null, csatAt: new Date() })
+      .where(eq(supportTickets.id, ticketId));
+
+    await logTicketEvent(tx, {
+      tenantId: tenant.id,
+      ticketId,
+      event: "rated",
+      actor: { kind: "customer", userId: user.id },
+      toValue: rating,
+      metadata: { hasComment: comment.trim().length > 0 },
+    });
+  });
+}
+
+/** Canned replies for the support composer, filtered to this ticket's type. */
+export async function listSavedReplies(ticketType: string) {
+  await getCurrentSupportAgent();
+  const rows = await database
+    .select()
+    .from(supportSavedReplies)
+    .where(eq(supportSavedReplies.active, true))
+    .orderBy(supportSavedReplies.title);
+
+  // Empty appliesTo means "every type", matching support_agents.handles_types.
+  return rows.filter(
+    (r) => r.appliesTo.length === 0 || r.appliesTo.includes(ticketType as (typeof r.appliesTo)[number]),
+  );
 }
 
 /** Reopen within 14 days of resolution; after that it's a new ticket. */

@@ -247,6 +247,10 @@ export default async function DashboardPage() {
 
       <PageHelp
         id="today"
+        // The welcome card above already orients a first-time reader, and
+        // two tinted panels stacked read as one repeated thing. This stays
+        // one click away rather than competing with it.
+        defaultCollapsed
         title="How this page works"
         steps={{
           yours:
