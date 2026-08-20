@@ -19,6 +19,8 @@ import { Step1Document } from "./wizard/Step1Document";
 import { Step2Basics } from "./wizard/Step2Basics";
 import { Step3LineItems } from "./wizard/Step3LineItems";
 import { Step4Review } from "./wizard/Step4Review";
+import { RequestConsequencesRail } from "./wizard/RequestConsequencesRail";
+import { computeBudgetStatus } from "./wizard/budgetStatus";
 import { emptyLine, buildExistingLineRefs, type Line, type PendingMatch, type Department, type CostCenter, type Category, type CatalogItem } from "./wizard/types";
 
 type Revision = {
@@ -189,6 +191,7 @@ export function RequisitionForm({
     () => lines.reduce((sum, l) => sum + Number(l.quantity || 0) * Number(l.estimatedUnitPrice || 0), 0),
     [lines],
   );
+  const budgetStatus = computeBudgetStatus(costCenterId, costCenters, committedByCostCenter, total);
 
   // Refreshed whenever something that affects routing changes. Rules match
   // on value, department, cost centre and line category, so those are the
@@ -303,109 +306,130 @@ export function RequisitionForm({
     });
   };
 
+  // The rail's Send button is reachable from every step, before
+  // justification or duplicate-acknowledgement reasons (only entered on
+  // Review) exist — so a click from anywhere but Review takes you there
+  // first, rather than submitting invalid state. A second click, now on
+  // Review, actually sends it.
+  const handleSend = () => {
+    if (step !== "review") {
+      goToStep("review");
+      return;
+    }
+    submit(true);
+  };
+
   return (
-    <div className="flex flex-col gap-6">
-      <nav className="flex flex-wrap items-center gap-1 text-sm">
-        {steps.map((s, i) => (
-          <span key={s} className="flex items-center gap-1">
-            {i > 0 && <span className="text-muted-foreground">›</span>}
-            <button
-              type="button"
-              disabled={i > maxVisited}
-              onClick={() => goToStep(s)}
-              className={cn(
-                "rounded-md px-2 py-1",
-                i === stepIndex
-                  ? "bg-primary/10 font-medium text-primary"
-                  : i <= maxVisited
-                    ? "text-muted-foreground hover:text-foreground"
-                    : "text-muted-foreground/50",
-              )}
-            >
-              {STEP_LABEL[s]}
-            </button>
-          </span>
-        ))}
-      </nav>
+    <div className="flex flex-col gap-7 lg:flex-row">
+      <div className="flex min-w-0 flex-1 flex-col gap-6">
+        <nav className="flex flex-wrap items-center gap-1 text-sm">
+          {steps.map((s, i) => (
+            <span key={s} className="flex items-center gap-1">
+              {i > 0 && <span className="text-muted-foreground">›</span>}
+              <button
+                type="button"
+                disabled={i > maxVisited}
+                onClick={() => goToStep(s)}
+                className={cn(
+                  "rounded-md px-2 py-1",
+                  i === stepIndex
+                    ? "bg-primary/10 font-medium text-primary"
+                    : i <= maxVisited
+                      ? "text-muted-foreground hover:text-foreground"
+                      : "text-muted-foreground/50",
+                )}
+              >
+                {STEP_LABEL[s]}
+              </button>
+            </span>
+          ))}
+        </nav>
 
-      {step === "document" && (
-        <Step1Document
-          isExtracting={isExtracting}
-          extractMessage={extractMessage}
-          onExtract={extractFromDocument}
-          onSkip={() => goToStep("basics")}
-        />
-      )}
+        {step === "document" && (
+          <Step1Document
+            isExtracting={isExtracting}
+            extractMessage={extractMessage}
+            onExtract={extractFromDocument}
+            onSkip={() => goToStep("basics")}
+          />
+        )}
 
-      {step === "basics" && (
-        <Step2Basics
-          departments={departments}
-          costCenters={costCenters}
-          departmentId={departmentId}
-          costCenterId={costCenterId}
-          setDepartmentId={setDepartmentId}
-          setCostCenterId={setCostCenterId}
-          total={total}
-          committedByCostCenter={committedByCostCenter}
-        />
-      )}
+        {step === "basics" && (
+          <Step2Basics
+            departments={departments}
+            costCenters={costCenters}
+            departmentId={departmentId}
+            costCenterId={costCenterId}
+            setDepartmentId={setDepartmentId}
+            setCostCenterId={setCostCenterId}
+            total={total}
+            committedByCostCenter={committedByCostCenter}
+          />
+        )}
 
-      {step === "lines" && (
-        <Step3LineItems
-          lines={lines}
-          categories={categories}
-          catalogItems={catalogItems}
-          updateLine={updateLine}
-          removeLine={removeLine}
-          addLine={addLine}
-          total={total}
-          documentMeta={documentMeta}
-          sourceDocumentKey={sourceDocumentKey}
-          pendingMatches={pendingMatches}
-          onUpdateMatch={resolveUpdateMatch}
-          onKeepMatchSeparate={resolveKeepSeparate}
-        />
-      )}
+        {step === "lines" && (
+          <Step3LineItems
+            lines={lines}
+            categories={categories}
+            catalogItems={catalogItems}
+            updateLine={updateLine}
+            removeLine={removeLine}
+            addLine={addLine}
+            total={total}
+            documentMeta={documentMeta}
+            sourceDocumentKey={sourceDocumentKey}
+            pendingMatches={pendingMatches}
+            onUpdateMatch={resolveUpdateMatch}
+            onKeepMatchSeparate={resolveKeepSeparate}
+          />
+        )}
 
-      {step === "review" && (
-        <Step4Review
-          justification={justification}
-          setJustification={setJustification}
-          preview={preview}
-          revision={!!revision}
-          isPending={isPending}
-          error={error}
-          onSave={() => submit(false)}
-          onSubmit={() => submit(true)}
-          duplicates={duplicates}
-          itemName={itemName}
-          duplicateReasons={duplicateReasons}
-          onDuplicateReasonChange={setDuplicateReason}
-          onEditLines={() => goToStep("lines")}
-        />
-      )}
+        {step === "review" && (
+          <Step4Review
+            justification={justification}
+            setJustification={setJustification}
+            error={error}
+            duplicates={duplicates}
+            itemName={itemName}
+            duplicateReasons={duplicateReasons}
+            onDuplicateReasonChange={setDuplicateReason}
+            onEditLines={() => goToStep("lines")}
+          />
+        )}
 
-      <div className="flex justify-between">
-        <button
-          type="button"
-          disabled={stepIndex === 0}
-          onClick={() => setStepIndex((i) => Math.max(0, i - 1))}
-          className={cn(
-            "text-sm text-muted-foreground hover:text-foreground disabled:pointer-events-none disabled:opacity-0",
-          )}
-        >
-          ← Back
-        </button>
-        {stepIndex < steps.length - 1 && (
+        <div className="flex justify-between">
           <button
             type="button"
-            onClick={() => goToStep(steps[stepIndex + 1])}
-            className="text-sm text-muted-foreground hover:text-foreground"
+            disabled={stepIndex === 0}
+            onClick={() => setStepIndex((i) => Math.max(0, i - 1))}
+            className={cn(
+              "text-sm text-muted-foreground hover:text-foreground disabled:pointer-events-none disabled:opacity-0",
+            )}
           >
-            Next →
+            ← Back
           </button>
-        )}
+          {stepIndex < steps.length - 1 && (
+            <button
+              type="button"
+              onClick={() => goToStep(steps[stepIndex + 1])}
+              className="text-sm text-muted-foreground hover:text-foreground"
+            >
+              Next →
+            </button>
+          )}
+        </div>
       </div>
+
+      <RequestConsequencesRail
+        preview={preview}
+        duplicates={duplicates}
+        budgetStatus={budgetStatus}
+        revision={!!revision}
+        isPending={isPending}
+        onSend={handleSend}
+        onSaveDraft={() => submit(false)}
+        onLookAtDuplicates={() => goToStep("review")}
+      />
     </div>
   );
 }

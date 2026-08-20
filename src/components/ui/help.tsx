@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useLayoutEffect, useState, type ReactNode } from "react";
+import Link from "next/link";
 import { Popover } from "@base-ui/react/popover";
 import { GLOSSARY, type GlossaryKey } from "@/lib/glossary";
 import { cn } from "@/lib/utils";
@@ -146,6 +147,12 @@ export function Term({
               {entry.definition}
             </Popover.Description>
             {entry.soWhat && <p className="mt-1.5 text-xs leading-relaxed text-primary">{entry.soWhat}</p>}
+            <Link
+              href={`/dashboard/help?term=${name}`}
+              className="mt-1.5 inline-block text-[11px] text-muted-foreground underline underline-offset-2 hover:text-foreground"
+            >
+              Read more
+            </Link>
           </Popover.Popup>
         </Popover.Positioner>
       </Popover.Portal>

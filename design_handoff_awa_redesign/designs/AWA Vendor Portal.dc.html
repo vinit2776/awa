@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Source+Serif+4:opsz,wght@8..60,400;8..60,500&display=swap" rel="stylesheet">
+<style>body{margin:0;background:#E9E7E1;font-family:Geist,system-ui,sans-serif}a{color:#D97757}a:hover{color:#C6613F}</style>
+</helmet>
+
+<div style="width:900px;box-sizing:border-box;border:1px solid rgba(11,11,11,0.14);border-radius:12px;background:#FCFCFB;padding:32px 36px;display:flex;flex-direction:column;gap:24px">
+  <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:16px">
+    <div>
+      <h1 style="margin:0;font-family:'Source Serif 4',Georgia,serif;font-size:24px;font-weight:400">Orders from Kalyani Industries</h1>
+      <p style="margin:5px 0 0;font-size:14px;line-height:1.55;color:#5B5952;max-width:70ch">You're signed in as ops@suraksha.co.in for <strong style="font-weight:500">Suraksha Traders</strong>. This page is the real order — if an emailed PDF ever disagrees with what's here, what's here is correct.</p>
+    </div>
+    <button style="flex-shrink:0;height:32px;padding:0 12px;border:1px solid rgba(11,11,11,0.10);border-radius:8px;background:#FCFCFB;font-size:13px;cursor:pointer">Sign out</button>
+  </div>
+
+  <sc-if value="{{ notConfirmed }}" hint-placeholder-val="{{ true }}">
+    <div style="border:1px solid rgba(217,119,87,0.35);background:rgba(217,119,87,0.05);border-radius:12px;padding:20px 22px;display:flex;gap:24px;align-items:flex-start">
+      <div style="flex:1;min-width:0">
+        <div style="display:flex;align-items:baseline;gap:10px">
+          <p style="margin:0;font-size:16px;font-weight:500">PO-2026-0006 · ₹1,48,000</p>
+          <span style="border-radius:999px;padding:2px 9px;font-size:11.5px;font-weight:500;background:rgba(217,119,87,0.16);color:#C6613F">needs your confirmation</span>
+        </div>
+        <p style="margin:8px 0 0;font-size:14.5px;line-height:1.6;color:#0B0B0B">Kalyani Industries wants <strong style="font-weight:500">200 ISI-marked safety helmets</strong>, delivered to the Pune plant by <strong style="font-weight:500">2 September</strong>.</p>
+        <p style="margin:6px 0 0;font-size:13.5px;line-height:1.6;color:#5B5952">They're waiting for you to say you can supply it at this price and date. Confirming is what makes this order binding on both sides.</p>
+        <div style="margin-top:14px;display:flex;flex-wrap:wrap;gap:10px">
+          <button onclick="{{ confirm }}" style="height:40px;padding:0 18px;border:none;border-radius:10px;background:#D97757;color:#fff;font-size:14.5px;font-weight:500;cursor:pointer">Yes — we can supply this</button>
+          <button style="height:40px;padding:0 16px;border:1px solid rgba(11,11,11,0.12);border-radius:10px;background:#FCFCFB;font-size:14.5px;cursor:pointer">Something's wrong with it</button>
+          <button style="height:40px;padding:0 16px;border:1px solid rgba(11,11,11,0.12);border-radius:10px;background:#FCFCFB;font-size:14.5px;cursor:pointer">Download the order (PDF)</button>
+        </div>
+      </div>
+      <div style="width:200px;flex-shrink:0;border-left:1px solid rgba(11,11,11,0.10);padding-left:20px">
+        <p style="margin:0;font-size:11px;letter-spacing:0.07em;text-transform:uppercase;color:#9A968C">Is this genuine?</p>
+        <p style="margin:8px 0 0;font-size:12.5px;line-height:1.55;color:#5B5952">Every AWA order carries a QR code and a fingerprint. Scan or check it and you'll see the same figures you see here.</p>
+        <p style="margin:8px 0 0;font-family:ui-monospace,monospace;font-size:11px;color:#78766F;word-break:break-all">9f2c·41ab·77de</p>
+        <a href="#" style="display:inline-block;margin-top:8px;font-size:12.5px">Check this order</a>
+      </div>
+    </div>
+  </sc-if>
+  <sc-if value="{{ confirmed }}" hint-placeholder-val="{{ false }}">
+    <div style="border:1px solid rgba(12,163,12,0.3);background:rgba(12,163,12,0.06);border-radius:12px;padding:18px 22px">
+      <p style="margin:0;font-size:15px;font-weight:500;color:#0B0B0B">PO-2026-0006 confirmed</p>
+      <p style="margin:4px 0 0;font-size:13.5px;color:#5B5952">Kalyani has been notified. Deliver by 2 September, then bill for what they've received.</p>
+    </div>
+  </sc-if>
+
+  <div style="border:1px solid rgba(11,11,11,0.08);border-radius:12px;padding:20px 22px">
+    <div style="display:flex;align-items:baseline;gap:10px">
+      <p style="margin:0;font-size:16px;font-weight:500">PO-2026-0003 · ₹14,400</p>
+      <span style="border-radius:999px;padding:2px 9px;font-size:11.5px;font-weight:500;background:rgba(37,106,191,0.10);color:#256ABF">part delivered</span>
+    </div>
+    <p style="margin:8px 0 0;font-size:14.5px;line-height:1.6;color:#0B0B0B">12 of 24 helmets received on 6 August. <strong style="font-weight:500">They're still expecting the other 12.</strong></p>
+    <p style="margin:6px 0 0;font-size:13.5px;line-height:1.6;color:#5B5952">You can invoice for the 12 already received now, or wait and bill once.</p>
+    <div style="margin-top:14px;display:flex;flex-wrap:wrap;gap:10px">
+      <button style="height:36px;padding:0 14px;border:1px solid rgba(11,11,11,0.12);border-radius:10px;background:#FCFCFB;font-size:14px;cursor:pointer">Send an invoice for the 12</button>
+      <button style="height:36px;padding:0 14px;border:1px solid rgba(11,11,11,0.12);border-radius:10px;background:#FCFCFB;font-size:14px;cursor:pointer">Tell them about a delay</button>
+    </div>
+  </div>
+
+  <div style="border:1px solid rgba(11,11,11,0.08);border-radius:12px;padding:18px 22px;display:flex;align-items:center;gap:20px;background:#F6F6F3">
+    <div style="flex:1">
+      <p style="margin:0;font-size:14px;font-weight:500">PO-2026-0001 · ₹6,000 — finished</p>
+      <p style="margin:4px 0 0;font-size:13.5px;color:#5B5952">Delivered, billed and paid on 24 July. Reference UTR 4471983320. Nothing needed from you.</p>
+    </div>
+    <button style="flex-shrink:0;height:32px;padding:0 12px;border:1px solid rgba(11,11,11,0.10);border-radius:8px;background:#FCFCFB;font-size:13px;cursor:pointer">See it</button>
+  </div>
+
+  <p style="margin:0;font-size:12.5px;line-height:1.55;color:#78766F;max-width:80ch">A note on bank details: AWA will never ask you to change your account details by email or through this page. If you need to change them, Kalyani's finance team will call you back on a number they already hold.</p>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:900,&quot;height&quot;:700}}">
+class Component extends DCLogic {
+  state = { confirmed: false };
+  renderVals() {
+    return {
+      notConfirmed: !this.state.confirmed,
+      confirmed: this.state.confirmed,
+      confirm: () => this.setState({ confirmed: true }),
+    };
+  }
+}
+</script>
+</body>
+</html>

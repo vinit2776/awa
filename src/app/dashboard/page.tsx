@@ -21,12 +21,15 @@ import {
 } from "@/db/schema";
 import { buttonVariants } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Card } from "@/components/ui/card";
 import { Info, PageHelp } from "@/components/ui/help";
 import { LifecycleStatus } from "@/components/ui/lifecycle-status";
-import { computeStage, approvalStepDetail } from "@/lib/lifecycle";
+import { LifecycleRail } from "@/components/ui/lifecycle-rail";
+import { computeStage, approvalStepDetail, railPosition, LIFECYCLE_STEPS, type LifecycleStepKey } from "@/lib/lifecycle";
 import { entityLabel } from "@/lib/entityLinks";
 import { requisitionLabel } from "@/lib/requisitionSummary";
-import { stagesForRoles } from "@/lib/roleStages";
+import { stagesForRoles, STAGE_OWNER_HINT } from "@/lib/roleStages";
+import { hasFlag, AWA_REDESIGN_FLAG } from "@/lib/featureFlags";
 import { WelcomeCard } from "./WelcomeCard";
 import { cn } from "@/lib/utils";
 
@@ -47,6 +50,7 @@ import { cn } from "@/lib/utils";
  */
 export default async function DashboardPage() {
   const { user, tenant } = await getCurrentUserAndTenant();
+  const redesigned = hasFlag(tenant.featureFlags, AWA_REDESIGN_FLAG);
   const { askedOfMe } = await listMyQueries();
 
   const data = await withTenant(tenant.id, async (tx) => {
@@ -62,15 +66,13 @@ export default async function DashboardPage() {
       .where(eq(purchaseRequisitionsTable.status, "pending_approval"));
 
     const allRequisitions = await tx.select().from(purchaseRequisitionsTable);
+    const allRfqs = await tx.select().from(rfqsTable);
     const invoices = await tx.select().from(invoicesTable);
     const payments = await tx.select().from(paymentInstructionsTable);
     const purchaseOrders = await tx.select().from(purchaseOrdersTable);
 
     // Only what's needed to stage my own requisitions — not the tenant's.
     const myIds = myRequisitions.map((r) => r.id);
-    const myRfqs = myIds.length
-      ? await tx.select().from(rfqsTable).where(inArray(rfqsTable.requisitionId, myIds))
-      : [];
     const myRequirementRows = myIds.length
       ? await tx.select().from(requirementsTable).where(inArray(requirementsTable.requisitionId, myIds))
       : [];
@@ -82,13 +84,13 @@ export default async function DashboardPage() {
 
     return {
       myRequisitions,
-      myRfqs,
       myRequirementRows,
       myLines,
       catalogItems: await tx.select().from(catalogItemsTable),
       pendingRequirements,
       requisitionsInApproval,
       allRequisitions,
+      allRfqs,
       invoices,
       payments,
       purchaseOrders,
@@ -106,8 +108,8 @@ export default async function DashboardPage() {
   });
 
   const {
-    myRequisitions, myRfqs, myRequirementRows, myLines, catalogItems, pendingRequirements, requisitionsInApproval,
-    allRequisitions, invoices, payments, purchaseOrders, users, myRoles, activeRules, viewerIsAdmin,
+    myRequisitions, myRequirementRows, myLines, catalogItems, pendingRequirements, requisitionsInApproval,
+    allRequisitions, allRfqs, invoices, payments, purchaseOrders, users, myRoles, activeRules, viewerIsAdmin,
   } = data;
 
   const userName = (id: string | null) => users.find((u) => u.id === id)?.fullName ?? "—";
@@ -162,7 +164,7 @@ export default async function DashboardPage() {
       const po = purchaseOrders.find((p) => p.requisitionId === r.id);
       const invoice = po ? invoices.find((i) => i.poId === po.id) : undefined;
       const payment = invoice ? payments.find((p) => p.invoiceId === invoice.id) : undefined;
-      const stage = computeStage(r, myRfqs.filter((x) => x.requisitionId === r.id), po, invoice, payment);
+      const stage = computeStage(r, allRfqs.filter((x) => x.requisitionId === r.id), po, invoice, payment);
 
       const pendingForThis = myRequirementRows.filter((x) => x.requisitionId === r.id && x.status === "pending");
       const currentGroup = pendingForThis.length ? Math.min(...pendingForThis.map((x) => x.groupNo)) : null;
@@ -201,6 +203,344 @@ export default async function DashboardPage() {
     { label: "Failed payments", count: payments.filter((p) => p.status === "failed").length, href: "/dashboard/payments", urgent: true },
   ].filter((q) => q.count > 0);
 
+  if (!redesigned) {
+    return (
+      <LegacyHome
+        tenant={tenant}
+        user={user}
+        needsMe={needsMe}
+        myRoles={myRoles}
+        stagesForRoles={stagesForRoles}
+        viewerIsAdmin={viewerIsAdmin}
+        activeRules={activeRules}
+        actionableApprovals={actionableApprovals}
+        requisitionsInApproval={requisitionsInApproval}
+        userName={userName}
+        myRejected={myRejected}
+        labelFor={labelFor}
+        openQueries={openQueries}
+        myDrafts={myDrafts}
+        myInFlight={myInFlight}
+        queues={queues}
+      />
+    );
+  }
+
+  // ---- Redesign: the seven-stage bar --------------------------------------
+
+  const ownedStages = new Set(stagesForRoles(myRoles.map((r) => r.key)));
+
+  // "Currently sitting at this station" — everything except records that
+  // have fully exited the pipeline (Paid) or hit a dead end (cancelled /
+  // closed), which aren't waiting on anyone at that stage anymore.
+  const DEAD_STAGES = new Set(["Cancelled", "Rejected — closed", "PO cancelled"]);
+  const stageCounts = LIFECYCLE_STEPS.map(() => 0);
+  for (const r of allRequisitions) {
+    const po = purchaseOrders.find((p) => p.requisitionId === r.id);
+    const invoice = po ? invoices.find((i) => i.poId === po.id) : undefined;
+    const payment = invoice ? payments.find((p) => p.invoiceId === invoice.id) : undefined;
+    const stage = computeStage(r, allRfqs.filter((x) => x.requisitionId === r.id), po, invoice, payment);
+    if (stage === "Paid" || DEAD_STAGES.has(stage)) continue;
+    stageCounts[railPosition(stage).step] += 1;
+  }
+
+  const STAGE_TITLE: Record<LifecycleStepKey, string> = {
+    requisition: "Someone asks",
+    approval: "Someone agrees",
+    sourcing: "A vendor is chosen",
+    purchase_order: "The order goes out",
+    receipt: "It arrives",
+    invoice: "The bill is checked",
+    payment: "It gets paid",
+  };
+  const STAGE_HREF: Record<LifecycleStepKey, string> = {
+    requisition: "/dashboard/requisitions?scope=all",
+    approval: "/dashboard/approvals",
+    sourcing: "/dashboard/sourcing",
+    purchase_order: "/dashboard/fulfillment",
+    receipt: "/dashboard/fulfillment",
+    invoice: "/dashboard/invoices",
+    payment: "/dashboard/payments",
+  };
+  const STAGE_SUB: Record<LifecycleStepKey, string | null> = {
+    requisition: myDrafts.length > 0 ? `yours · ${myDrafts.length} unsent` : null,
+    approval: actionableApprovals.length > 0 ? `${actionableApprovals.length} waiting on you` : null,
+    sourcing: null,
+    purchase_order: null,
+    receipt: null,
+    invoice: null,
+    payment: null,
+  };
+
+  return (
+    <div className="flex flex-1 flex-col gap-6 p-4 sm:p-8">
+      <div>
+        <h1 className="font-serif text-2xl text-foreground">How buying works here, and where you sit in it</h1>
+        <p className="text-sm text-muted-foreground">
+          {ownedStages.size} of {LIFECYCLE_STEPS.length} stages are yours — marked below. Numbers are what {tenant.name} is
+          holding right now.
+        </p>
+      </div>
+
+      {viewerIsAdmin && activeRules.length === 0 && (
+        <div className="flex items-start gap-3 rounded-lg border border-destructive/40 bg-destructive/5 px-3.5 py-3">
+          <span className="mt-0.5 w-[3px] self-stretch rounded-sm bg-destructive" aria-hidden="true" />
+          <div>
+            <p className="text-sm font-medium">Nothing is being approved by anyone yet</p>
+            <p className="mt-0.5 text-sm text-muted-foreground">
+              {tenant.name} has no active approval rules, so every requisition anyone submits is approved
+              automatically the moment it is sent.
+              <Info
+                title="Why it auto-approves"
+                next="One rule — say, anything over 0 needs a department head — closes the gap."
+              >
+                When no rule matches a requisition there is nobody to route it to, so AWA approves it rather
+                than leaving it stuck forever. That keeps a half-configured tenant from deadlocking, but it
+                means the controls you bought aren&apos;t running yet.
+              </Info>
+            </p>
+            <Link
+              href="/dashboard/admin/approval-rules"
+              className={cn(buttonVariants({ variant: "outline", size: "sm" }), "mt-2")}
+            >
+              Set up approval rules
+            </Link>
+          </div>
+        </div>
+      )}
+
+      <div className="flex overflow-x-auto rounded-xl border border-border">
+        {LIFECYCLE_STEPS.map((step, index) => {
+          const mine = ownedStages.has(step.key);
+          // The owner hint ("procurement", "finance") is written for a
+          // stage that isn't the viewer's — showing it on a tinted "mine"
+          // column contradicts the tint. An owned stage with nothing more
+          // specific to say falls back to "yours", never the hint.
+          const sub = STAGE_SUB[step.key] ?? (mine ? "yours" : STAGE_OWNER_HINT[step.key]);
+          return (
+            <Link
+              key={step.key}
+              href={STAGE_HREF[step.key]}
+              className={cn(
+                "min-w-[130px] flex-1 shrink-0 px-3.5 py-4 text-left transition-colors hover:bg-primary/10",
+                index < LIFECYCLE_STEPS.length - 1 && "border-r border-border",
+                mine && "bg-primary/[0.07]",
+              )}
+            >
+              {mine ? (
+                <span className="flex items-center gap-1.5">
+                  <span className="size-[7px] shrink-0 rounded-full bg-primary" aria-hidden="true" />
+                  <span className="text-[13px] font-medium text-foreground">{STAGE_TITLE[step.key]}</span>
+                </span>
+              ) : (
+                <span className="text-[13px] text-muted-foreground">{STAGE_TITLE[step.key]}</span>
+              )}
+              <p className="mt-1.5 text-[11.5px] text-muted-foreground/80">{step.label}</p>
+              <p className={cn("mt-2.5 text-xl font-medium tabular-nums", mine ? "text-foreground" : "text-muted-foreground")}>
+                {stageCounts[index]}
+              </p>
+              <p className={cn("mt-0.5 text-[11.5px]", mine ? "font-medium text-primary" : "text-muted-foreground")}>
+                {sub}
+              </p>
+            </Link>
+          );
+        })}
+      </div>
+
+      <div className="flex flex-col items-start gap-6 md:flex-row">
+        <section className="flex w-full flex-[1.15] flex-col gap-2.5">
+          <h2 className="text-[12.5px] font-medium tracking-[0.07em] text-muted-foreground uppercase">
+            Waiting on you{actionableApprovals.length + myRejected.length + openQueries.length + myDrafts.length > 0 ? "" : " — nothing right now"}
+          </h2>
+
+          {needsMe === 0 ? (
+            <p className="rounded-lg border border-dashed border-input p-6 text-center text-sm text-muted-foreground">
+              Nothing needs a decision from you right now.
+            </p>
+          ) : (
+            <ul className="flex flex-col gap-2">
+              {actionableApprovals.length > 0 && (
+                <ActionRow
+                  tone="primary"
+                  title={`Approve ${actionableApprovals.length} requisition${actionableApprovals.length === 1 ? "" : "s"}`}
+                  detail={
+                    actionableApprovals.length === 1
+                      ? `${userName(requisitionsInApproval.find((r) => r.id === actionableApprovals[0].requisitionId)?.requestorId ?? null)} is waiting on your decision.`
+                      : "Each one is waiting on your decision before it can go any further."
+                  }
+                  cta={{ label: "Review", href: "/dashboard/approvals" }}
+                />
+              )}
+
+              {myRejected.map((r) => (
+                <ActionRow
+                  key={r.id}
+                  tone="warning"
+                  title={`"${labelFor(r)}" was sent back`}
+                  detail={`An approver asked for changes to your ${r.totalEstimatedValue} ${r.currency} requisition. Revising it restarts approval from the first step.`}
+                  cta={{ label: "Revise", href: `/dashboard/requisitions/${r.id}/edit` }}
+                />
+              ))}
+
+              {openQueries.map(({ clarification, counterpartName, href }) => (
+                <ActionRow
+                  key={clarification.id}
+                  tone="info"
+                  title={`${counterpartName} asked you a question`}
+                  detail={clarification.question}
+                  cta={{ label: "Answer", href }}
+                  meta={clarification.blocksProgress ? `Blocking the ${entityLabel(clarification.entityType).toLowerCase()}` : undefined}
+                />
+              ))}
+
+              {myDrafts.map((r) => (
+                <ActionRow
+                  key={r.id}
+                  tone="neutral"
+                  title={`Unsubmitted draft — ${labelFor(r)}`}
+                  detail={`${r.totalEstimatedValue} ${r.currency}. Nobody can see this until you submit it.`}
+                  cta={{ label: "Open", href: `/dashboard/requisitions/${r.id}` }}
+                />
+              ))}
+            </ul>
+          )}
+        </section>
+
+        <section className="flex w-full flex-1 flex-col gap-2.5">
+          <h2 className="text-[12.5px] font-medium tracking-[0.07em] text-muted-foreground uppercase">Yours, on the map</h2>
+          {myInFlight.length === 0 ? (
+            <p className="rounded-lg border border-dashed border-input p-6 text-center text-sm text-muted-foreground">
+              Nothing of yours is in flight right now.
+            </p>
+          ) : (
+            <div className="flex flex-col gap-2">
+              {myInFlight.map(({ requisition, stage }) => (
+                <Card key={requisition.id} className="p-3">
+                  <p className="text-[13.5px] font-medium">{labelFor(requisition)}</p>
+                  <LifecycleRail
+                    stage={stage}
+                    compact
+                    href={`/dashboard/requisitions/${requisition.id}`}
+                    className="mt-2"
+                  />
+                  <p className="mt-1.5 text-xs text-muted-foreground">{stage}</p>
+                </Card>
+              ))}
+              <Card className="bg-muted/60">
+                <p className="text-[13px] leading-relaxed text-muted-foreground">
+                  Every request, order, bill and payment in AWA shows this same seven-part bar. Learn it once.
+                </p>
+              </Card>
+            </div>
+          )}
+        </section>
+      </div>
+
+      <div className="flex flex-col gap-3 sm:flex-row">
+        <Link
+          href="/dashboard/requisitions/new"
+          className="flex flex-1 flex-col gap-1 rounded-[10px] border border-border bg-background px-4.5 py-4 text-left transition-colors hover:bg-muted"
+        >
+          <span className="text-[15px] font-medium text-foreground">Ask for something</span>
+          <span className="text-[13px] text-muted-foreground">
+            Two minutes. We&apos;ll tell you who has to agree before you send it.
+          </span>
+        </Link>
+        <Link
+          href="/dashboard/requisitions?scope=all"
+          className="flex flex-1 flex-col gap-1 rounded-[10px] border border-border bg-background px-4.5 py-4 text-left transition-colors hover:bg-muted"
+        >
+          <span className="text-[15px] font-medium text-foreground">Find out what happened to something</span>
+          <span className="text-[13px] text-muted-foreground">
+            Search anyone&apos;s request — see who is holding it and since when.
+          </span>
+        </Link>
+      </div>
+    </div>
+  );
+}
+
+function ActionRow({
+  tone,
+  title,
+  detail,
+  meta,
+  cta,
+}: {
+  tone: "primary" | "warning" | "info" | "neutral";
+  title: string;
+  detail: string;
+  meta?: string;
+  cta: { label: string; href: string };
+}) {
+  const accent = {
+    primary: "bg-primary",
+    warning: "bg-warning",
+    info: "bg-chart-1",
+    neutral: "bg-muted-foreground",
+  }[tone];
+
+  return (
+    <li className="flex items-start gap-3 rounded-lg border border-border p-3.5">
+      <span className={cn("mt-0.5 w-[3px] self-stretch rounded-sm", accent)} aria-hidden="true" />
+      <div className="min-w-0 flex-1">
+        <p className="text-sm font-medium">{title}</p>
+        <p className="text-sm text-muted-foreground">{detail}</p>
+        {meta && <p className="mt-0.5 text-xs text-muted-foreground">{meta}</p>}
+      </div>
+      <Link href={cta.href} className={cn(buttonVariants({ variant: "outline", size: "sm" }), "shrink-0")}>
+        {cta.label}
+      </Link>
+    </li>
+  );
+}
+
+/**
+ * Pre-redesign layout, kept only for tenants without the awaRedesign
+ * feature flag (see src/lib/featureFlags.ts) — delete once every tenant
+ * has been switched over.
+ */
+function LegacyHome({
+  tenant,
+  user,
+  needsMe,
+  myRoles,
+  stagesForRoles: stagesForRolesFn,
+  viewerIsAdmin,
+  activeRules,
+  actionableApprovals,
+  requisitionsInApproval,
+  userName,
+  myRejected,
+  labelFor,
+  openQueries,
+  myDrafts,
+  myInFlight,
+  queues,
+}: {
+  tenant: { name: string };
+  user: { fullName: string };
+  needsMe: number;
+  myRoles: { key: string; displayName: string }[];
+  stagesForRoles: (roleKeys: string[]) => LifecycleStepKey[];
+  viewerIsAdmin: boolean;
+  activeRules: unknown[];
+  actionableApprovals: { requisitionId: string }[];
+  requisitionsInApproval: { id: string; requestorId: string | null }[];
+  userName: (id: string | null) => string;
+  myRejected: { id: string; totalEstimatedValue: string; currency: string }[];
+  labelFor: (r: { id: string }) => string;
+  openQueries: { clarification: { id: string; question: string; blocksProgress: boolean }; counterpartName: string; href: string }[];
+  myDrafts: { id: string; totalEstimatedValue: string; currency: string }[];
+  myInFlight: {
+    requisition: { id: string; totalEstimatedValue: string; currency: string; createdAt: Date };
+    stage: string;
+    stepDetail: string | null;
+    waitingOn: { name: string } | null;
+    since: Date | null;
+  }[];
+  queues: { label: string; count: number; href: string; urgent?: boolean }[];
+}) {
   return (
     <div className="flex flex-1 flex-col gap-6 p-8">
       <div>
@@ -215,7 +555,7 @@ export default async function DashboardPage() {
       <WelcomeCard
         firstName={user.fullName.split(" ")[0]}
         roleNames={myRoles.map((r) => r.displayName)}
-        ownedStages={stagesForRoles(myRoles.map((r) => r.key))}
+        ownedStages={stagesForRolesFn(myRoles.map((r) => r.key))}
       />
 
       {viewerIsAdmin && activeRules.length === 0 && (
@@ -288,7 +628,7 @@ export default async function DashboardPage() {
               <ActionRow
                 key={r.id}
                 tone="warning"
-                title={`“${labelFor(r)}” was sent back`}
+                title={`"${labelFor(r)}" was sent back`}
                 detail={`An approver asked for changes to your ${r.totalEstimatedValue} ${r.currency} requisition. Revising it restarts approval from the first step.`}
                 cta={{ label: "Revise", href: `/dashboard/requisitions/${r.id}/edit` }}
               />
@@ -301,7 +641,7 @@ export default async function DashboardPage() {
                 title={`${counterpartName} asked you a question`}
                 detail={clarification.question}
                 cta={{ label: "Answer", href }}
-                meta={clarification.blocksProgress ? `Blocking the ${entityLabel(clarification.entityType).toLowerCase()}` : undefined}
+                meta={clarification.blocksProgress ? `Blocking the ${entityLabel("requisition").toLowerCase()}` : undefined}
               />
             ))}
 
@@ -385,40 +725,5 @@ export default async function DashboardPage() {
         </section>
       )}
     </div>
-  );
-}
-
-function ActionRow({
-  tone,
-  title,
-  detail,
-  meta,
-  cta,
-}: {
-  tone: "primary" | "warning" | "info" | "neutral";
-  title: string;
-  detail: string;
-  meta?: string;
-  cta: { label: string; href: string };
-}) {
-  const accent = {
-    primary: "bg-primary",
-    warning: "bg-warning",
-    info: "bg-chart-1",
-    neutral: "bg-muted-foreground",
-  }[tone];
-
-  return (
-    <li className="flex items-start gap-3 rounded-lg border border-border p-3.5">
-      <span className={cn("mt-0.5 w-[3px] self-stretch rounded-sm", accent)} aria-hidden="true" />
-      <div className="min-w-0 flex-1">
-        <p className="text-sm font-medium">{title}</p>
-        <p className="text-sm text-muted-foreground">{detail}</p>
-        {meta && <p className="mt-0.5 text-xs text-muted-foreground">{meta}</p>}
-      </div>
-      <Link href={cta.href} className={cn(buttonVariants({ variant: "outline", size: "sm" }), "shrink-0")}>
-        {cta.label}
-      </Link>
-    </li>
   );
 }

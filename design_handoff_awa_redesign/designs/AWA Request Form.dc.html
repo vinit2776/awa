@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Source+Serif+4:opsz,wght@8..60,400;8..60,500&display=swap" rel="stylesheet">
+<style>
+  body { margin:0; background:#E9E7E1; font-family:Geist,system-ui,sans-serif; }
+  a { color:#D97757; }
+  a:hover { color:#C6613F; }
+  input, select, textarea { font-family:inherit; }
+</style>
+</helmet>
+
+<div style="display:flex;width:100%;min-width:1180px;min-height:760px;background:#FCFCFB">
+  <dc-import name="AwaSidebarNew" active="requests" hint-size="248px,760px"></dc-import>
+
+  <main style="flex:1;min-width:0;display:flex;gap:28px;padding:32px 36px">
+    <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:22px">
+      <div>
+        <h1 style="margin:0;font-family:'Source Serif 4',Georgia,serif;font-size:24px;font-weight:400;color:#0B0B0B">Ask for something</h1>
+        <p style="margin:4px 0 0;font-size:14px;color:#5B5952">Formally a <span title="A request to buy, before any money is committed." style="border-bottom:1px dashed rgba(217,119,87,0.7);cursor:help">requisition</span> — a request to buy, before any money is committed.</p>
+      </div>
+
+      <fieldset style="border:1px solid rgba(11,11,11,0.08);border-radius:10px;padding:16px 18px;margin:0">
+        <legend style="padding:0 6px;font-size:12px;letter-spacing:0.06em;text-transform:uppercase;color:#9A968C">What</legend>
+        <div style="display:flex;flex-direction:column;gap:12px">
+          <sc-for list="{{ lines }}" as="line" hint-placeholder-count="1">
+            <div style="display:flex;gap:10px;align-items:flex-end">
+              <div style="flex:1;display:flex;flex-direction:column;gap:5px">
+                <label style="font-size:12.5px;color:#5B5952">Item</label>
+                <input value="{{ line.item }}" onchange="{{ line.setItem }}" style="height:38px;border:1px solid rgba(11,11,11,0.14);border-radius:8px;padding:0 10px;font-size:14px;background:#fff">
+              </div>
+              <div style="width:80px;display:flex;flex-direction:column;gap:5px">
+                <label style="font-size:12.5px;color:#5B5952">Qty</label>
+                <input value="{{ line.qty }}" onchange="{{ line.setQty }}" style="height:38px;border:1px solid rgba(11,11,11,0.14);border-radius:8px;padding:0 10px;font-size:14px;background:#fff">
+              </div>
+              <div style="width:120px;display:flex;flex-direction:column;gap:5px">
+                <label style="font-size:12.5px;color:#5B5952">Price each</label>
+                <input value="{{ line.price }}" onchange="{{ line.setPrice }}" style="height:38px;border:1px solid rgba(11,11,11,0.14);border-radius:8px;padding:0 10px;font-size:14px;background:#fff">
+              </div>
+              <div style="width:96px;text-align:right;padding-bottom:9px;font-size:14px;font-weight:500">{{ line.lineTotal }}</div>
+              <sc-if value="{{ line.canRemove }}" hint-placeholder-val="{{ false }}">
+                <button onclick="{{ line.remove }}" style="height:38px;padding:0 8px;border:none;background:none;color:#78766F;font-size:12.5px;cursor:pointer;white-space:nowrap;flex-shrink:0">Remove</button>
+              </sc-if>
+            </div>
+          </sc-for>
+          <div style="display:flex;align-items:center;gap:14px">
+            <button onclick="{{ addLine }}" style="height:28px;padding:0 10px;border:1px solid rgba(11,11,11,0.10);border-radius:8px;background:#FCFCFB;font-size:12.5px;cursor:pointer;white-space:nowrap;flex-shrink:0">Add a line</button>
+            <span style="font-size:12.5px;color:#78766F">Unit and category came from the catalogue — <a href="#">change them</a></span>
+            <span style="margin-left:auto;font-size:14px;font-weight:500">{{ total }}</span>
+          </div>
+        </div>
+      </fieldset>
+
+      <fieldset style="border:1px solid rgba(11,11,11,0.08);border-radius:10px;padding:16px 18px;margin:0">
+        <legend style="padding:0 6px;font-size:12px;letter-spacing:0.06em;text-transform:uppercase;color:#9A968C">Who pays</legend>
+        <div style="display:flex;gap:12px;flex-wrap:wrap">
+          <div style="flex:1;min-width:180px;display:flex;flex-direction:column;gap:5px">
+            <label style="font-size:12.5px;color:#5B5952">Department</label>
+            <select onchange="{{ setDepartment }}" style="height:38px;border:1px solid rgba(11,11,11,0.14);border-radius:8px;padding:0 10px;font-size:14px;background:#fff">
+              <option>Facilities</option><option>Engineering</option><option>Operations</option>
+            </select>
+          </div>
+          <div style="flex:1;min-width:220px;display:flex;flex-direction:column;gap:5px">
+            <label style="font-size:12.5px;color:#5B5952">Budget line <span style="color:#9A968C">(cost centre)</span></label>
+            <select style="height:38px;border:1px solid rgba(11,11,11,0.14);border-radius:8px;padding:0 10px;font-size:14px;background:#fff">
+              <option>Facilities — running costs</option>
+            </select>
+          </div>
+        </div>
+        <div style="margin-top:14px">
+          <div style="display:flex;height:8px;overflow:hidden;border-radius:999px;background:#F0EFEA">
+            <span style="width:65%;background:rgba(120,118,111,0.45)"></span>
+            <span style="{{ budgetBarStyle }}"></span>
+          </div>
+          <div style="margin-top:6px;display:flex;justify-content:space-between;font-size:12.5px;color:#78766F">
+            <span>₹8,02,000 already committed · <span style="color:#D97757">{{ total }} this request</span></span>
+            <span>{{ budgetLeft }} left of ₹12,00,000</span>
+          </div>
+        </div>
+      </fieldset>
+
+      <fieldset style="border:1px solid rgba(11,11,11,0.08);border-radius:10px;padding:16px 18px;margin:0">
+        <legend style="padding:0 6px;font-size:12px;letter-spacing:0.06em;text-transform:uppercase;color:#9A968C">Why</legend>
+        <textarea rows="2" value="{{ justification }}" onchange="{{ setJustification }}" placeholder="One line — it's what an approver reads first." style="width:100%;box-sizing:border-box;border:1px solid rgba(11,11,11,0.14);border-radius:8px;padding:10px 12px;font-size:14px;background:#fff"></textarea>
+      </fieldset>
+    </div>
+
+    <aside style="width:330px;flex-shrink:0;display:flex;flex-direction:column;gap:14px;border-left:1px solid rgba(11,11,11,0.08);padding-left:26px">
+      <p style="margin:0;font-size:12px;letter-spacing:0.07em;text-transform:uppercase;color:#9A968C">If you send this now</p>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <div style="display:flex;align-items:center;gap:10px;border:1px solid rgba(11,11,11,0.08);border-radius:10px;padding:10px 12px;background:#fff">
+          <span style="width:24px;height:24px;border-radius:999px;background:#CBCADB;font-size:10px;font-weight:600;color:#3A3860;display:grid;place-items:center">VS</span>
+          <div><p style="margin:0;font-size:13px;font-weight:500">Vikram Shah</p><p style="margin:0;font-size:11.5px;color:#78766F">Head of Facilities · decides first</p></div>
+        </div>
+        <p style="margin:0;padding-left:12px;font-size:11.5px;color:#9A968C">then, only if he agrees →</p>
+        <div style="display:flex;align-items:center;gap:10px;border:1px solid rgba(11,11,11,0.08);border-radius:10px;padding:10px 12px;background:#fff">
+          <span style="width:24px;height:24px;border-radius:999px;background:#BCD1CA;font-size:10px;font-weight:600;color:#2E4A41;display:grid;place-items:center">PM</span>
+          <div><p style="margin:0;font-size:13px;font-weight:500">Priya Menon</p><p style="margin:0;font-size:11.5px;color:#78766F">Finance · because it's over ₹50,000</p></div>
+        </div>
+        <p style="margin:2px 0 0;font-size:12px;color:#78766F">Rule: "Facilities over 50,000". <a href="#">Why these two?</a></p>
+      </div>
+
+      <div style="border-top:1px solid rgba(11,11,11,0.08);padding-top:14px;display:flex;flex-direction:column;gap:8px">
+        <div style="display:flex;gap:8px;align-items:flex-start">
+          <span style="margin-top:5px;width:6px;height:6px;border-radius:999px;background:#0CA30C;flex-shrink:0"></span>
+          <p style="margin:0;font-size:12.5px;line-height:1.5;color:#5B5952">Within budget — {{ budgetLeft }} would remain this year.</p>
+        </div>
+        <div style="display:flex;gap:8px;align-items:flex-start">
+          <span style="margin-top:5px;width:6px;height:6px;border-radius:999px;background:#F9B21A;flex-shrink:0"></span>
+          <p style="margin:0;font-size:12.5px;line-height:1.5;color:#5B5952">Ravi asked for 20 of the same helmets six days ago. <a href="#">Look</a> — if it's the same need, add to his instead.</p>
+        </div>
+        <div style="display:flex;gap:8px;align-items:flex-start">
+          <span style="margin-top:5px;width:6px;height:6px;border-radius:999px;background:#256ABF;flex-shrink:0"></span>
+          <p style="margin:0;font-size:12.5px;line-height:1.5;color:#5B5952">Typically 2 days to a decision at this value.</p>
+        </div>
+      </div>
+
+      <div style="border-top:1px solid rgba(11,11,11,0.08);padding-top:14px;display:flex;flex-direction:column;gap:8px">
+        <button onclick="{{ send }}" style="height:40px;border:none;border-radius:10px;background:#D97757;color:#fff;font-size:14.5px;font-weight:500;cursor:pointer">Send to Vikram Shah</button>
+        <button onclick="{{ saveDraft }}" style="height:36px;border:1px solid rgba(11,11,11,0.10);border-radius:10px;background:#FCFCFB;font-size:13.5px;cursor:pointer">Keep as a draft</button>
+        <p style="margin:0;font-size:11.5px;line-height:1.45;color:#9A968C">A draft is private to you. Sending commits nothing — it asks a person.</p>
+        <sc-if value="{{ statusMessage }}" hint-placeholder-val="{{ false }}">
+          <p style="margin:4px 0 0;font-size:12.5px;font-weight:500;color:#0A8A0A">{{ statusMessage }}</p>
+        </sc-if>
+      </div>
+    </aside>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1180,&quot;height&quot;:760}}">
+const fmt = (n) => "₹" + n.toLocaleString("en-IN", { maximumFractionDigits: 0 });
+
+class Component extends DCLogic {
+  state = {
+    lines: [{ item: "Safety helmet — ISI marked, yellow", qty: "24", price: "600" }],
+    department: "Facilities",
+    justification: "",
+    statusMessage: "",
+  };
+
+  addLine = () => this.setState((s) => ({ lines: [...s.lines, { item: "", qty: "1", price: "0" }] }));
+  removeLine = (i) => this.setState((s) => ({ lines: s.lines.filter((_, idx) => idx !== i) }));
+  updateLine = (i, patch) =>
+    this.setState((s) => ({ lines: s.lines.map((l, idx) => (idx === i ? { ...l, ...patch } : l)) }));
+
+  renderVals() {
+    const total = this.state.lines.reduce(
+      (sum, l) => sum + (Number(l.qty) || 0) * (Number(l.price) || 0), 0,
+    );
+    const budget = 1200000;
+    const committed = 802000;
+    const left = budget - committed - total;
+    const pct = Math.min((total / budget) * 100, Math.max(100 - (committed / budget) * 100, 0));
+
+    return {
+      lines: this.state.lines.map((line, i) => ({
+        item: line.item, qty: line.qty, price: line.price,
+        lineTotal: fmt((Number(line.qty) || 0) * (Number(line.price) || 0)),
+        canRemove: this.state.lines.length > 1,
+        setItem: (e) => this.updateLine(i, { item: e.target.value }),
+        setQty: (e) => this.updateLine(i, { qty: e.target.value }),
+        setPrice: (e) => this.updateLine(i, { price: e.target.value }),
+        remove: () => this.removeLine(i),
+      })),
+      addLine: this.addLine,
+      total: fmt(total),
+      budgetLeft: fmt(left),
+      budgetBarStyle: { width: pct + "%", background: left < 0 ? "#F9B21A" : "#D97757" },
+      setDepartment: (e) => this.setState({ department: e.target.value }),
+      justification: this.state.justification,
+      setJustification: (e) => this.setState({ justification: e.target.value }),
+      statusMessage: this.state.statusMessage,
+      send: () => this.setState({ statusMessage: "Sent to Vikram Shah — you'll be told what he decides." }),
+      saveDraft: () => this.setState({ statusMessage: "Saved as a draft. Only you can see it." }),
+    };
+  }
+}
+</script>
+</body>
+</html>

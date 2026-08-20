@@ -1,8 +1,11 @@
 import { notFound } from "next/navigation";
+import QRCode from "qrcode";
 import { getCurrentVendorUser } from "@/db/vendorSession";
 import { withTenant } from "@/db/withTenant";
 import { getVendorPoDetail } from "@/db/vendorPortal";
 import { buttonVariants } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { getAppOrigin } from "@/lib/appOrigin";
 import { cn } from "@/lib/utils";
 import { confirmPo } from "./actions";
 
@@ -15,6 +18,12 @@ export default async function VendorPoDetailPage({ params }: { params: Promise<{
 
   const { po, lines, items, signatory } = detail;
   const itemName = (itemId: string | null) => items.find((i) => i.id === itemId)?.name ?? null;
+
+  // Same QR/hash pair already printed on the issued PDF (db/poPdf.ts) —
+  // surfaced here too, so a vendor checking the order doesn't have to
+  // trust a PDF that arrived by email to see it.
+  const verifyUrl = po.qrToken ? `${await getAppOrigin()}/po-verify/${po.qrToken}` : null;
+  const qrDataUrl = verifyUrl ? await QRCode.toDataURL(verifyUrl, { margin: 0 }) : null;
 
   return (
     <div className="flex flex-col gap-6 p-8">
@@ -43,8 +52,28 @@ export default async function VendorPoDetailPage({ params }: { params: Promise<{
         </p>
       )}
 
-      {po.documentHash && (
-        <p className="break-all text-xs text-muted-foreground">Document hash: {po.documentHash}</p>
+      {(po.documentHash || qrDataUrl) && (
+        <Card className="flex max-w-md items-start gap-4 bg-muted/40 p-3.5">
+          {qrDataUrl && (
+            // eslint-disable-next-line @next/next/no-img-element -- a data: URI, not an optimizable remote image
+            <img src={qrDataUrl} alt="" width={72} height={72} className="shrink-0 rounded-md bg-white p-1" />
+          )}
+          <div className="min-w-0">
+            <p className="text-[11px] tracking-[0.07em] text-muted-foreground uppercase">Is this genuine?</p>
+            <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+              Every AWA order carries a QR code and a fingerprint. Scan it, or check it below, and you&apos;ll see
+              the same figures as on this page.
+            </p>
+            {po.documentHash && (
+              <p className="mt-1.5 truncate font-mono text-[11px] text-muted-foreground">{po.documentHash}</p>
+            )}
+            {verifyUrl && (
+              <a href={verifyUrl} className="mt-1.5 inline-block text-xs text-primary underline underline-offset-2">
+                Check this order
+              </a>
+            )}
+          </div>
+        </Card>
       )}
 
       <table className="w-full text-sm">

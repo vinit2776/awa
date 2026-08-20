@@ -15,6 +15,7 @@ import { buttonVariants } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Info, Term } from "@/components/ui/help";
 import { cn } from "@/lib/utils";
+import { RuleTemplatePicker } from "./RuleTemplatePicker";
 
 /**
  * Setup, in the order the dependencies actually run.
@@ -162,6 +163,8 @@ export default async function AdminSetupPage() {
       <ol className="flex flex-col rounded-lg border border-border">
         {steps.map((step, index) => {
           const isCurrent = step.key === currentKey;
+          const showRulePicker = step.key === "rules" && !step.done;
+
           return (
             <li
               key={step.key}
@@ -185,7 +188,7 @@ export default async function AdminSetupPage() {
                 ✓
               </span>
 
-              <div className="flex-1">
+              <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-center gap-2">
                   <p className={cn("text-sm", step.done ? "text-muted-foreground" : "font-medium text-foreground")}>
                     {step.title}
@@ -196,21 +199,28 @@ export default async function AdminSetupPage() {
                 {step.detail && <p className="mt-0.5 text-xs text-muted-foreground">{step.detail}</p>}
                 {step.key === "rules" && activeRules.length === 0 && (
                   <p className="mt-0.5 text-xs text-muted-foreground">
-                    Who must sign off, at what value, for which category or department. Until one exists, nothing
-                    is reviewed.
+                    An approval rule says who must agree before money is committed. Skip it and AWA has nobody to
+                    send requests to, so it approves them itself.
                   </p>
+                )}
+                {showRulePicker && (
+                  <div className="mt-3.5">
+                    <RuleTemplatePicker roles={data.roles} />
+                  </div>
                 )}
               </div>
 
-              <Link
-                href={step.href}
-                className={cn(
-                  buttonVariants({ variant: step.done ? "outline" : "default", size: "sm" }),
-                  "shrink-0",
-                )}
-              >
-                {step.done ? "Review" : "Set up"}
-              </Link>
+              {!showRulePicker && (
+                <Link
+                  href={step.href}
+                  className={cn(
+                    buttonVariants({ variant: step.done ? "outline" : "default", size: "sm" }),
+                    "shrink-0",
+                  )}
+                >
+                  {step.done ? "Review" : "Set up"}
+                </Link>
+              )}
             </li>
           );
         })}

@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Source+Serif+4:opsz,wght@8..60,400;8..60,500&display=swap" rel="stylesheet">
+<style>body{margin:0;background:#E9E7E1;font-family:Geist,system-ui,sans-serif}a{color:#D97757}a:hover{color:#C6613F}</style>
+</helmet>
+
+<div style="display:flex;width:100%;min-width:1180px;min-height:760px;background:#FCFCFB">
+  <dc-import name="AwaSidebarNew" active="help" hint-size="248px,760px"></dc-import>
+
+  <main style="flex:1;min-width:0;display:flex">
+    <nav style="width:210px;flex-shrink:0;border-right:1px solid rgba(11,11,11,0.08);padding:28px 16px;display:flex;flex-direction:column;gap:2px">
+      <p style="margin:0 8px 10px;font-size:11px;letter-spacing:0.08em;text-transform:uppercase;color:#9A968C">Contents</p>
+      <sc-for list="{{ sections }}" as="sec" hint-placeholder-count="6">
+        <a href="#" onclick="{{ sec.select }}" style="{{ sec.style }}">{{ sec.label }}</a>
+      </sc-for>
+    </nav>
+
+    <div style="flex:1;min-width:0;padding:28px 32px;display:flex;flex-direction:column;gap:20px">
+      <div>
+        <h1 style="margin:0;font-family:'Source Serif 4',Georgia,serif;font-size:25px;font-weight:400">The seven stages</h1>
+        <p style="margin:5px 0 0;font-size:14px;line-height:1.55;color:#5B5952;max-width:62ch">Everything AWA does is one of these, in this order. The bold name is what we call it on screen; the grey name is what auditors and paperwork call it.</p>
+      </div>
+
+      <ol style="margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:10px">
+        <li style="border:1px solid rgba(11,11,11,0.08);border-radius:10px;padding:16px 18px">
+          <div style="display:flex;align-items:baseline;gap:10px">
+            <span style="font-family:ui-monospace,monospace;font-size:12px;color:#9A968C">01</span>
+            <p style="margin:0;font-size:15px;font-weight:500">Someone asks for something</p>
+            <a href="#" onclick="{{ lookup1 }}" style="font-size:12.5px;color:#9A968C;text-decoration:underline dashed;text-decoration-color:rgba(217,119,87,0.7)">requisition</a>
+            <span style="margin-left:auto;border-radius:999px;padding:2px 9px;font-size:11.5px;font-weight:500;background:rgba(217,119,87,0.14);color:#C6613F">yours</span>
+          </div>
+          <p style="margin:10px 0 0;font-size:13.5px;line-height:1.55;color:#5B5952">Describe what you need and which budget it belongs to. Nothing is ordered and no money moves.</p>
+        </li>
+        <li style="border:1px solid rgba(11,11,11,0.08);border-radius:10px;padding:16px 18px">
+          <div style="display:flex;align-items:baseline;gap:10px">
+            <span style="font-family:ui-monospace,monospace;font-size:12px;color:#9A968C">02</span>
+            <p style="margin:0;font-size:15px;font-weight:500">Someone with authority agrees</p>
+            <a href="#" onclick="{{ lookup2 }}" style="font-size:12.5px;color:#9A968C;text-decoration:underline dashed;text-decoration-color:rgba(217,119,87,0.7)">approval</a>
+            <span style="margin-left:auto;border-radius:999px;padding:2px 9px;font-size:11.5px;font-weight:500;background:rgba(217,119,87,0.14);color:#C6613F">yours</span>
+          </div>
+          <p style="margin:10px 0 0;font-size:13.5px;line-height:1.55;color:#5B5952">Agree, ask a question, or send it back for changes. Sending back is not a refusal — the same request comes round again.</p>
+        </li>
+        <li style="border:1px solid rgba(11,11,11,0.08);border-radius:10px;padding:16px 18px;opacity:0.9">
+          <div style="display:flex;align-items:baseline;gap:10px">
+            <span style="font-family:ui-monospace,monospace;font-size:12px;color:#9A968C">05</span>
+            <p style="margin:0;font-size:15px;font-weight:500">Somebody confirms it turned up</p>
+            <a href="#" onclick="{{ lookup3 }}" style="font-size:12.5px;color:#9A968C;text-decoration:underline dashed;text-decoration-color:rgba(217,119,87,0.7)">goods receipt</a>
+            <span style="margin-left:auto;font-size:11.5px;color:#9A968C">whoever takes delivery</span>
+          </div>
+          <p style="margin:10px 0 0;font-size:13.5px;line-height:1.55;color:#5B5952;max-width:70ch">Not you, if you asked for it — deliberately, so nobody can order and sign for their own purchase.</p>
+        </li>
+      </ol>
+    </div>
+
+    <aside style="width:300px;flex-shrink:0;border-left:1px solid rgba(11,11,11,0.08);background:#F6F6F3;padding:24px 20px;display:flex;flex-direction:column;gap:14px">
+      <p style="margin:0;font-size:11px;letter-spacing:0.08em;text-transform:uppercase;color:#9A968C">Words we use</p>
+      <input placeholder="Look up a word…" value="{{ query }}" onchange="{{ setQuery }}" style="height:34px;border:1px solid rgba(11,11,11,0.12);border-radius:8px;padding:0 10px;font-size:13px;background:#fff">
+      <div style="border:1px solid rgba(11,11,11,0.10);border-radius:10px;background:#fff;padding:14px">
+        <p style="margin:0;font-size:14px;font-weight:500">{{ term.title }}</p>
+        <p style="margin:8px 0 0;font-size:11.5px;letter-spacing:0.06em;text-transform:uppercase;color:#9A968C">In plain words</p>
+        <p style="margin:4px 0 0;font-size:13px;line-height:1.55;color:#5B5952">{{ term.plain }}</p>
+        <p style="margin:10px 0 0;font-size:11.5px;letter-spacing:0.06em;text-transform:uppercase;color:#9A968C">Why it matters</p>
+        <p style="margin:4px 0 0;font-size:13px;line-height:1.55;color:#5B5952">{{ term.why }}</p>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px">
+        <sc-for list="{{ chips }}" as="chip" hint-placeholder-count="6">
+          <button onclick="{{ chip.select }}" style="{{ chip.style }}">{{ chip.label }}</button>
+        </sc-for>
+      </div>
+      <p style="margin:auto 0 0;font-size:12px;line-height:1.5;color:#78766F">Every underlined word in AWA opens this panel — the definition is the same one, written once.</p>
+    </aside>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1180,&quot;height&quot;:760}}">
+const TERMS = {
+  requisition: { title: "Requisition", plain: "A request to buy something, before any money is committed.", why: "It's the record everything else — approval, ordering, delivery, billing — hangs off." },
+  approval: { title: "Approval", plain: "A yes from whoever has to agree before a requisition can move on.", why: "Who has to agree depends on amount, department, and what's being bought." },
+  "goods-receipt": { title: "Goods receipt", plain: "A note saying what actually arrived, and how much of it — recorded by whoever unpacked the delivery.", why: "A vendor's bill is only paid for what a receipt says came in. Short deliveries are fine — record what arrived; the rest stays owed." },
+  "cost-centre": { title: "Cost centre", plain: "A budget line — the account a purchase is charged against.", why: "Requests can't be approved against a budget that doesn't exist, so this comes early in setup." },
+  rfq: { title: "RFQ", plain: "An invitation to vendors to quote a price for something.", why: "Optional — you can skip straight to ordering if the vendor and price are already settled." },
+  "three-way-match": { title: "Three-way match", plain: "Checking that the order, the delivery, and the bill all agree.", why: "It's what stops a business paying for more than it ordered or received." },
+};
+const CHIPS = ["requisition", "rfq", "cost-centre", "three-way-match", "goods-receipt", "approval"];
+const SECTIONS = ["What AWA is for", "The seven stages", "Which parts are mine", "Words we use", "If something looks stuck", "Questions people ask us"];
+
+class Component extends DCLogic {
+  state = { section: "The seven stages", term: "goods-receipt", query: "" };
+
+  renderVals() {
+    const t = TERMS[this.state.term] ?? TERMS["goods-receipt"];
+    return {
+      sections: SECTIONS.map((s) => ({
+        label: s, select: () => this.setState({ section: s }),
+        style: { borderRadius: "8px", padding: "7px 8px", fontSize: "13.5px", textDecoration: "none",
+          color: s === this.state.section ? "#D97757" : "rgba(11,11,11,0.75)",
+          background: s === this.state.section ? "rgba(217,119,87,0.10)" : "transparent",
+          fontWeight: s === this.state.section ? 500 : 400 },
+      })),
+      lookup1: () => this.setState({ term: "requisition" }),
+      lookup2: () => this.setState({ term: "approval" }),
+      lookup3: () => this.setState({ term: "goods-receipt" }),
+      query: this.state.query,
+      setQuery: (e) => {
+        const q = e.target.value; this.setState({ query: q });
+        const match = Object.keys(TERMS).find((k) => k.includes(q.toLowerCase()) || TERMS[k].title.toLowerCase().includes(q.toLowerCase()));
+        if (match) this.setState({ term: match });
+      },
+      term: { title: t.title, plain: t.plain, why: t.why },
+      chips: CHIPS.map((k) => ({
+        label: TERMS[k].title, select: () => this.setState({ term: k }),
+        style: { border: k === this.state.term ? "1.5px solid #D97757" : "1px solid rgba(11,11,11,0.10)",
+          borderRadius: "999px", padding: "4px 10px", fontSize: "12px", background: "#fff", cursor: "pointer",
+          color: k === this.state.term ? "#C6613F" : "#5B5952" },
+      })),
+    };
+  }
+}
+</script>
+</body>
+</html>
