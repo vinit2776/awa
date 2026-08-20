@@ -34,25 +34,25 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ e
   const { error } = await searchParams;
 
   return (
-    <div className="flex flex-1 flex-col items-center justify-center gap-4">
+    <div className="flex flex-1 flex-col items-center justify-center gap-4 px-4">
       <h1 className="text-xl font-medium">Procurement &amp; asset platform</h1>
       {error && <p className="max-w-sm text-center text-sm text-destructive">{error}</p>}
-      <form action={handleSignIn} className="flex flex-col gap-2">
+      <form action={handleSignIn} className="flex w-full max-w-64 flex-col gap-2">
         <input
           name="email"
           type="email"
           required
           placeholder="you@company.com"
-          className="h-9 w-64 rounded-md border px-2 text-sm"
+          className="h-11 w-full rounded-md border px-2 text-base sm:h-9 sm:text-sm"
         />
         <input
           name="password"
           type="password"
           required
           placeholder="Password"
-          className="h-9 w-64 rounded-md border px-2 text-sm"
+          className="h-11 w-full rounded-md border px-2 text-base sm:h-9 sm:text-sm"
         />
-        <button type="submit" className={cn(buttonVariants())}>
+        <button type="submit" className={cn(buttonVariants(), "h-11 sm:h-8")}>
           Sign in
         </button>
       </form>

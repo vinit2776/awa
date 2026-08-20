@@ -1,0 +1,994 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Source+Serif+4:opsz,wght@8..60,400;8..60,500&display=swap" rel="stylesheet">
+<style>
+  body { margin:0; background:#E9E7E1; }
+  a { color:#D97757; }
+  a:hover { color:#C6613F; }
+</style>
+</helmet>
+
+<section style="display:flex;flex-direction:column;gap:40px;padding:48px;font-family:Geist,system-ui,sans-serif;align-items:flex-start">
+
+  <div style="max-width:820px">
+    <p style="margin:0;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11px;letter-spacing:0.08em;text-transform:uppercase;color:#78766F">Turn 1 · redesign &amp; self-teaching flows</p>
+    <h1 style="margin:8px 0 0;font-family:'Source Serif 4',Georgia,serif;font-size:34px;font-weight:400;color:#0B0B0B">“I don't know where to start, or how to use it”</h1>
+    <p style="margin:12px 0 0;font-size:15px;line-height:1.6;color:#4E4C46;text-wrap:pretty">AWA already explains itself more carefully than most products — page help, a glossary, empty states that point somewhere. The problem isn't missing explanation, it's that <strong style="font-weight:500">the explanation is optional, dismissible, and scattered across ten peer queues</strong>, so a first-timer meets a filing cabinet instead of a path. Five moves below, then six built options: <a href="#1a">1a</a>/<a href="#1b">1b</a> onboarding, <a href="#1c">1c</a>/<a href="#1d">1d</a> home, <a href="#1e">1e</a>/<a href="#1f">1f</a> the request form, plus <a href="#1g">1g</a> help, <a href="#1h">1h</a> mobile, <a href="#1i">1i</a> vendor.</p>
+  </div>
+
+  <div style="display:flex;flex-wrap:wrap;gap:14px;max-width:1180px">
+    <div style="flex:1 1 210px;border:1px solid rgba(11,11,11,0.10);border-radius:10px;background:#FCFCFB;padding:16px">
+      <p style="margin:0;font-family:ui-monospace,monospace;font-size:11px;color:#D97757">01</p>
+      <p style="margin:6px 0 0;font-size:14px;font-weight:500">One front door</p>
+      <p style="margin:4px 0 0;font-size:13px;line-height:1.5;color:#78766F">A pinned <em>Start here</em> that never disappears and adapts to your role. Replaces a welcome card that self-destructs and a setup page behind the tenth nav item.</p>
+    </div>
+    <div style="flex:1 1 210px;border:1px solid rgba(11,11,11,0.10);border-radius:10px;background:#FCFCFB;padding:16px">
+      <p style="margin:0;font-family:ui-monospace,monospace;font-size:11px;color:#D97757">02</p>
+      <p style="margin:6px 0 0;font-size:14px;font-weight:500">Yours vs. the rest</p>
+      <p style="margin:4px 0 0;font-size:13px;line-height:1.5;color:#78766F">Ten flat queues become three yours and four shared, labelled as shared. The nav itself teaches how little of the process is your job.</p>
+    </div>
+    <div style="flex:1 1 210px;border:1px solid rgba(11,11,11,0.10);border-radius:10px;background:#FCFCFB;padding:16px">
+      <p style="margin:0;font-family:ui-monospace,monospace;font-size:11px;color:#D97757">03</p>
+      <p style="margin:6px 0 0;font-size:14px;font-weight:500">The same seven steps, everywhere</p>
+      <p style="margin:4px 0 0;font-size:13px;line-height:1.5;color:#78766F">The existing <span style="font-family:ui-monospace,monospace;font-size:12px">LifecycleRail</span> promoted from a detail page to the spine of home, every record, and every email.</p>
+    </div>
+    <div style="flex:1 1 210px;border:1px solid rgba(11,11,11,0.10);border-radius:10px;background:#FCFCFB;padding:16px">
+      <p style="margin:0;font-family:ui-monospace,monospace;font-size:11px;color:#D97757">04</p>
+      <p style="margin:6px 0 0;font-size:14px;font-weight:500">Formal term, plain gloss</p>
+      <p style="margin:4px 0 0;font-size:13px;line-height:1.5;color:#78766F">Keep <em>requisition</em>, <em>goods receipt</em>, <em>three-way match</em> — always followed once by the plain words, and always clickable into the glossary.</p>
+    </div>
+    <div style="flex:1 1 210px;border:1px solid rgba(11,11,11,0.10);border-radius:10px;background:#FCFCFB;padding:16px">
+      <p style="margin:0;font-family:ui-monospace,monospace;font-size:11px;color:#D97757">05</p>
+      <p style="margin:6px 0 0;font-size:14px;font-weight:500">Undismissable “why am I here”</p>
+      <p style="margin:4px 0 0;font-size:13px;line-height:1.5;color:#78766F">One permanent line under every queue title: what lands here, where it comes from, what you do. Cheap enough to never need dismissing.</p>
+    </div>
+  </div>
+
+  <div style="display:flex;flex-wrap:wrap;gap:36px;align-items:flex-start">
+
+    <!-- 1a -->
+    <div id="1a" style="display:flex;flex-direction:column;gap:12px;width:1180px">
+      <div style="display:flex;align-items:baseline;gap:10px">
+        <span style="font-family:ui-monospace,monospace;font-size:11px;background:rgba(217,119,87,0.14);color:#C6613F;border-radius:6px;padding:3px 7px">1a</span>
+        <h2 style="margin:0;font-family:'Source Serif 4',Georgia,serif;font-size:22px;font-weight:400">Onboarding as a checklist</h2>
+        <p style="margin:0;font-size:13px;color:#78766F">Start here · admin, day one</p>
+      </div>
+      <p style="margin:0;max-width:900px;font-size:14px;line-height:1.55;color:#4E4C46">Takes the honest sequencing already written in <span style="font-family:ui-monospace,monospace;font-size:12.5px">admin/page.tsx</span> and makes it the tenant's front door: time-boxed, plain-titled, and each step states the consequence of skipping it. The step in progress shows a live rehearsal of what the rule will do to a real request.</p>
+      <div style="width:1180px;border:1px solid rgba(11,11,11,0.14);border-radius:12px;overflow:hidden;background:#FCFCFB;display:flex">
+        <dc-import name="AwaSidebarNew" active="start" start-caption="2 of 4 done" hint-size="248px,880px"></dc-import>
+        <main style="flex:1;min-width:0;display:flex;flex-direction:column;gap:24px;padding:32px 36px">
+          <div>
+            <h1 style="margin:0;font-family:'Source Serif 4',Georgia,serif;font-size:26px;font-weight:400;color:#0B0B0B">Start here</h1>
+            <p style="margin:4px 0 0;font-size:14.5px;line-height:1.55;color:#5B5952;max-width:70ch">Four things, about twenty minutes, in this order — each one needs the one above it. Nothing is permanent; all of it stays editable.</p>
+          </div>
+
+          <div style="display:flex;align-items:center;gap:16px;border:1px solid rgba(11,11,11,0.08);border-radius:10px;background:#F6F6F3;padding:14px 16px">
+            <div style="flex:1;display:flex;flex-direction:column;gap:8px">
+              <div style="display:flex;gap:4px">
+                <span style="flex:1;height:6px;border-radius:999px;background:#0CA30C"></span>
+                <span style="flex:1;height:6px;border-radius:999px;background:#0CA30C"></span>
+                <span style="flex:1;height:6px;border-radius:999px;background:#D97757"></span>
+                <span style="flex:1;height:6px;border-radius:999px;background:rgba(11,11,11,0.10)"></span>
+              </div>
+              <p style="margin:0;font-size:13px;color:#5B5952"><strong style="font-weight:500">2 of 4 done.</strong> Until step 3 is finished, every request anyone sends is approved automatically — the controls aren't running yet.</p>
+            </div>
+            <span style="border-radius:999px;padding:4px 10px;font-size:12px;font-weight:500;background:rgba(249,178,26,0.12);color:#B07A05">Not live yet</span>
+          </div>
+
+          <ol style="margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:10px">
+            <li style="display:flex;gap:14px;border:1px solid rgba(11,11,11,0.08);border-radius:10px;padding:14px 16px;background:#FCFCFB">
+              <span style="width:20px;height:20px;flex-shrink:0;display:grid;place-items:center;border-radius:999px;background:#0CA30C;color:#fff;font-size:11px;font-weight:600">✓</span>
+              <div style="flex:1">
+                <p style="margin:0;font-size:14.5px;font-weight:500;color:#5B5952">Where the money comes from</p>
+                <p style="margin:2px 0 0;font-size:13px;color:#78766F">4 departments, 6 budget lines — all with an annual figure, so requesters see how much is left before they ask.</p>
+              </div>
+              <button style="flex-shrink:0;height:30px;padding:0 12px;border:1px solid rgba(11,11,11,0.10);border-radius:8px;background:#FCFCFB;font-size:13px;font-family:inherit;color:#0B0B0B;cursor:pointer">Review</button>
+            </li>
+            <li style="display:flex;gap:14px;border:1px solid rgba(11,11,11,0.08);border-radius:10px;padding:14px 16px;background:#FCFCFB">
+              <span style="width:20px;height:20px;flex-shrink:0;display:grid;place-items:center;border-radius:999px;background:#0CA30C;color:#fff;font-size:11px;font-weight:600">✓</span>
+              <div style="flex:1">
+                <p style="margin:0;font-size:14.5px;font-weight:500;color:#5B5952">Who's in, and what each of them does</p>
+                <p style="margin:2px 0 0;font-size:13px;color:#78766F">7 people invited, all with a role. <span style="color:#B07A05">3 hold no role beyond requesting</span> — fine, but they can only ask for things.</p>
+              </div>
+              <button style="flex-shrink:0;height:30px;padding:0 12px;border:1px solid rgba(11,11,11,0.10);border-radius:8px;background:#FCFCFB;font-size:13px;font-family:inherit;color:#0B0B0B;cursor:pointer">Review</button>
+            </li>
+
+            <li style="border:1px solid rgba(217,119,87,0.4);border-radius:10px;background:rgba(217,119,87,0.05);padding:18px 20px">
+              <div style="display:flex;gap:14px;align-items:flex-start">
+                <span style="width:20px;height:20px;flex-shrink:0;display:grid;place-items:center;border-radius:999px;border:1.5px solid #D97757;color:#D97757;font-size:11px;font-weight:600">3</span>
+                <div style="flex:1;min-width:0">
+                  <div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px">
+                    <p style="margin:0;font-size:15px;font-weight:500;color:#0B0B0B">Who has to sign off</p>
+                    <span style="border-radius:999px;padding:2px 8px;font-size:11.5px;font-weight:500;background:rgba(217,119,87,0.16);color:#C6613F">6 minutes · you're here</span>
+                  </div>
+                  <p style="margin:6px 0 0;font-size:13.5px;line-height:1.55;color:#5B5952;max-width:74ch">An <span style="border-bottom:1px dashed rgba(217,119,87,0.7);cursor:help">approval rule</span> says who must agree before money is committed — by amount, department, or kind of thing. <strong style="font-weight:500;color:#0B0B0B">Skip it and AWA has nobody to send requests to, so it approves them itself.</strong></p>
+
+                  <div style="margin-top:14px;display:flex;gap:16px;flex-wrap:wrap">
+                    <div style="flex:1 1 380px;border:1px solid rgba(11,11,11,0.10);border-radius:10px;background:#fff;padding:14px">
+                      <p style="margin:0;font-size:11px;letter-spacing:0.08em;text-transform:uppercase;color:#9A968C">Start from a common one</p>
+                      <div style="margin-top:10px;display:flex;flex-direction:column;gap:8px">
+                        <label style="display:flex;gap:10px;align-items:flex-start;border:1.5px solid #D97757;border-radius:8px;padding:10px 12px;background:rgba(217,119,87,0.05);cursor:pointer">
+                          <span style="margin-top:2px;width:14px;height:14px;border-radius:999px;border:4px solid #D97757;flex-shrink:0"></span>
+                          <span>
+                            <span style="display:block;font-size:13.5px;font-weight:500">The manager of whoever asks</span>
+                            <span style="display:block;margin-top:2px;font-size:12.5px;color:#78766F">Anything over ₹0 goes to that person's department head. One step, nobody left out.</span>
+                          </span>
+                        </label>
+                        <label style="display:flex;gap:10px;align-items:flex-start;border:1px solid rgba(11,11,11,0.10);border-radius:8px;padding:10px 12px;cursor:pointer">
+                          <span style="margin-top:2px;width:14px;height:14px;border-radius:999px;border:1.5px solid rgba(11,11,11,0.25);flex-shrink:0"></span>
+                          <span>
+                            <span style="display:block;font-size:13.5px;font-weight:500">Manager, then finance over ₹50,000</span>
+                            <span style="display:block;margin-top:2px;font-size:12.5px;color:#78766F">Small things move fast; anything material gets a second pair of eyes.</span>
+                          </span>
+                        </label>
+                        <label style="display:flex;gap:10px;align-items:flex-start;border:1px solid rgba(11,11,11,0.10);border-radius:8px;padding:10px 12px;cursor:pointer">
+                          <span style="margin-top:2px;width:14px;height:14px;border-radius:999px;border:1.5px solid rgba(11,11,11,0.25);flex-shrink:0"></span>
+                          <span>
+                            <span style="display:block;font-size:13.5px;font-weight:500">Write my own</span>
+                            <span style="display:block;margin-top:2px;font-size:12.5px;color:#78766F">The full rule matrix — amount, department, category, several signatories.</span>
+                          </span>
+                        </label>
+                      </div>
+                    </div>
+
+                    <div style="flex:1 1 300px;border:1px solid rgba(11,11,11,0.10);border-radius:10px;background:#F6F6F3;padding:14px">
+                      <p style="margin:0;font-size:11px;letter-spacing:0.08em;text-transform:uppercase;color:#9A968C">Rehearsal · a real request from last week</p>
+                      <p style="margin:10px 0 0;font-size:13.5px;line-height:1.5;color:#0B0B0B">Anjali's <strong style="font-weight:500">₹86,000 generator service</strong> would go to:</p>
+                      <div style="margin-top:10px;display:flex;flex-direction:column;gap:6px">
+                        <div style="display:flex;align-items:center;gap:8px;background:#fff;border:1px solid rgba(11,11,11,0.08);border-radius:8px;padding:8px 10px">
+                          <span style="width:22px;height:22px;border-radius:999px;background:#CBCADB;font-size:10px;font-weight:600;color:#3A3860;display:grid;place-items:center">VS</span>
+                          <span style="font-size:13px">Vikram Shah <span style="color:#78766F">· head of Facilities</span></span>
+                        </div>
+                        <p style="margin:0;padding-left:10px;font-size:12px;color:#78766F">then, if approved →</p>
+                        <div style="display:flex;align-items:center;gap:8px;background:#fff;border:1px dashed rgba(11,11,11,0.14);border-radius:8px;padding:8px 10px;opacity:0.6">
+                          <span style="width:22px;height:22px;border-radius:999px;background:#F6F6F3;font-size:10px;color:#78766F;display:grid;place-items:center">—</span>
+                          <span style="font-size:13px;color:#78766F">nobody — this rule stops at one step</span>
+                        </div>
+                      </div>
+                      <p style="margin:12px 0 0;font-size:12.5px;line-height:1.5;color:#78766F">Change the choice on the left and this updates. Nothing is saved until you press below.</p>
+                    </div>
+                  </div>
+
+                  <div style="margin-top:14px;display:flex;flex-wrap:wrap;gap:10px;align-items:center">
+                    <button style="height:34px;padding:0 14px;border:none;border-radius:8px;background:#D97757;color:#fff;font-size:14px;font-weight:500;font-family:inherit;cursor:pointer">Turn this rule on</button>
+                    <button style="height:34px;padding:0 14px;border:1px solid rgba(11,11,11,0.10);border-radius:8px;background:#FCFCFB;font-size:14px;font-family:inherit;color:#0B0B0B;cursor:pointer">Do this later</button>
+                    <span style="font-size:12.5px;color:#78766F">You can add more rules any time — they stack.</span>
+                  </div>
+                </div>
+              </div>
+            </li>
+
+            <li style="display:flex;gap:14px;border:1px solid rgba(11,11,11,0.08);border-radius:10px;padding:14px 16px;background:#FCFCFB">
+              <span style="width:20px;height:20px;flex-shrink:0;display:grid;place-items:center;border-radius:999px;border:1.5px solid rgba(11,11,11,0.18);color:#78766F;font-size:11px;font-weight:600">4</span>
+              <div style="flex:1">
+                <p style="margin:0;font-size:14.5px;font-weight:500">Tell your team it exists</p>
+                <p style="margin:2px 0 0;font-size:13px;line-height:1.5;color:#78766F">We'll send each person a short note in their own words — what AWA is, which of the seven stages is theirs, and one thing to try. <span style="color:#5B5952">3 minutes · the step teams skip and then blame the tool.</span></p>
+              </div>
+              <button style="flex-shrink:0;height:30px;padding:0 12px;border:1px solid rgba(11,11,11,0.10);border-radius:8px;background:#FCFCFB;font-size:13px;font-family:inherit;color:#0B0B0B;cursor:pointer">Preview the note</button>
+            </li>
+          </ol>
+
+          <div style="display:flex;align-items:center;gap:14px;border-top:1px solid rgba(11,11,11,0.08);padding-top:18px">
+            <div style="flex:1">
+              <p style="margin:0;font-size:14px;font-weight:500">Not sure what you're setting up?</p>
+              <p style="margin:2px 0 0;font-size:13px;color:#78766F">Follow one purchase — a request for helmets — through all seven stages in ninety seconds. No data needed.</p>
+            </div>
+            <button style="height:32px;padding:0 12px;border:1px solid rgba(11,11,11,0.10);border-radius:8px;background:#FCFCFB;font-size:13px;font-family:inherit;color:#0B0B0B;cursor:pointer">Walk me through it</button>
+          </div>
+        </main>
+      </div>
+    </div>
+
+    <!-- 1b -->
+    <div id="1b" style="display:flex;flex-direction:column;gap:12px;width:1180px">
+      <div style="display:flex;align-items:baseline;gap:10px">
+        <span style="font-family:ui-monospace,monospace;font-size:11px;background:rgba(217,119,87,0.14);color:#C6613F;border-radius:6px;padding:3px 7px">1b</span>
+        <h2 style="margin:0;font-family:'Source Serif 4',Georgia,serif;font-size:22px;font-weight:400">Onboarding as one guided task</h2>
+        <p style="margin:0;font-size:13px;color:#78766F">Learn by doing the real thing, coached in place</p>
+      </div>
+      <p style="margin:0;max-width:900px;font-size:14px;line-height:1.55;color:#4E4C46">No checklist to read: the app picks the one thing this person's role exists to do and coaches them through it on the real screens, with real consequences shown before they commit. The strip persists across pages, can be paused, and never blocks a click.</p>
+      <div style="width:1180px;border:1px solid rgba(11,11,11,0.14);border-radius:12px;overflow:hidden;background:#FCFCFB;display:flex;flex-direction:column">
+        <div style="display:flex;align-items:center;gap:14px;background:#D97757;color:#fff;padding:10px 20px">
+          <span style="display:flex;gap:5px;align-items:center">
+            <span style="width:7px;height:7px;border-radius:999px;background:#fff"></span>
+            <span style="width:7px;height:7px;border-radius:999px;background:rgba(255,255,255,0.4)"></span>
+            <span style="width:7px;height:7px;border-radius:999px;background:rgba(255,255,255,0.4)"></span>
+          </span>
+          <p style="margin:0;font-size:13.5px"><strong style="font-weight:500">Your first request · step 1 of 3</strong> — say what you need. Two minutes, and you can stop at any point.</p>
+          <button style="margin-left:auto;height:26px;padding:0 10px;border:1px solid rgba(255,255,255,0.45);border-radius:8px;background:transparent;color:#fff;font-size:12.5px;font-family:inherit;cursor:pointer">Pause</button>
+          <button style="border:none;background:none;color:rgba(255,255,255,0.85);font-size:12.5px;font-family:inherit;cursor:pointer">Skip the walkthrough</button>
+        </div>
+        <div style="display:flex">
+          <dc-import name="AwaSidebarNew" active="today" start-caption="walkthrough in progress" hint-size="248px,640px"></dc-import>
+          <main style="flex:1;min-width:0;display:flex;flex-direction:column;gap:22px;padding:32px 36px">
+            <div style="opacity:0.45">
+              <h1 style="margin:0;font-family:'Source Serif 4',Georgia,serif;font-size:26px;font-weight:400">Good morning, Anjali</h1>
+              <p style="margin:4px 0 0;font-size:14.5px;color:#5B5952">Nothing is waiting on you yet — you haven't asked for anything.</p>
+            </div>
+
+            <div style="display:flex;gap:20px;align-items:flex-start">
+              <div style="display:flex;flex-direction:column;gap:10px;border:2px solid #D97757;border-radius:12px;padding:20px;background:#fff;box-shadow:0 10px 15px -3px rgba(0,0,0,0.10),0 4px 6px -4px rgba(0,0,0,0.10);width:420px">
+                <p style="margin:0;font-family:'Source Serif 4',Georgia,serif;font-size:19px">Ask for something</p>
+                <p style="margin:0;font-size:13.5px;line-height:1.5;color:#5B5952">Describe what you need in your own words. AWA works out who has to agree and tells you before you send it.</p>
+                <button style="align-self:flex-start;margin-top:4px;height:36px;padding:0 16px;border:none;border-radius:8px;background:#D97757;color:#fff;font-size:14.5px;font-weight:500;font-family:inherit;cursor:pointer">Start a request</button>
+              </div>
+
+              <div style="position:relative;width:340px;border-radius:12px;background:#0B0B0B;color:#fff;padding:16px 18px">
+                <span style="position:absolute;left:-7px;top:28px;width:14px;height:14px;background:#0B0B0B;transform:rotate(45deg)"></span>
+                <p style="margin:0;font-size:11px;letter-spacing:0.08em;text-transform:uppercase;color:rgba(255,255,255,0.55)">Step 1 of 3</p>
+                <p style="margin:8px 0 0;font-size:14.5px;line-height:1.5">Start here. You'll write what you need in plain words — no codes, no forms to learn. Nothing is sent to anyone until you say so.</p>
+                <div style="margin-top:14px;display:flex;align-items:center;gap:10px">
+                  <button style="height:30px;padding:0 12px;border:none;border-radius:8px;background:#fff;color:#0B0B0B;font-size:13px;font-weight:500;font-family:inherit;cursor:pointer">Got it</button>
+                  <button style="border:none;background:none;color:rgba(255,255,255,0.7);font-size:12.5px;font-family:inherit;cursor:pointer">What is AWA for?</button>
+                </div>
+              </div>
+            </div>
+
+            <div style="opacity:0.45;display:flex;flex-direction:column;gap:10px">
+              <h2 style="margin:0;font-size:13px;letter-spacing:0.06em;text-transform:uppercase;color:#9A968C">Your part of the process</h2>
+              <div style="display:flex;border:1px solid rgba(11,11,11,0.08);border-radius:10px;overflow:hidden">
+                <div style="flex:1;padding:12px 14px;border-right:1px solid rgba(11,11,11,0.08);background:rgba(217,119,87,0.06)"><p style="margin:0;font-size:13px;font-weight:500">1 · You ask</p><p style="margin:2px 0 0;font-size:12px;color:#78766F">yours</p></div>
+                <div style="flex:1;padding:12px 14px;border-right:1px solid rgba(11,11,11,0.08)"><p style="margin:0;font-size:13px">2 · Someone agrees</p><p style="margin:2px 0 0;font-size:12px;color:#78766F">your manager</p></div>
+                <div style="flex:1;padding:12px 14px;border-right:1px solid rgba(11,11,11,0.08)"><p style="margin:0;font-size:13px">3–5 · Buying &amp; delivery</p><p style="margin:2px 0 0;font-size:12px;color:#78766F">procurement</p></div>
+                <div style="flex:1;padding:12px 14px"><p style="margin:0;font-size:13px">6–7 · Bill &amp; payment</p><p style="margin:2px 0 0;font-size:12px;color:#78766F">finance</p></div>
+              </div>
+            </div>
+          </main>
+        </div>
+      </div>
+
+      <div style="display:flex;flex-wrap:wrap;gap:20px;align-items:flex-start">
+        <div style="width:700px;border:1px solid rgba(11,11,11,0.14);border-radius:12px;background:#FCFCFB;padding:24px;display:flex;flex-direction:column;gap:16px">
+          <p style="margin:0;font-family:ui-monospace,monospace;font-size:11.5px;color:#78766F">step 2 of 3 · the same coaching, one field deep</p>
+          <div style="display:flex;gap:18px;align-items:flex-start">
+            <div style="flex:1;display:flex;flex-direction:column;gap:6px">
+              <label style="font-size:13px;font-weight:500;color:#0B0B0B">Which budget should this come out of?</label>
+              <p style="margin:0;font-size:12.5px;color:#78766F">Called a <span style="border-bottom:1px dashed rgba(217,119,87,0.7)">cost centre</span> on the paperwork.</p>
+              <select style="height:38px;border:1.5px solid #D97757;border-radius:10px;padding:0 10px;font-size:14px;font-family:inherit;background:#fff"><option>Facilities — running costs (FAC-OPEX-26)</option></select>
+              <p style="margin:2px 0 0;font-size:12.5px;color:#78766F">₹3,98,000 of ₹12,00,000 left this year after this request.</p>
+            </div>
+            <div style="position:relative;width:280px;border-radius:12px;background:#0B0B0B;color:#fff;padding:16px 18px">
+              <span style="position:absolute;left:-7px;top:24px;width:14px;height:14px;background:#0B0B0B;transform:rotate(45deg)"></span>
+              <p style="margin:0;font-size:14px;line-height:1.5">Not sure? Pick your department's default. An approver can move it, and getting it wrong doesn't lose your request.</p>
+              <button style="margin-top:12px;height:28px;padding:0 12px;border:none;border-radius:8px;background:#fff;color:#0B0B0B;font-size:12.5px;font-weight:500;font-family:inherit;cursor:pointer">Next</button>
+            </div>
+          </div>
+        </div>
+        <div style="width:420px;border:1px solid rgba(11,11,11,0.14);border-radius:12px;background:#F6F6F3;padding:20px">
+          <p style="margin:0;font-size:14px;font-weight:500">Why this one, if you can only build one</p>
+          <p style="margin:8px 0 0;font-size:13.5px;line-height:1.6;color:#5B5952"><a href="#1a">1a</a> teaches the admin who configures once. <a href="#1b">1b</a> teaches the ninety percent who use AWA four times a year and will never read a checklist. They're complementary: 1a for <em>Start here</em> when your role is setup, 1b for everyone else — same component, different task list.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- 1c -->
+    <div id="1c" style="display:flex;flex-direction:column;gap:12px;width:1180px">
+      <div style="display:flex;align-items:baseline;gap:10px">
+        <span style="font-family:ui-monospace,monospace;font-size:11px;background:rgba(217,119,87,0.14);color:#C6613F;border-radius:6px;padding:3px 7px">1c</span>
+        <h2 style="margin:0;font-family:'Source Serif 4',Georgia,serif;font-size:22px;font-weight:400">Home that answers one question</h2>
+        <p style="margin:0;font-size:13px;color:#78766F">“Is anything waiting on me, and is my stuff moving?”</p>
+      </div>
+      <p style="margin:0;max-width:900px;font-size:14px;line-height:1.55;color:#4E4C46">The current Today page is right in intent and crowded in practice — four tinted panels compete before the first item. Here the answer is the page: one sentence, then the work, each row saying who holds it and what you can do about it. Explanation is a permanent footer, not a banner that outranks the work.</p>
+      <div style="width:1180px;border:1px solid rgba(11,11,11,0.14);border-radius:12px;overflow:hidden;background:#FCFCFB;display:flex">
+        <dc-import name="AwaSidebarNew" active="today" hint-size="248px,860px"></dc-import>
+        <main style="flex:1;min-width:0;display:flex;flex-direction:column;gap:26px;padding:32px 36px">
+          <div>
+            <h1 style="margin:0;font-family:'Source Serif 4',Georgia,serif;font-size:27px;font-weight:400;color:#0B0B0B">Three things need you, Anjali.</h1>
+            <p style="margin:6px 0 0;font-size:14.5px;color:#5B5952">Your other two requests are moving on their own. Nothing is stuck.</p>
+          </div>
+
+          <section style="display:flex;flex-direction:column;gap:10px">
+            <ul style="margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:10px">
+              <li style="display:flex;gap:14px;align-items:flex-start;border:1px solid rgba(217,119,87,0.35);background:rgba(217,119,87,0.05);border-radius:10px;padding:16px 18px">
+                <span style="width:3px;align-self:stretch;border-radius:2px;background:#D97757"></span>
+                <div style="flex:1;min-width:0">
+                  <p style="margin:0;font-size:15px;font-weight:500;color:#0B0B0B">Two people are waiting on your decision</p>
+                  <p style="margin:3px 0 0;font-size:13.5px;line-height:1.55;color:#5B5952">Vikram's generator service (₹86,000) and Meera's laptop (₹77,000). Neither can be bought until you say yes — the oldest has been sitting three days.</p>
+                </div>
+                <button style="flex-shrink:0;height:34px;padding:0 14px;border:none;border-radius:8px;background:#D97757;color:#fff;font-size:14px;font-weight:500;font-family:inherit;cursor:pointer">Decide now</button>
+              </li>
+              <li style="display:flex;gap:14px;align-items:flex-start;border:1px solid rgba(11,11,11,0.08);border-radius:10px;padding:16px 18px">
+                <span style="width:3px;align-self:stretch;border-radius:2px;background:#F9B21A"></span>
+                <div style="flex:1;min-width:0">
+                  <p style="margin:0;font-size:15px;font-weight:500;color:#0B0B0B">Your helmet request came back with a question, not a no</p>
+                  <p style="margin:3px 0 0;font-size:13.5px;line-height:1.55;color:#5B5952">Vikram asked for a second quote — it's 18% above April's price. Edit and send it again; it keeps its place and goes back through the same two people.</p>
+                </div>
+                <button style="flex-shrink:0;height:34px;padding:0 14px;border:1px solid rgba(11,11,11,0.10);border-radius:8px;background:#FCFCFB;font-size:14px;font-family:inherit;color:#0B0B0B;cursor:pointer">Fix and resend</button>
+              </li>
+              <li style="display:flex;gap:14px;align-items:flex-start;border:1px solid rgba(11,11,11,0.08);border-radius:10px;padding:16px 18px">
+                <span style="width:3px;align-self:stretch;border-radius:2px;background:#256ABF"></span>
+                <div style="flex:1;min-width:0">
+                  <p style="margin:0;font-size:15px;font-weight:500;color:#0B0B0B">A draft you never sent — “Hand sanitiser 5L ×10”</p>
+                  <p style="margin:3px 0 0;font-size:13.5px;line-height:1.55;color:#5B5952">Started 11 days ago. Nobody else can see it, and nothing happens to it until you send it.</p>
+                </div>
+                <button style="flex-shrink:0;height:34px;padding:0 14px;border:1px solid rgba(11,11,11,0.10);border-radius:8px;background:#FCFCFB;font-size:14px;font-family:inherit;color:#0B0B0B;cursor:pointer">Open draft</button>
+              </li>
+            </ul>
+          </section>
+
+          <section style="display:flex;flex-direction:column;gap:12px">
+            <div style="display:flex;align-items:baseline;justify-content:space-between">
+              <h2 style="margin:0;font-size:12.5px;letter-spacing:0.07em;text-transform:uppercase;color:#9A968C">Yours, moving without you</h2>
+              <a href="#" style="font-size:12.5px;color:#78766F;text-decoration:underline;text-underline-offset:2px">All my requests</a>
+            </div>
+            <ul style="margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:8px">
+              <li style="display:flex;align-items:center;gap:18px;border:1px solid rgba(11,11,11,0.08);border-radius:10px;padding:14px 16px">
+                <div style="flex:1;min-width:0">
+                  <p style="margin:0;font-size:14px;font-weight:500">Diesel generator service — annual</p>
+                  <p style="margin:2px 0 0;font-size:12.5px;color:#78766F">₹86,000 · asked 11 Aug</p>
+                </div>
+                <div style="width:260px;flex-shrink:0">
+                  <div style="display:flex;gap:3px">
+                    <span style="flex:1;height:4px;border-radius:2px;background:#0CA30C"></span>
+                    <span style="flex:1;height:4px;border-radius:2px;background:#D97757"></span>
+                    <span style="flex:1;height:4px;border-radius:2px;background:rgba(11,11,11,0.10)"></span>
+                    <span style="flex:1;height:4px;border-radius:2px;background:rgba(11,11,11,0.10)"></span>
+                    <span style="flex:1;height:4px;border-radius:2px;background:rgba(11,11,11,0.10)"></span>
+                    <span style="flex:1;height:4px;border-radius:2px;background:rgba(11,11,11,0.10)"></span>
+                    <span style="flex:1;height:4px;border-radius:2px;background:rgba(11,11,11,0.10)"></span>
+                  </div>
+                  <p style="margin:6px 0 0;font-size:12.5px;color:#5B5952">Waiting on <strong style="font-weight:500">Vikram Shah</strong> to agree · 3 days</p>
+                </div>
+                <button style="flex-shrink:0;height:30px;padding:0 12px;border:1px solid rgba(11,11,11,0.10);border-radius:8px;background:#FCFCFB;font-size:12.5px;font-family:inherit;color:#0B0B0B;cursor:pointer">Nudge Vikram</button>
+              </li>
+              <li style="display:flex;align-items:center;gap:18px;border:1px solid rgba(11,11,11,0.08);border-radius:10px;padding:14px 16px">
+                <div style="flex:1;min-width:0">
+                  <p style="margin:0;font-size:14px;font-weight:500">Dell Latitude 5450 ×3</p>
+                  <p style="margin:2px 0 0;font-size:12.5px;color:#78766F">₹2,31,000 · asked 28 Jul</p>
+                </div>
+                <div style="width:260px;flex-shrink:0">
+                  <div style="display:flex;gap:3px">
+                    <span style="flex:1;height:4px;border-radius:2px;background:#0CA30C"></span>
+                    <span style="flex:1;height:4px;border-radius:2px;background:#0CA30C"></span>
+                    <span style="flex:1;height:4px;border-radius:2px;background:#0CA30C"></span>
+                    <span style="flex:1;height:4px;border-radius:2px;background:#0CA30C"></span>
+                    <span style="flex:1;height:4px;border-radius:2px;background:#D97757"></span>
+                    <span style="flex:1;height:4px;border-radius:2px;background:rgba(11,11,11,0.10)"></span>
+                    <span style="flex:1;height:4px;border-radius:2px;background:rgba(11,11,11,0.10)"></span>
+                  </div>
+                  <p style="margin:6px 0 0;font-size:12.5px;color:#5B5952">Ordered from Sagar Infotech · due to arrive 22 Aug</p>
+                </div>
+                <button style="flex-shrink:0;height:30px;padding:0 12px;border:1px solid rgba(11,11,11,0.10);border-radius:8px;background:#FCFCFB;font-size:12.5px;font-family:inherit;color:#0B0B0B;cursor:pointer">See the order</button>
+              </li>
+            </ul>
+          </section>
+
+          <section style="display:flex;gap:12px">
+            <button style="flex:1;display:flex;flex-direction:column;gap:4px;text-align:left;border:1px solid rgba(11,11,11,0.10);border-radius:10px;background:#FCFCFB;padding:16px 18px;font-family:inherit;cursor:pointer">
+              <span style="font-size:15px;font-weight:500;color:#0B0B0B">Ask for something</span>
+              <span style="font-size:13px;color:#78766F">Two minutes. We'll tell you who has to agree before you send it.</span>
+            </button>
+            <button style="flex:1;display:flex;flex-direction:column;gap:4px;text-align:left;border:1px solid rgba(11,11,11,0.10);border-radius:10px;background:#FCFCFB;padding:16px 18px;font-family:inherit;cursor:pointer">
+              <span style="font-size:15px;font-weight:500;color:#0B0B0B">Find out what happened to something</span>
+              <span style="font-size:13px;color:#78766F">Search anyone's request — see who is holding it and since when.</span>
+            </button>
+          </section>
+
+          <footer style="display:flex;gap:22px;border-top:1px solid rgba(11,11,11,0.08);padding-top:18px">
+            <div style="flex:1">
+              <p style="margin:0;font-size:12.5px;letter-spacing:0.07em;text-transform:uppercase;color:#9A968C">Worth knowing</p>
+              <ul style="margin:8px 0 0;padding-left:18px;display:flex;flex-direction:column;gap:5px;font-size:13px;line-height:1.5;color:#5B5952">
+                <li>Asking for something commits nothing — a person has to agree first.</li>
+                <li>Two of the seven stages are yours. The other five happen without you.</li>
+                <li>Nothing is ever deleted: you can always see who did what, and when.</li>
+              </ul>
+            </div>
+            <div style="width:260px;flex-shrink:0">
+              <p style="margin:0;font-size:13px;font-weight:500">Still feels unfamiliar?</p>
+              <p style="margin:4px 0 0;font-size:12.5px;line-height:1.5;color:#78766F">The whole process, in plain words, with the formal name for each stage beside it.</p>
+              <button style="margin-top:10px;height:30px;padding:0 12px;border:1px solid rgba(11,11,11,0.10);border-radius:8px;background:#FCFCFB;font-size:12.5px;font-family:inherit;color:#0B0B0B;cursor:pointer">How AWA works</button>
+            </div>
+          </footer>
+        </main>
+      </div>
+    </div>
+
+    <!-- 1d -->
+    <div id="1d" style="display:flex;flex-direction:column;gap:12px;width:1180px">
+      <div style="display:flex;align-items:baseline;gap:10px">
+        <span style="font-family:ui-monospace,monospace;font-size:11px;background:rgba(217,119,87,0.14);color:#C6613F;border-radius:6px;padding:3px 7px">1d</span>
+        <h2 style="margin:0;font-family:'Source Serif 4',Georgia,serif;font-size:22px;font-weight:400">Home built on the process map</h2>
+        <p style="margin:0;font-size:13px;color:#78766F">Learn the whole shape first, then read your position in it</p>
+      </div>
+      <p style="margin:0;max-width:900px;font-size:14px;line-height:1.55;color:#4E4C46">The seven stages stop being a caption and become the page's organising structure. Every count, every request, every colleague's work is placed on the same spine — so the mental model is built by looking, once, rather than explained repeatedly. Costs vertical space; earns it in weeks one to four.</p>
+      <div style="width:1180px;border:1px solid rgba(11,11,11,0.14);border-radius:12px;overflow:hidden;background:#FCFCFB;display:flex">
+        <dc-import name="AwaSidebarNew" active="today" hint-size="248px,840px"></dc-import>
+        <main style="flex:1;min-width:0;display:flex;flex-direction:column;gap:24px;padding:32px 36px">
+          <div>
+            <h1 style="margin:0;font-family:'Source Serif 4',Georgia,serif;font-size:24px;font-weight:400;color:#0B0B0B">How buying works here, and where you sit in it</h1>
+            <p style="margin:5px 0 0;font-size:14px;color:#5B5952">Two of the seven stages are yours — marked below. Numbers are what Kalyani Industries is holding at each stage right now.</p>
+          </div>
+
+          <div style="display:flex;border:1px solid rgba(11,11,11,0.10);border-radius:12px;overflow:hidden">
+            <div style="flex:1;padding:16px 14px;background:rgba(217,119,87,0.07);border-right:1px solid rgba(11,11,11,0.08)">
+              <div style="display:flex;align-items:center;gap:6px"><span style="width:7px;height:7px;border-radius:999px;background:#D97757"></span><p style="margin:0;font-size:13px;font-weight:500;color:#0B0B0B">Someone asks</p></div>
+              <p style="margin:6px 0 0;font-size:11.5px;color:#78766F">Requisition</p>
+              <p style="margin:10px 0 0;font-size:20px;font-weight:500;font-variant-numeric:tabular-nums">3</p>
+              <p style="margin:2px 0 0;font-size:11.5px;color:#C6613F;font-weight:500">yours · 1 unsent</p>
+            </div>
+            <div style="flex:1;padding:16px 14px;background:rgba(217,119,87,0.07);border-right:1px solid rgba(11,11,11,0.08)">
+              <div style="display:flex;align-items:center;gap:6px"><span style="width:7px;height:7px;border-radius:999px;background:#D97757"></span><p style="margin:0;font-size:13px;font-weight:500;color:#0B0B0B">Someone agrees</p></div>
+              <p style="margin:6px 0 0;font-size:11.5px;color:#78766F">Approval</p>
+              <p style="margin:10px 0 0;font-size:20px;font-weight:500;font-variant-numeric:tabular-nums">5</p>
+              <p style="margin:2px 0 0;font-size:11.5px;color:#C6613F;font-weight:500">2 waiting on you</p>
+            </div>
+            <div style="flex:1;padding:16px 14px;border-right:1px solid rgba(11,11,11,0.08)">
+              <p style="margin:0;font-size:13px;color:#5B5952">A vendor is chosen</p>
+              <p style="margin:6px 0 0;font-size:11.5px;color:#9A968C">Sourcing / RFQ</p>
+              <p style="margin:10px 0 0;font-size:20px;font-weight:500;font-variant-numeric:tabular-nums;color:#5B5952">4</p>
+              <p style="margin:2px 0 0;font-size:11.5px;color:#9A968C">procurement</p>
+            </div>
+            <div style="flex:1;padding:16px 14px;border-right:1px solid rgba(11,11,11,0.08)">
+              <p style="margin:0;font-size:13px;color:#5B5952">The order goes out</p>
+              <p style="margin:6px 0 0;font-size:11.5px;color:#9A968C">Purchase order</p>
+              <p style="margin:10px 0 0;font-size:20px;font-weight:500;font-variant-numeric:tabular-nums;color:#5B5952">2</p>
+              <p style="margin:2px 0 0;font-size:11.5px;color:#9A968C">procurement</p>
+            </div>
+            <div style="flex:1;padding:16px 14px;border-right:1px solid rgba(11,11,11,0.08)">
+              <p style="margin:0;font-size:13px;color:#5B5952">It arrives</p>
+              <p style="margin:6px 0 0;font-size:11.5px;color:#9A968C">Goods receipt</p>
+              <p style="margin:10px 0 0;font-size:20px;font-weight:500;font-variant-numeric:tabular-nums;color:#5B5952">2</p>
+              <p style="margin:2px 0 0;font-size:11.5px;color:#9A968C">whoever takes delivery</p>
+            </div>
+            <div style="flex:1;padding:16px 14px;border-right:1px solid rgba(11,11,11,0.08)">
+              <p style="margin:0;font-size:13px;color:#5B5952">The bill is checked</p>
+              <p style="margin:6px 0 0;font-size:11.5px;color:#9A968C">Three-way match</p>
+              <p style="margin:10px 0 0;display:flex;align-items:center;gap:6px;font-size:20px;font-weight:500;font-variant-numeric:tabular-nums;color:#5B5952">3 <span style="border-radius:999px;padding:1px 7px;font-size:11px;font-weight:500;background:rgba(249,178,26,0.14);color:#B07A05">1 stuck</span></p>
+              <p style="margin:2px 0 0;font-size:11.5px;color:#9A968C">finance</p>
+            </div>
+            <div style="flex:1;padding:16px 14px">
+              <p style="margin:0;font-size:13px;color:#5B5952">It gets paid</p>
+              <p style="margin:6px 0 0;font-size:11.5px;color:#9A968C">Payment</p>
+              <p style="margin:10px 0 0;font-size:20px;font-weight:500;font-variant-numeric:tabular-nums;color:#5B5952">3</p>
+              <p style="margin:2px 0 0;font-size:11.5px;color:#9A968C">finance</p>
+            </div>
+          </div>
+
+          <div style="display:flex;gap:22px;align-items:flex-start">
+            <section style="flex:1.15;display:flex;flex-direction:column;gap:10px">
+              <h2 style="margin:0;font-size:12.5px;letter-spacing:0.07em;text-transform:uppercase;color:#9A968C">Waiting on you — stage 2</h2>
+              <div style="display:flex;flex-direction:column;gap:8px">
+                <div style="border:1px solid rgba(217,119,87,0.35);background:rgba(217,119,87,0.05);border-radius:10px;padding:14px 16px">
+                  <p style="margin:0;font-size:14px;font-weight:500">Vikram's generator service · ₹86,000</p>
+                  <p style="margin:3px 0 0;font-size:13px;line-height:1.5;color:#5B5952">Waiting 3 days. Says yes → goes to Priya in finance. Says no → Vikram can fix it and resend.</p>
+                  <div style="margin-top:10px;display:flex;gap:8px">
+                    <button style="height:30px;padding:0 12px;border:none;border-radius:8px;background:#D97757;color:#fff;font-size:13px;font-weight:500;font-family:inherit;cursor:pointer">Agree</button>
+                    <button style="height:30px;padding:0 12px;border:1px solid rgba(11,11,11,0.10);border-radius:8px;background:#FCFCFB;font-size:13px;font-family:inherit;cursor:pointer">Ask a question</button>
+                  </div>
+                </div>
+                <div style="border:1px solid rgba(11,11,11,0.08);border-radius:10px;padding:14px 16px">
+                  <p style="margin:0;font-size:14px;font-weight:500">Meera's laptop · ₹77,000</p>
+                  <p style="margin:3px 0 0;font-size:13px;color:#5B5952">Waiting 1 day. Same two options.</p>
+                </div>
+              </div>
+            </section>
+
+            <section style="flex:1;display:flex;flex-direction:column;gap:10px">
+              <h2 style="margin:0;font-size:12.5px;letter-spacing:0.07em;text-transform:uppercase;color:#9A968C">Yours, on the map</h2>
+              <div style="display:flex;flex-direction:column;gap:8px">
+                <div style="border:1px solid rgba(11,11,11,0.08);border-radius:10px;padding:12px 14px">
+                  <p style="margin:0;font-size:13.5px;font-weight:500">Generator service</p>
+                  <div style="margin-top:8px;display:flex;gap:3px">
+                    <span style="flex:1;height:4px;border-radius:2px;background:#0CA30C"></span><span style="flex:1;height:4px;border-radius:2px;background:#D97757"></span><span style="flex:1;height:4px;border-radius:2px;background:rgba(11,11,11,0.10)"></span><span style="flex:1;height:4px;border-radius:2px;background:rgba(11,11,11,0.10)"></span><span style="flex:1;height:4px;border-radius:2px;background:rgba(11,11,11,0.10)"></span><span style="flex:1;height:4px;border-radius:2px;background:rgba(11,11,11,0.10)"></span><span style="flex:1;height:4px;border-radius:2px;background:rgba(11,11,11,0.10)"></span>
+                  </div>
+                  <p style="margin:6px 0 0;font-size:12.5px;color:#5B5952">Stage 2 · with Vikram Shah</p>
+                </div>
+                <div style="border:1px solid rgba(11,11,11,0.08);border-radius:10px;padding:12px 14px">
+                  <p style="margin:0;font-size:13.5px;font-weight:500">Dell Latitude ×3</p>
+                  <div style="margin-top:8px;display:flex;gap:3px">
+                    <span style="flex:1;height:4px;border-radius:2px;background:#0CA30C"></span><span style="flex:1;height:4px;border-radius:2px;background:#0CA30C"></span><span style="flex:1;height:4px;border-radius:2px;background:#0CA30C"></span><span style="flex:1;height:4px;border-radius:2px;background:#0CA30C"></span><span style="flex:1;height:4px;border-radius:2px;background:#D97757"></span><span style="flex:1;height:4px;border-radius:2px;background:rgba(11,11,11,0.10)"></span><span style="flex:1;height:4px;border-radius:2px;background:rgba(11,11,11,0.10)"></span>
+                  </div>
+                  <p style="margin:6px 0 0;font-size:12.5px;color:#5B5952">Stage 5 · arriving 22 Aug</p>
+                </div>
+                <div style="border:1px solid rgba(11,11,11,0.08);border-radius:10px;padding:12px 14px;background:#F6F6F3">
+                  <p style="margin:0;font-size:13px;line-height:1.5;color:#5B5952">Every request, PO, bill and payment in AWA shows this same seven-part bar. Learn it once.</p>
+                </div>
+              </div>
+            </section>
+          </div>
+        </main>
+      </div>
+    </div>
+
+    <!-- 1e -->
+    <div id="1e" style="display:flex;flex-direction:column;gap:12px;width:1180px">
+      <div style="display:flex;align-items:baseline;gap:10px">
+        <span style="font-family:ui-monospace,monospace;font-size:11px;background:rgba(217,119,87,0.14);color:#C6613F;border-radius:6px;padding:3px 7px">1e</span>
+        <h2 style="margin:0;font-family:'Source Serif 4',Georgia,serif;font-size:22px;font-weight:400">Asking for something · three questions</h2>
+        <p style="margin:0;font-size:13px;color:#78766F">Wizard — for the person who does this twice a year</p>
+      </div>
+      <p style="margin:0;max-width:900px;font-size:14px;line-height:1.55;color:#4E4C46">The eleven-field form becomes three plain questions. Line items, unit of measure and categories still exist — they're filled from the catalogue or from an uploaded quote, and only shown when the answer can't be inferred. “Add another item” is available but not the default, because most requests are one thing.</p>
+      <div style="width:1180px;border:1px solid rgba(11,11,11,0.14);border-radius:12px;overflow:hidden;background:#FCFCFB;display:flex">
+        <dc-import name="AwaSidebarNew" active="requests" hint-size="248px,760px"></dc-import>
+        <main style="flex:1;min-width:0;display:flex;flex-direction:column;gap:26px;padding:32px 36px">
+          <div style="display:flex;align-items:center;gap:12px">
+            <div style="display:flex;align-items:center;gap:8px">
+              <span style="width:22px;height:22px;display:grid;place-items:center;border-radius:999px;background:#D97757;color:#fff;font-size:12px;font-weight:600">1</span>
+              <span style="font-size:14px;font-weight:500">What you need</span>
+            </div>
+            <span style="width:36px;height:1px;background:rgba(11,11,11,0.14)"></span>
+            <div style="display:flex;align-items:center;gap:8px;opacity:0.5">
+              <span style="width:22px;height:22px;display:grid;place-items:center;border-radius:999px;border:1.5px solid rgba(11,11,11,0.25);font-size:12px">2</span>
+              <span style="font-size:14px">Who pays for it</span>
+            </div>
+            <span style="width:36px;height:1px;background:rgba(11,11,11,0.14)"></span>
+            <div style="display:flex;align-items:center;gap:8px;opacity:0.5">
+              <span style="width:22px;height:22px;display:grid;place-items:center;border-radius:999px;border:1.5px solid rgba(11,11,11,0.25);font-size:12px">3</span>
+              <span style="font-size:14px">Check and send</span>
+            </div>
+            <span style="margin-left:auto;font-size:12.5px;color:#78766F">Nothing is sent until step 3. Saved as you go.</span>
+          </div>
+
+          <div style="max-width:640px;display:flex;flex-direction:column;gap:24px">
+            <div>
+              <h1 style="margin:0;font-family:'Source Serif 4',Georgia,serif;font-size:26px;font-weight:400;color:#0B0B0B">What do you need?</h1>
+              <p style="margin:5px 0 0;font-size:14px;color:#5B5952">In your own words. If it's something we've bought before, we'll fill in the details.</p>
+            </div>
+
+            <div style="display:flex;flex-direction:column;gap:8px">
+              <input value="safety helm" style="height:46px;border:1.5px solid #D97757;border-radius:10px;padding:0 14px;font-size:16px;font-family:inherit;background:#fff;color:#0B0B0B">
+              <div style="border:1px solid rgba(11,11,11,0.10);border-radius:10px;background:#fff;box-shadow:0 4px 6px -1px rgba(0,0,0,0.10),0 2px 4px -2px rgba(0,0,0,0.10);overflow:hidden">
+                <div style="display:flex;align-items:center;gap:12px;padding:12px 14px;background:rgba(217,119,87,0.06)">
+                  <div style="flex:1">
+                    <p style="margin:0;font-size:14px;font-weight:500">Safety helmet — ISI marked, yellow</p>
+                    <p style="margin:2px 0 0;font-size:12.5px;color:#78766F">In the catalogue · bought 4 times this year · ₹600 each from Suraksha Traders</p>
+                  </div>
+                  <span style="border-radius:999px;padding:2px 9px;font-size:11.5px;font-weight:500;background:rgba(12,163,12,0.10);color:#0A8A0A">known item</span>
+                </div>
+                <div style="display:flex;align-items:center;gap:12px;padding:12px 14px;border-top:1px solid rgba(11,11,11,0.06)">
+                  <div style="flex:1">
+                    <p style="margin:0;font-size:14px">Safety helmet with chin strap</p>
+                    <p style="margin:2px 0 0;font-size:12.5px;color:#78766F">Bought once, March 2026 · ₹740 each</p>
+                  </div>
+                </div>
+                <div style="display:flex;align-items:center;gap:12px;padding:12px 14px;border-top:1px solid rgba(11,11,11,0.06)">
+                  <div style="flex:1"><p style="margin:0;font-size:14px;color:#5B5952">Something else — describe it myself</p></div>
+                </div>
+              </div>
+              <div style="display:flex;align-items:flex-start;gap:10px;border:1px solid rgba(249,178,26,0.45);background:rgba(249,178,26,0.08);border-radius:10px;padding:11px 14px">
+                <span style="width:3px;align-self:stretch;border-radius:2px;background:#F9B21A"></span>
+                <p style="margin:0;font-size:13px;line-height:1.5;color:#5B5952"><strong style="font-weight:500;color:#0B0B0B">Ravi asked for 20 of these six days ago</strong> — it's at stage 4, being ordered. Worth checking before you ask for more. <a href="#" style="text-decoration:underline">See Ravi's request</a></p>
+              </div>
+            </div>
+
+            <div style="display:flex;gap:20px;flex-wrap:wrap">
+              <div style="display:flex;flex-direction:column;gap:6px">
+                <label style="font-size:13px;font-weight:500">How many?</label>
+                <div style="display:flex;align-items:center;gap:8px">
+                  <input value="24" style="height:40px;width:88px;border:1px solid rgba(11,11,11,0.14);border-radius:10px;padding:0 12px;font-size:15px;font-family:inherit;background:#fff">
+                  <span style="font-size:14px;color:#5B5952">helmets</span>
+                </div>
+              </div>
+              <div style="display:flex;flex-direction:column;gap:6px">
+                <label style="font-size:13px;font-weight:500">When do you need it?</label>
+                <select style="height:40px;border:1px solid rgba(11,11,11,0.14);border-radius:10px;padding:0 12px;font-size:15px;font-family:inherit;background:#fff"><option>Within two weeks</option></select>
+              </div>
+              <div style="flex:1;min-width:200px;display:flex;flex-direction:column;gap:6px">
+                <label style="font-size:13px;font-weight:500">Roughly what will it cost? <span style="font-weight:400;color:#78766F">optional</span></label>
+                <input value="₹14,400 total" style="height:40px;border:1px solid rgba(11,11,11,0.14);border-radius:10px;padding:0 12px;font-size:15px;font-family:inherit;background:#fff">
+                <p style="margin:0;font-size:12.5px;color:#78766F">Filled from the catalogue price. An estimate is fine — procurement gets the real quote.</p>
+              </div>
+            </div>
+
+            <div style="display:flex;align-items:center;gap:12px;border:1px dashed rgba(11,11,11,0.16);border-radius:10px;padding:14px 16px">
+              <div style="flex:1">
+                <p style="margin:0;font-size:13.5px;font-weight:500">Got a quote or proforma from the vendor?</p>
+                <p style="margin:2px 0 0;font-size:12.5px;color:#78766F">Drop the PDF in and we'll read the items and prices off it — you won't have to type them.</p>
+              </div>
+              <button style="height:32px;padding:0 12px;border:1px solid rgba(11,11,11,0.10);border-radius:8px;background:#FCFCFB;font-size:13px;font-family:inherit;cursor:pointer">Add a file</button>
+            </div>
+
+            <div style="display:flex;flex-direction:column;gap:6px">
+              <label style="font-size:13px;font-weight:500">Why do you need it?</label>
+              <textarea rows="2" placeholder="One line is plenty — it's what an approver reads first." style="border:1px solid rgba(11,11,11,0.14);border-radius:10px;padding:10px 12px;font-size:14.5px;font-family:inherit;background:#fff"></textarea>
+            </div>
+
+            <div style="display:flex;align-items:center;gap:12px">
+              <button style="height:40px;padding:0 18px;border:none;border-radius:10px;background:#D97757;color:#fff;font-size:15px;font-weight:500;font-family:inherit;cursor:pointer">Next — who pays for it</button>
+              <button style="border:none;background:none;font-size:13.5px;font-family:inherit;color:#78766F;cursor:pointer">Add another item</button>
+              <span style="margin-left:auto;font-size:12.5px;color:#78766F">Draft saved · only you can see it</span>
+            </div>
+          </div>
+        </main>
+      </div>
+
+      <div style="width:640px;border:1px solid rgba(11,11,11,0.14);border-radius:12px;background:#FCFCFB;padding:26px;display:flex;flex-direction:column;gap:18px">
+        <p style="margin:0;font-family:ui-monospace,monospace;font-size:11.5px;color:#78766F">step 3 of 3 · check and send</p>
+        <h2 style="margin:0;font-family:'Source Serif 4',Georgia,serif;font-size:22px;font-weight:400">24 safety helmets, ₹14,400</h2>
+        <div style="display:flex;flex-direction:column;gap:0;border:1px solid rgba(11,11,11,0.08);border-radius:10px;overflow:hidden;font-size:13.5px">
+          <div style="display:flex;padding:11px 14px"><span style="width:170px;color:#78766F">Charged to</span><span>Facilities — running costs</span></div>
+          <div style="display:flex;padding:11px 14px;border-top:1px solid rgba(11,11,11,0.06)"><span style="width:170px;color:#78766F">Budget left after this</span><span>₹3,98,000 of ₹12,00,000</span></div>
+          <div style="display:flex;padding:11px 14px;border-top:1px solid rgba(11,11,11,0.06)"><span style="width:170px;color:#78766F">Needed by</span><span>Within two weeks</span></div>
+        </div>
+        <div style="border:1px solid rgba(217,119,87,0.35);background:rgba(217,119,87,0.05);border-radius:10px;padding:14px 16px">
+          <p style="margin:0;font-size:14px;font-weight:500">When you send this, it goes to Vikram Shah</p>
+          <p style="margin:4px 0 0;font-size:13px;line-height:1.55;color:#5B5952">Head of Facilities. If he agrees it goes to <strong style="font-weight:500">Priya Menon</strong> in finance, because it's over ₹50,000 — then procurement finds a vendor. You'll be told at every step, and you can see where it is any time.</p>
+        </div>
+        <div style="display:flex;gap:10px;align-items:center">
+          <button style="height:42px;padding:0 20px;border:none;border-radius:10px;background:#D97757;color:#fff;font-size:15px;font-weight:500;font-family:inherit;cursor:pointer">Send to Vikram</button>
+          <button style="height:42px;padding:0 16px;border:1px solid rgba(11,11,11,0.10);border-radius:10px;background:#FCFCFB;font-size:14.5px;font-family:inherit;cursor:pointer">Keep as draft</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 1f -->
+    <div id="1f" style="display:flex;flex-direction:column;gap:12px;width:1180px">
+      <div style="display:flex;align-items:baseline;gap:10px">
+        <span style="font-family:ui-monospace,monospace;font-size:11px;background:rgba(217,119,87,0.14);color:#C6613F;border-radius:6px;padding:3px 7px">1f</span>
+        <h2 style="margin:0;font-family:'Source Serif 4',Georgia,serif;font-size:22px;font-weight:400">One page, with the consequences alongside</h2>
+        <p style="margin:0;font-size:13px;color:#78766F">Keeps the current shape · for people who raise these weekly</p>
+      </div>
+      <p style="margin:0;max-width:900px;font-size:14px;line-height:1.55;color:#4E4C46">Everything stays on one screen — faster for a repeat user, and closer to today's code. The teaching comes from a rail that answers, continuously, the question the form never answered: what will happen if I press send. It already exists as <span style="font-family:ui-monospace,monospace;font-size:12.5px">previewApprovers()</span>; this gives it somewhere to live.</p>
+      <div style="width:1180px;border:1px solid rgba(11,11,11,0.14);border-radius:12px;overflow:hidden;background:#FCFCFB;display:flex">
+        <dc-import name="AwaSidebarNew" active="requests" hint-size="248px,760px"></dc-import>
+        <main style="flex:1;min-width:0;display:flex;gap:28px;padding:32px 36px">
+          <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:22px">
+            <div>
+              <h1 style="margin:0;font-family:'Source Serif 4',Georgia,serif;font-size:24px;font-weight:400;color:#0B0B0B">Ask for something</h1>
+              <p style="margin:4px 0 0;font-size:14px;color:#5B5952">Formally a <span style="border-bottom:1px dashed rgba(217,119,87,0.7);cursor:help">requisition</span> — a request to buy, before any money is committed.</p>
+            </div>
+
+            <fieldset style="border:1px solid rgba(11,11,11,0.08);border-radius:10px;padding:16px 18px;margin:0">
+              <legend style="padding:0 6px;font-size:12px;letter-spacing:0.06em;text-transform:uppercase;color:#9A968C">What</legend>
+              <div style="display:flex;flex-direction:column;gap:12px">
+                <div style="display:flex;gap:10px;align-items:flex-end">
+                  <div style="flex:1;display:flex;flex-direction:column;gap:5px">
+                    <label style="font-size:12.5px;color:#5B5952">Item</label>
+                    <input value="Safety helmet — ISI marked, yellow" style="height:38px;border:1px solid rgba(11,11,11,0.14);border-radius:8px;padding:0 10px;font-size:14px;font-family:inherit;background:#fff">
+                  </div>
+                  <div style="width:80px;display:flex;flex-direction:column;gap:5px">
+                    <label style="font-size:12.5px;color:#5B5952">Qty</label>
+                    <input value="24" style="height:38px;border:1px solid rgba(11,11,11,0.14);border-radius:8px;padding:0 10px;font-size:14px;font-family:inherit;background:#fff">
+                  </div>
+                  <div style="width:120px;display:flex;flex-direction:column;gap:5px">
+                    <label style="font-size:12.5px;color:#5B5952">Price each</label>
+                    <input value="600.00" style="height:38px;border:1px solid rgba(11,11,11,0.14);border-radius:8px;padding:0 10px;font-size:14px;font-family:inherit;background:#fff">
+                  </div>
+                </div>
+                <div style="display:flex;align-items:center;gap:14px">
+                  <button style="height:28px;padding:0 10px;border:1px solid rgba(11,11,11,0.10);border-radius:8px;background:#FCFCFB;font-size:12.5px;font-family:inherit;cursor:pointer;white-space:nowrap;flex-shrink:0">Add a line</button>
+                  <span style="font-size:12.5px;color:#78766F">Unit and category came from the catalogue — <a href="#" style="text-decoration:underline">change them</a></span>
+                  <span style="margin-left:auto;font-size:14px;font-weight:500">₹14,400</span>
+                </div>
+              </div>
+            </fieldset>
+
+            <fieldset style="border:1px solid rgba(11,11,11,0.08);border-radius:10px;padding:16px 18px;margin:0">
+              <legend style="padding:0 6px;font-size:12px;letter-spacing:0.06em;text-transform:uppercase;color:#9A968C">Who pays</legend>
+              <div style="display:flex;gap:12px;flex-wrap:wrap">
+                <div style="flex:1;min-width:180px;display:flex;flex-direction:column;gap:5px">
+                  <label style="font-size:12.5px;color:#5B5952">Department</label>
+                  <select style="height:38px;border:1px solid rgba(11,11,11,0.14);border-radius:8px;padding:0 10px;font-size:14px;font-family:inherit;background:#fff"><option>Facilities</option></select>
+                </div>
+                <div style="flex:1;min-width:220px;display:flex;flex-direction:column;gap:5px">
+                  <label style="font-size:12.5px;color:#5B5952">Budget line <span style="color:#9A968C">(cost centre)</span></label>
+                  <select style="height:38px;border:1px solid rgba(11,11,11,0.14);border-radius:8px;padding:0 10px;font-size:14px;font-family:inherit;background:#fff"><option>Facilities — running costs</option></select>
+                </div>
+              </div>
+              <div style="margin-top:14px">
+                <div style="display:flex;height:8px;overflow:hidden;border-radius:999px;background:#F0EFEA">
+                  <span style="width:65%;background:rgba(120,118,111,0.45)"></span>
+                  <span style="width:2%;background:#D97757"></span>
+                </div>
+                <div style="margin-top:6px;display:flex;justify-content:space-between;font-size:12.5px;color:#78766F">
+                  <span>₹8,02,000 already committed · <span style="color:#D97757">₹14,400 this request</span></span>
+                  <span>₹3,83,600 left of ₹12,00,000</span>
+                </div>
+              </div>
+            </fieldset>
+
+            <fieldset style="border:1px solid rgba(11,11,11,0.08);border-radius:10px;padding:16px 18px;margin:0">
+              <legend style="padding:0 6px;font-size:12px;letter-spacing:0.06em;text-transform:uppercase;color:#9A968C">Why</legend>
+              <textarea rows="2" placeholder="One line — it's what an approver reads first." style="width:100%;box-sizing:border-box;border:1px solid rgba(11,11,11,0.14);border-radius:8px;padding:10px 12px;font-size:14px;font-family:inherit;background:#fff"></textarea>
+            </fieldset>
+          </div>
+
+          <aside style="width:330px;flex-shrink:0;display:flex;flex-direction:column;gap:14px;border-left:1px solid rgba(11,11,11,0.08);padding-left:26px">
+            <p style="margin:0;font-size:12px;letter-spacing:0.07em;text-transform:uppercase;color:#9A968C">If you send this now</p>
+            <div style="display:flex;flex-direction:column;gap:8px">
+              <div style="display:flex;align-items:center;gap:10px;border:1px solid rgba(11,11,11,0.08);border-radius:10px;padding:10px 12px;background:#fff">
+                <span style="width:24px;height:24px;border-radius:999px;background:#CBCADB;font-size:10px;font-weight:600;color:#3A3860;display:grid;place-items:center">VS</span>
+                <div><p style="margin:0;font-size:13px;font-weight:500">Vikram Shah</p><p style="margin:0;font-size:11.5px;color:#78766F">Head of Facilities · decides first</p></div>
+              </div>
+              <p style="margin:0;padding-left:12px;font-size:11.5px;color:#9A968C">then, only if he agrees →</p>
+              <div style="display:flex;align-items:center;gap:10px;border:1px solid rgba(11,11,11,0.08);border-radius:10px;padding:10px 12px;background:#fff">
+                <span style="width:24px;height:24px;border-radius:999px;background:#BCD1CA;font-size:10px;font-weight:600;color:#2E4A41;display:grid;place-items:center">PM</span>
+                <div><p style="margin:0;font-size:13px;font-weight:500">Priya Menon</p><p style="margin:0;font-size:11.5px;color:#78766F">Finance · because it's over ₹50,000</p></div>
+              </div>
+              <p style="margin:2px 0 0;font-size:12px;color:#78766F">Rule: “Facilities over 50,000”. <a href="#" style="text-decoration:underline">Why these two?</a></p>
+            </div>
+
+            <div style="border-top:1px solid rgba(11,11,11,0.08);padding-top:14px;display:flex;flex-direction:column;gap:8px">
+              <div style="display:flex;gap:8px;align-items:flex-start">
+                <span style="margin-top:5px;width:6px;height:6px;border-radius:999px;background:#0CA30C;flex-shrink:0"></span>
+                <p style="margin:0;font-size:12.5px;line-height:1.5;color:#5B5952">Within budget — ₹3,83,600 would remain this year.</p>
+              </div>
+              <div style="display:flex;gap:8px;align-items:flex-start">
+                <span style="margin-top:5px;width:6px;height:6px;border-radius:999px;background:#F9B21A;flex-shrink:0"></span>
+                <p style="margin:0;font-size:12.5px;line-height:1.5;color:#5B5952">Ravi asked for 20 of the same helmets six days ago. <a href="#" style="text-decoration:underline">Look</a> — if it's the same need, add to his instead.</p>
+              </div>
+              <div style="display:flex;gap:8px;align-items:flex-start">
+                <span style="margin-top:5px;width:6px;height:6px;border-radius:999px;background:#256ABF;flex-shrink:0"></span>
+                <p style="margin:0;font-size:12.5px;line-height:1.5;color:#5B5952">Typically 2 days to a decision at this value.</p>
+              </div>
+            </div>
+
+            <div style="border-top:1px solid rgba(11,11,11,0.08);padding-top:14px;display:flex;flex-direction:column;gap:8px">
+              <button style="height:40px;border:none;border-radius:10px;background:#D97757;color:#fff;font-size:14.5px;font-weight:500;font-family:inherit;cursor:pointer">Send to Vikram Shah</button>
+              <button style="height:36px;border:1px solid rgba(11,11,11,0.10);border-radius:10px;background:#FCFCFB;font-size:13.5px;font-family:inherit;cursor:pointer">Keep as a draft</button>
+              <p style="margin:0;font-size:11.5px;line-height:1.45;color:#9A968C">A draft is private to you. Sending commits nothing — it asks a person.</p>
+            </div>
+          </aside>
+        </main>
+      </div>
+      <div style="width:640px;border:1px solid rgba(249,178,26,0.45);background:rgba(249,178,26,0.07);border-radius:12px;padding:18px 20px">
+        <p style="margin:0;font-family:ui-monospace,monospace;font-size:11.5px;color:#B07A05">the same rail, on a half-configured tenant</p>
+        <p style="margin:8px 0 0;font-size:14.5px;font-weight:500">Nobody will look at this before it's bought</p>
+        <p style="margin:4px 0 0;font-size:13.5px;line-height:1.55;color:#5B5952">No rule covers a ₹14,400 request in Facilities, so sending it approves it on the spot and it goes straight to buying. That's AWA not deadlocking — it isn't the control you think you have. <a href="#" style="text-decoration:underline">Tell your admin</a></p>
+      </div>
+    </div>
+
+    <!-- 1g -->
+    <div id="1g" style="display:flex;flex-direction:column;gap:12px;width:1180px">
+      <div style="display:flex;align-items:baseline;gap:10px">
+        <span style="font-family:ui-monospace,monospace;font-size:11px;background:rgba(217,119,87,0.14);color:#C6613F;border-radius:6px;padding:3px 7px">1g</span>
+        <h2 style="margin:0;font-family:'Source Serif 4',Georgia,serif;font-size:22px;font-weight:400">“How AWA works” — a place to go and read</h2>
+        <p style="margin:0;font-size:13px;color:#78766F">Formal terms kept, plain gloss beside them</p>
+      </div>
+      <p style="margin:0;max-width:900px;font-size:14px;line-height:1.55;color:#4E4C46">The existing <span style="font-family:ui-monospace,monospace;font-size:12.5px">glossary.ts</span> is good writing that can only be reached by hovering a word you happened to notice. Given a page of its own it becomes browsable: the process end to end, each stage naming who does it and what you'd actually do, with the same definitions available in place as before.</p>
+      <div style="width:1180px;border:1px solid rgba(11,11,11,0.14);border-radius:12px;overflow:hidden;background:#FCFCFB;display:flex">
+        <dc-import name="AwaSidebarNew" active="help" hint-size="248px,720px"></dc-import>
+        <main style="flex:1;min-width:0;display:flex;gap:0">
+          <nav style="width:210px;flex-shrink:0;border-right:1px solid rgba(11,11,11,0.08);padding:28px 16px;display:flex;flex-direction:column;gap:2px">
+            <p style="margin:0 8px 10px;font-size:11px;letter-spacing:0.08em;text-transform:uppercase;color:#9A968C">Contents</p>
+            <a href="#" style="border-radius:8px;padding:7px 8px;font-size:13.5px;text-decoration:none;color:rgba(11,11,11,0.75)">What AWA is for</a>
+            <a href="#" style="border-radius:8px;padding:7px 8px;font-size:13.5px;text-decoration:none;color:#D97757;background:rgba(217,119,87,0.10);font-weight:500">The seven stages</a>
+            <a href="#" style="border-radius:8px;padding:7px 8px;font-size:13.5px;text-decoration:none;color:rgba(11,11,11,0.75)">Which parts are mine</a>
+            <a href="#" style="border-radius:8px;padding:7px 8px;font-size:13.5px;text-decoration:none;color:rgba(11,11,11,0.75)">Words we use</a>
+            <a href="#" style="border-radius:8px;padding:7px 8px;font-size:13.5px;text-decoration:none;color:rgba(11,11,11,0.75)">If something looks stuck</a>
+            <a href="#" style="border-radius:8px;padding:7px 8px;font-size:13.5px;text-decoration:none;color:rgba(11,11,11,0.75)">Questions people ask us</a>
+          </nav>
+
+          <div style="flex:1;min-width:0;padding:28px 32px;display:flex;flex-direction:column;gap:20px">
+            <div>
+              <h1 style="margin:0;font-family:'Source Serif 4',Georgia,serif;font-size:25px;font-weight:400">The seven stages</h1>
+              <p style="margin:5px 0 0;font-size:14px;line-height:1.55;color:#5B5952;max-width:62ch">Everything AWA does is one of these, in this order. The bold name is what we call it on screen; the grey name is what it's called on paperwork and by auditors.</p>
+            </div>
+
+            <ol style="margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:10px">
+              <li style="border:1px solid rgba(11,11,11,0.08);border-radius:10px;padding:16px 18px">
+                <div style="display:flex;align-items:baseline;gap:10px">
+                  <span style="font-family:ui-monospace,monospace;font-size:12px;color:#9A968C">01</span>
+                  <p style="margin:0;font-size:15px;font-weight:500">Someone asks for something</p>
+                  <span style="font-size:12.5px;color:#9A968C">requisition</span>
+                  <span style="margin-left:auto;border-radius:999px;padding:2px 9px;font-size:11.5px;font-weight:500;background:rgba(217,119,87,0.14);color:#C6613F">yours</span>
+                </div>
+                <div style="margin-top:12px;display:flex;gap:24px;flex-wrap:wrap">
+                  <div style="flex:1;min-width:200px"><p style="margin:0;font-size:11.5px;letter-spacing:0.06em;text-transform:uppercase;color:#9A968C">What you do</p><p style="margin:5px 0 0;font-size:13.5px;line-height:1.55;color:#5B5952">Describe what you need and which budget it belongs to. Nothing is ordered and no money moves.</p></div>
+                  <div style="flex:1;min-width:200px"><p style="margin:0;font-size:11.5px;letter-spacing:0.06em;text-transform:uppercase;color:#9A968C">What to expect</p><p style="margin:5px 0 0;font-size:13.5px;line-height:1.55;color:#5B5952">Within a day or two, either a yes, or a question from the person who has to agree.</p></div>
+                </div>
+              </li>
+              <li style="border:1px solid rgba(11,11,11,0.08);border-radius:10px;padding:16px 18px">
+                <div style="display:flex;align-items:baseline;gap:10px">
+                  <span style="font-family:ui-monospace,monospace;font-size:12px;color:#9A968C">02</span>
+                  <p style="margin:0;font-size:15px;font-weight:500">Someone with authority agrees</p>
+                  <span style="font-size:12.5px;color:#9A968C">approval</span>
+                  <span style="margin-left:auto;border-radius:999px;padding:2px 9px;font-size:11.5px;font-weight:500;background:rgba(217,119,87,0.14);color:#C6613F">yours</span>
+                </div>
+                <div style="margin-top:12px;display:flex;gap:24px;flex-wrap:wrap">
+                  <div style="flex:1;min-width:200px"><p style="margin:0;font-size:11.5px;letter-spacing:0.06em;text-transform:uppercase;color:#9A968C">What you do</p><p style="margin:5px 0 0;font-size:13.5px;line-height:1.55;color:#5B5952">Agree, ask a question, or send it back for changes. Sending back is not a refusal — the same request comes round again.</p></div>
+                  <div style="flex:1;min-width:200px"><p style="margin:0;font-size:11.5px;letter-spacing:0.06em;text-transform:uppercase;color:#9A968C">Good to know</p><p style="margin:5px 0 0;font-size:13.5px;line-height:1.55;color:#5B5952">Who has to agree depends on amount, department and what's being bought — you'll always be shown the chain before you send.</p></div>
+                </div>
+              </li>
+              <li style="border:1px solid rgba(11,11,11,0.08);border-radius:10px;padding:16px 18px;opacity:0.85">
+                <div style="display:flex;align-items:baseline;gap:10px">
+                  <span style="font-family:ui-monospace,monospace;font-size:12px;color:#9A968C">05</span>
+                  <p style="margin:0;font-size:15px;font-weight:500">Somebody confirms it turned up</p>
+                  <span style="font-size:12.5px;color:#9A968C">goods receipt · service acceptance</span>
+                  <span style="margin-left:auto;font-size:11.5px;color:#9A968C">whoever takes delivery</span>
+                </div>
+                <p style="margin:10px 0 0;font-size:13.5px;line-height:1.55;color:#5B5952;max-width:70ch">Not you, if you asked for it — deliberately. The person who requested something can't be the person who confirms it arrived, so that nobody can order and sign for their own purchase. <span style="border-bottom:1px dashed rgba(217,119,87,0.7);cursor:help">Segregation of duties</span>, if you meet the phrase.</p>
+              </li>
+            </ol>
+          </div>
+
+          <aside style="width:300px;flex-shrink:0;border-left:1px solid rgba(11,11,11,0.08);background:#F6F6F3;padding:24px 20px;display:flex;flex-direction:column;gap:14px">
+            <div style="display:flex;align-items:center;justify-content:space-between">
+              <p style="margin:0;font-size:11px;letter-spacing:0.08em;text-transform:uppercase;color:#9A968C">Words we use</p>
+              <button style="border:none;background:none;font-size:16px;line-height:1;color:#78766F;font-family:inherit;cursor:pointer">×</button>
+            </div>
+            <input placeholder="Look up a word…" style="height:34px;border:1px solid rgba(11,11,11,0.12);border-radius:8px;padding:0 10px;font-size:13px;font-family:inherit;background:#fff">
+            <div style="border:1px solid rgba(11,11,11,0.10);border-radius:10px;background:#fff;padding:14px">
+              <p style="margin:0;font-size:14px;font-weight:500">Goods receipt</p>
+              <p style="margin:8px 0 0;font-size:11.5px;letter-spacing:0.06em;text-transform:uppercase;color:#9A968C">In plain words</p>
+              <p style="margin:4px 0 0;font-size:13px;line-height:1.55;color:#5B5952">A note saying what actually arrived, and how much of it — recorded by whoever unpacked the delivery.</p>
+              <p style="margin:10px 0 0;font-size:11.5px;letter-spacing:0.06em;text-transform:uppercase;color:#9A968C">Why it matters</p>
+              <p style="margin:4px 0 0;font-size:13px;line-height:1.55;color:#5B5952">A vendor's bill is only paid for what a receipt says came in. Short deliveries are fine — record what arrived and the rest stays owed.</p>
+            </div>
+            <div style="display:flex;flex-wrap:wrap;gap:6px">
+              <span style="border:1px solid rgba(11,11,11,0.10);border-radius:999px;padding:4px 10px;font-size:12px;color:#5B5952">Requisition</span>
+              <span style="border:1px solid rgba(11,11,11,0.10);border-radius:999px;padding:4px 10px;font-size:12px;color:#5B5952">RFQ</span>
+              <span style="border:1px solid rgba(11,11,11,0.10);border-radius:999px;padding:4px 10px;font-size:12px;color:#5B5952">Purchase order</span>
+              <span style="border:1px solid rgba(11,11,11,0.10);border-radius:999px;padding:4px 10px;font-size:12px;color:#5B5952">Three-way match</span>
+              <span style="border:1px solid rgba(11,11,11,0.10);border-radius:999px;padding:4px 10px;font-size:12px;color:#5B5952">Cost centre</span>
+              <span style="border:1px solid rgba(11,11,11,0.10);border-radius:999px;padding:4px 10px;font-size:12px;color:#5B5952">Exception</span>
+            </div>
+            <p style="margin:auto 0 0;font-size:12px;line-height:1.5;color:#78766F">Every underlined word in AWA opens this panel — the definition is the same one, written once.</p>
+          </aside>
+        </main>
+      </div>
+    </div>
+
+    <!-- 1h -->
+    <div id="1h" style="display:flex;flex-direction:column;gap:12px;width:1180px">
+      <div style="display:flex;align-items:baseline;gap:10px">
+        <span style="font-family:ui-monospace,monospace;font-size:11px;background:rgba(217,119,87,0.14);color:#C6613F;border-radius:6px;padding:3px 7px">1h</span>
+        <h2 style="margin:0;font-family:'Source Serif 4',Georgia,serif;font-size:22px;font-weight:400">On a phone, where approvers actually are</h2>
+        <p style="margin:0;font-size:13px;color:#78766F">First screen · what needs you · one decision</p>
+      </div>
+      <p style="margin:0;max-width:900px;font-size:14px;line-height:1.55;color:#4E4C46">A manager meets AWA in a push notification on a site visit. The three screens below are the whole product for that person — so the decision, and its consequence, has to fit on one thumb-reachable card, and the sign-in has to say what this thing is before asking for a password.</p>
+      <div style="display:flex;gap:28px;flex-wrap:wrap">
+
+        <div style="width:390px;border:10px solid #1C1B19;border-radius:44px;overflow:hidden;background:#FCFCFB;display:flex;flex-direction:column">
+          <div style="display:flex;justify-content:space-between;padding:12px 22px 6px;font-size:12px;font-weight:500;color:#0B0B0B"><span>9:41</span><span>▮▮▮</span></div>
+          <div style="flex:1;display:flex;flex-direction:column;justify-content:center;gap:18px;padding:32px 26px 44px">
+            <div style="display:flex;align-items:center;gap:10px">
+              <span style="width:34px;height:34px;display:grid;place-items:center;border-radius:8px;background:#D97757;font-family:'Source Serif 4',Georgia,serif;font-size:17px;color:#fff">A</span>
+              <span style="font-family:'Source Serif 4',Georgia,serif;font-size:21px">AWA</span>
+            </div>
+            <div>
+              <h1 style="margin:0;font-family:'Source Serif 4',Georgia,serif;font-size:24px;font-weight:400;line-height:1.25">Kalyani Industries buys things through AWA.</h1>
+              <p style="margin:8px 0 0;font-size:14.5px;line-height:1.55;color:#5B5952">Ask for what you need, agree to what others ask for, and see where any order has got to.</p>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:10px">
+              <input placeholder="you@kalyani.co.in" style="height:48px;border:1px solid rgba(11,11,11,0.14);border-radius:12px;padding:0 14px;font-size:16px;font-family:inherit;background:#fff">
+              <input placeholder="Password" style="height:48px;border:1px solid rgba(11,11,11,0.14);border-radius:12px;padding:0 14px;font-size:16px;font-family:inherit;background:#fff">
+              <button style="height:50px;border:none;border-radius:12px;background:#D97757;color:#fff;font-size:16px;font-weight:500;font-family:inherit;cursor:pointer">Sign in</button>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:10px;border-top:1px solid rgba(11,11,11,0.08);padding-top:16px">
+              <a href="#" style="font-size:14px;text-decoration:none">I've forgotten my password</a>
+              <a href="#" style="font-size:14px;text-decoration:none">I supply Kalyani Industries — I'm not staff</a>
+              <p style="margin:0;font-size:12.5px;line-height:1.5;color:#78766F">Accounts are created by your admin. There's no sign-up.</p>
+            </div>
+          </div>
+        </div>
+
+        <div style="width:390px;border:10px solid #1C1B19;border-radius:44px;overflow:hidden;background:#FCFCFB;display:flex;flex-direction:column">
+          <div style="display:flex;justify-content:space-between;padding:12px 22px 6px;font-size:12px;font-weight:500;color:#0B0B0B"><span>9:41</span><span>▮▮▮</span></div>
+          <div style="flex:1;display:flex;flex-direction:column;gap:18px;padding:20px 20px 40px">
+            <div>
+              <h1 style="margin:0;font-family:'Source Serif 4',Georgia,serif;font-size:22px;font-weight:400">Two things need you</h1>
+              <p style="margin:4px 0 0;font-size:14px;color:#5B5952">Nothing else is stuck.</p>
+            </div>
+            <div style="border:1px solid rgba(217,119,87,0.35);background:rgba(217,119,87,0.05);border-radius:12px;padding:16px">
+              <p style="margin:0;font-size:15px;font-weight:500">Anjali needs ₹86,000 for a generator service</p>
+              <p style="margin:5px 0 0;font-size:13.5px;line-height:1.5;color:#5B5952">Facilities · waiting 3 days · 16% more than the last one cost</p>
+              <button style="margin-top:12px;width:100%;height:46px;border:none;border-radius:10px;background:#D97757;color:#fff;font-size:15px;font-weight:500;font-family:inherit;cursor:pointer">Look at it</button>
+            </div>
+            <div style="border:1px solid rgba(11,11,11,0.08);border-radius:12px;padding:16px">
+              <p style="margin:0;font-size:15px;font-weight:500">Meera needs ₹77,000 for a laptop</p>
+              <p style="margin:5px 0 0;font-size:13.5px;color:#5B5952">Engineering · waiting 1 day</p>
+              <button style="margin-top:12px;width:100%;height:46px;border:1px solid rgba(11,11,11,0.12);border-radius:10px;background:#FCFCFB;font-size:15px;font-family:inherit;cursor:pointer">Look at it</button>
+            </div>
+            <div style="margin-top:auto;border-top:1px solid rgba(11,11,11,0.08);padding-top:14px">
+              <p style="margin:0;font-size:13px;line-height:1.5;color:#78766F">You're an approver — stage 2 of 7. The other stages happen without you. <a href="#" style="text-decoration:underline">How AWA works</a></p>
+            </div>
+          </div>
+        </div>
+
+        <div style="width:390px;border:10px solid #1C1B19;border-radius:44px;overflow:hidden;background:#FCFCFB;display:flex;flex-direction:column">
+          <div style="display:flex;justify-content:space-between;padding:12px 22px 6px;font-size:12px;font-weight:500;color:#0B0B0B"><span>9:41</span><span>▮▮▮</span></div>
+          <div style="flex:1;display:flex;flex-direction:column;gap:16px;padding:16px 20px 40px">
+            <a href="#" style="font-size:13.5px;text-decoration:none">← Two things need you</a>
+            <div>
+              <p style="margin:0;font-size:12px;letter-spacing:0.06em;text-transform:uppercase;color:#9A968C">Stage 2 of 7 · your decision</p>
+              <h1 style="margin:6px 0 0;font-family:'Source Serif 4',Georgia,serif;font-size:21px;font-weight:400;line-height:1.3">Diesel generator service — annual</h1>
+              <p style="margin:6px 0 0;font-size:14px;color:#5B5952">₹86,000 · Anjali Rao · Facilities</p>
+            </div>
+            <div style="border:1px solid rgba(11,11,11,0.08);border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:10px">
+              <p style="margin:0;font-size:13.5px;line-height:1.55;color:#5B5952">“Annual AMC due before monsoon; last service was March 2026.”</p>
+              <div style="border-top:1px solid rgba(11,11,11,0.06);padding-top:10px;display:flex;flex-direction:column;gap:6px">
+                <p style="margin:0;font-size:13px;color:#5B5952"><span style="color:#B07A05;font-weight:500">16% higher</span> than the last service (₹74,000, Bharat Power)</p>
+                <p style="margin:0;font-size:13px;color:#5B5952">Facilities has ₹3,98,000 left this year</p>
+              </div>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:10px">
+              <button style="width:100%;min-height:52px;border:none;border-radius:12px;background:#D97757;color:#fff;font-size:15.5px;font-weight:500;font-family:inherit;cursor:pointer;display:flex;flex-direction:column;gap:2px;align-items:center;justify-content:center;padding:8px">
+                <span>Agree</span>
+                <span style="font-size:12px;font-weight:400;opacity:0.9">then it goes to Priya in finance</span>
+              </button>
+              <button style="width:100%;min-height:52px;border:1px solid rgba(11,11,11,0.14);border-radius:12px;background:#FCFCFB;font-size:15.5px;font-family:inherit;cursor:pointer;display:flex;flex-direction:column;gap:2px;align-items:center;justify-content:center;padding:8px;color:#0B0B0B">
+                <span>Ask Anjali a question</span>
+                <span style="font-size:12px;color:#78766F">holds it here, nothing is refused</span>
+              </button>
+              <button style="width:100%;min-height:52px;border:1px solid rgba(11,11,11,0.14);border-radius:12px;background:#FCFCFB;font-size:15.5px;font-family:inherit;cursor:pointer;display:flex;flex-direction:column;gap:2px;align-items:center;justify-content:center;padding:8px;color:#0B0B0B">
+                <span>Send back for changes</span>
+                <span style="font-size:12px;color:#78766F">she can fix it and resend</span>
+              </button>
+              <a href="#" style="align-self:center;margin-top:2px;font-size:13px;color:#78766F;text-decoration:underline">Refuse it outright</a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 1i -->
+    <div id="1i" style="display:flex;flex-direction:column;gap:12px;width:1180px">
+      <div style="display:flex;align-items:baseline;gap:10px">
+        <span style="font-family:ui-monospace,monospace;font-size:11px;background:rgba(217,119,87,0.14);color:#C6613F;border-radius:6px;padding:3px 7px">1i</span>
+        <h2 style="margin:0;font-family:'Source Serif 4',Georgia,serif;font-size:22px;font-weight:400">The vendor portal, for a stranger</h2>
+        <p style="margin:0;font-size:13px;color:#78766F">One visit, no training, no account they asked for</p>
+      </div>
+      <p style="margin:0;max-width:900px;font-size:14px;line-height:1.55;color:#4E4C46">A supplier lands here from an email, has never seen AWA, and is currently shown <span style="font-family:ui-monospace,monospace;font-size:12.5px">partially_fulfilled</span> with no indication of what's wanted from them. Every order becomes a sentence about who owes whom what, with the one action that matters made obvious — and the trust anchors (hash, QR) explained rather than assumed.</p>
+      <div style="width:900px;border:1px solid rgba(11,11,11,0.14);border-radius:12px;background:#FCFCFB;padding:32px 36px;display:flex;flex-direction:column;gap:24px">
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:16px">
+          <div>
+            <h1 style="margin:0;font-family:'Source Serif 4',Georgia,serif;font-size:24px;font-weight:400">Orders from Kalyani Industries</h1>
+            <p style="margin:5px 0 0;font-size:14px;line-height:1.55;color:#5B5952;max-width:70ch">You're signed in as ops@suraksha.co.in for <strong style="font-weight:500">Suraksha Traders</strong>. This page is the real order — if an emailed PDF ever disagrees with what's here, what's here is correct.</p>
+          </div>
+          <button style="flex-shrink:0;height:32px;padding:0 12px;border:1px solid rgba(11,11,11,0.10);border-radius:8px;background:#FCFCFB;font-size:13px;font-family:inherit;cursor:pointer">Sign out</button>
+        </div>
+
+        <div style="border:1px solid rgba(217,119,87,0.35);background:rgba(217,119,87,0.05);border-radius:12px;padding:20px 22px;display:flex;gap:24px;align-items:flex-start">
+          <div style="flex:1;min-width:0">
+            <div style="display:flex;align-items:baseline;gap:10px">
+              <p style="margin:0;font-size:16px;font-weight:500">PO-2026-0006 · ₹1,48,000</p>
+              <span style="border-radius:999px;padding:2px 9px;font-size:11.5px;font-weight:500;background:rgba(217,119,87,0.16);color:#C6613F">needs your confirmation</span>
+            </div>
+            <p style="margin:8px 0 0;font-size:14.5px;line-height:1.6;color:#0B0B0B">Kalyani Industries wants <strong style="font-weight:500">200 ISI-marked safety helmets</strong>, delivered to the Pune plant by <strong style="font-weight:500">2 September</strong>.</p>
+            <p style="margin:6px 0 0;font-size:13.5px;line-height:1.6;color:#5B5952">They're waiting for you to say you can supply it at this price and date. Confirming is what makes this order binding on both sides — after that you deliver, and you can bill for whatever they've received.</p>
+            <div style="margin-top:14px;display:flex;flex-wrap:wrap;gap:10px">
+              <button style="height:40px;padding:0 18px;border:none;border-radius:10px;background:#D97757;color:#fff;font-size:14.5px;font-weight:500;font-family:inherit;cursor:pointer">Yes — we can supply this</button>
+              <button style="height:40px;padding:0 16px;border:1px solid rgba(11,11,11,0.12);border-radius:10px;background:#FCFCFB;font-size:14.5px;font-family:inherit;cursor:pointer">Something's wrong with it</button>
+              <button style="height:40px;padding:0 16px;border:1px solid rgba(11,11,11,0.12);border-radius:10px;background:#FCFCFB;font-size:14.5px;font-family:inherit;cursor:pointer">Download the order (PDF)</button>
+            </div>
+          </div>
+          <div style="width:200px;flex-shrink:0;border-left:1px solid rgba(11,11,11,0.10);padding-left:20px">
+            <p style="margin:0;font-size:11px;letter-spacing:0.07em;text-transform:uppercase;color:#9A968C">Is this genuine?</p>
+            <p style="margin:8px 0 0;font-size:12.5px;line-height:1.55;color:#5B5952">Every AWA order carries a QR code and a fingerprint. Scan or check it and you'll see the same figures you see here.</p>
+            <p style="margin:8px 0 0;font-family:ui-monospace,monospace;font-size:11px;color:#78766F;word-break:break-all">9f2c·41ab·77de</p>
+            <a href="#" style="display:inline-block;margin-top:8px;font-size:12.5px">Check this order</a>
+          </div>
+        </div>
+
+        <div style="border:1px solid rgba(11,11,11,0.08);border-radius:12px;padding:20px 22px">
+          <div style="display:flex;align-items:baseline;gap:10px">
+            <p style="margin:0;font-size:16px;font-weight:500">PO-2026-0003 · ₹14,400</p>
+            <span style="border-radius:999px;padding:2px 9px;font-size:11.5px;font-weight:500;background:rgba(37,106,191,0.10);color:#256ABF">part delivered</span>
+          </div>
+          <p style="margin:8px 0 0;font-size:14.5px;line-height:1.6;color:#0B0B0B">12 of 24 helmets received on 6 August. <strong style="font-weight:500">They're still expecting the other 12.</strong></p>
+          <p style="margin:6px 0 0;font-size:13.5px;line-height:1.6;color:#5B5952">You can invoice for the 12 already received now, or wait and bill once. Either is fine — a bill is only paid for quantities Kalyani has recorded as arrived.</p>
+          <div style="margin-top:14px;display:flex;flex-wrap:wrap;gap:10px">
+            <button style="height:36px;padding:0 14px;border:1px solid rgba(11,11,11,0.12);border-radius:10px;background:#FCFCFB;font-size:14px;font-family:inherit;cursor:pointer">Send an invoice for the 12</button>
+            <button style="height:36px;padding:0 14px;border:1px solid rgba(11,11,11,0.12);border-radius:10px;background:#FCFCFB;font-size:14px;font-family:inherit;cursor:pointer">Tell them about a delay</button>
+          </div>
+        </div>
+
+        <div style="border:1px solid rgba(11,11,11,0.08);border-radius:12px;padding:18px 22px;display:flex;align-items:center;gap:20px;background:#F6F6F3">
+          <div style="flex:1">
+            <p style="margin:0;font-size:14px;font-weight:500">PO-2026-0001 · ₹6,000 — finished</p>
+            <p style="margin:4px 0 0;font-size:13.5px;color:#5B5952">Delivered, billed and paid on 24 July. Reference UTR 4471983320. Nothing needed from you.</p>
+          </div>
+          <button style="flex-shrink:0;height:32px;padding:0 12px;border:1px solid rgba(11,11,11,0.10);border-radius:8px;background:#FCFCFB;font-size:13px;font-family:inherit;cursor:pointer">See it</button>
+        </div>
+
+        <p style="margin:0;font-size:12.5px;line-height:1.55;color:#78766F;max-width:80ch">A note on bank details: AWA will never ask you to change your account details by email or through this page. If you need to change them, Kalyani's finance team will call you back on a number they already hold.</p>
+      </div>
+    </div>
+
+  </div>
+</section>
+</x-dc>
+</body>
+</html>

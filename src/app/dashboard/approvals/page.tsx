@@ -204,7 +204,7 @@ export default async function ApprovalsInboxPage({
     : myActionable;
 
   return (
-    <div className="flex flex-col gap-8 p-8">
+    <div className="flex flex-col gap-8 p-4 sm:p-8">
       <div className="flex flex-col gap-2">
         <Breadcrumbs items={[{ label: "Dashboard", href: "/dashboard" }, { label: "Approvals" }]} />
         <div>
@@ -419,14 +419,16 @@ export default async function ApprovalsInboxPage({
                           : `You are the last approver — this moves straight to sourcing. ${userName(requisition.requestorId)} is notified.`;
                       })()}
                     </p>
-                    <form action={approveRequirement} className="mt-2 flex flex-wrap items-end gap-2">
+                    <form action={approveRequirement} className="mt-2 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-end">
                       <input type="hidden" name="requirementId" value={req.id} />
                       <input
                         name="comment"
                         placeholder="Comment (optional)"
-                        className="h-8 w-48 rounded-md border px-2 text-sm"
+                        className="h-11 rounded-md border px-2 text-sm sm:h-8 sm:w-48"
                       />
-                      <button type="submit" className={cn(buttonVariants())}>Approve</button>
+                      <button type="submit" className={cn(buttonVariants(), "h-11 w-full sm:h-8 sm:w-auto")}>
+                        Approve
+                      </button>
                     </form>
                   </div>
                 </div>
@@ -443,15 +445,18 @@ export default async function ApprovalsInboxPage({
                         Rejecting closes it for good.
                       </Info>
                     </p>
-                    <form action={requestRevision} className="mt-2 flex flex-wrap items-end gap-2">
+                    <form action={requestRevision} className="mt-2 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-end">
                       <input type="hidden" name="requirementId" value={req.id} />
                       <input
                         name="comment"
                         required
                         placeholder="What needs fixing?"
-                        className="h-8 w-56 rounded-md border px-2 text-sm"
+                        className="h-11 rounded-md border px-2 text-sm sm:h-8 sm:w-56"
                       />
-                      <button type="submit" className={cn(buttonVariants({ variant: "outline" }))}>
+                      <button
+                        type="submit"
+                        className={cn(buttonVariants({ variant: "outline" }), "h-11 w-full sm:h-8 sm:w-auto")}
+                      >
                         Send back
                       </button>
                     </form>
@@ -467,15 +472,18 @@ export default async function ApprovalsInboxPage({
                     {userName(requisition.requestorId)} would have to raise a brand-new requisition from
                     scratch. Use &ldquo;send back&rdquo; unless the answer is genuinely no.
                   </p>
-                  <form action={rejectAndClose} className="mt-2 flex flex-wrap items-end gap-2">
+                  <form action={rejectAndClose} className="mt-2 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-end">
                     <input type="hidden" name="requirementId" value={req.id} />
                     <input
                       name="comment"
                       required
                       placeholder="Reason for closing"
-                      className="h-8 w-56 rounded-md border px-2 text-sm"
+                      className="h-11 rounded-md border px-2 text-sm sm:h-8 sm:w-56"
                     />
-                    <button type="submit" className={cn(buttonVariants({ variant: "destructive" }))}>
+                    <button
+                      type="submit"
+                      className={cn(buttonVariants({ variant: "destructive" }), "h-11 w-full sm:h-8 sm:w-auto")}
+                    >
                       Reject &amp; close
                     </button>
                   </form>

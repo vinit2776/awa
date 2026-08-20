@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Source+Serif+4:opsz,wght@8..60,400;8..60,500&display=swap" rel="stylesheet">
+<style>
+  body { margin:0; background:#E9E7E1; font-family:Geist,system-ui,sans-serif; }
+  a { color:#D97757; }
+  a:hover { color:#C6613F; }
+</style>
+</helmet>
+
+<div style="display:flex;width:100%;min-width:1180px;min-height:840px;background:#FCFCFB">
+  <dc-import name="AwaSidebarNew" active="today" hint-size="248px,840px"></dc-import>
+
+  <main style="flex:1;min-width:0;padding:32px 36px;display:flex;flex-direction:column;gap:24px">
+    <div>
+      <h1 style="margin:0;font-family:'Source Serif 4',Georgia,serif;font-size:24px;font-weight:400;color:#0B0B0B">How buying works here, and where you sit in it</h1>
+      <p style="margin:5px 0 0;font-size:14px;color:#5B5952">Two of the seven stages are yours — marked below. Numbers are what Kalyani Industries is holding right now.</p>
+    </div>
+
+    <div style="display:flex;border:1px solid rgba(11,11,11,0.10);border-radius:12px;overflow:hidden">
+      <sc-for list="{{ stages }}" as="stage" hint-placeholder-count="7">
+        <button onclick="{{ stage.onClick }}" style="{{ stage.style }}">
+          <sc-if value="{{ stage.mine }}" hint-placeholder-val="{{ false }}">
+            <div style="display:flex;align-items:center;gap:6px"><span style="width:7px;height:7px;border-radius:999px;background:#D97757"></span><p style="margin:0;font-size:13px;font-weight:500;color:#0B0B0B">{{ stage.title }}</p></div>
+          </sc-if>
+          <sc-if value="{{ stage.notMine }}" hint-placeholder-val="{{ true }}">
+            <p style="margin:0;font-size:13px;color:#5B5952">{{ stage.title }}</p>
+          </sc-if>
+          <p style="margin:6px 0 0;font-size:11.5px;color:#9A968C">{{ stage.formal }}</p>
+          <p style="{{ stage.countStyle }}">{{ stage.count }}</p>
+          <p style="{{ stage.subStyle }}">{{ stage.sub }}</p>
+        </button>
+      </sc-for>
+    </div>
+
+    <div style="display:flex;gap:22px;align-items:flex-start">
+      <section style="flex:1.15;display:flex;flex-direction:column;gap:10px">
+        <h2 style="margin:0;font-size:12.5px;letter-spacing:0.07em;text-transform:uppercase;color:#9A968C">Waiting on you — stage 2</h2>
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <div style="border:1px solid rgba(217,119,87,0.35);background:rgba(217,119,87,0.05);border-radius:10px;padding:14px 16px">
+            <p style="margin:0;font-size:14px;font-weight:500">Vikram's generator service · ₹86,000</p>
+            <p style="margin:3px 0 0;font-size:13px;line-height:1.5;color:#5B5952">Waiting 3 days. Says yes → goes to Priya in finance. Says no → Vikram can fix it and resend.</p>
+            <div style="margin-top:10px;display:flex;gap:8px">
+              <button onclick="{{ decide }}" style="height:30px;padding:0 12px;border:none;border-radius:8px;background:#D97757;color:#fff;font-size:13px;font-weight:500;cursor:pointer">Agree</button>
+              <button onclick="{{ decide }}" style="height:30px;padding:0 12px;border:1px solid rgba(11,11,11,0.10);border-radius:8px;background:#FCFCFB;font-size:13px;cursor:pointer">Ask a question</button>
+            </div>
+          </div>
+          <div style="border:1px solid rgba(11,11,11,0.08);border-radius:10px;padding:14px 16px">
+            <p style="margin:0;font-size:14px;font-weight:500">Meera's laptop · ₹77,000</p>
+            <p style="margin:3px 0 0;font-size:13px;color:#5B5952">Waiting 1 day. Same two options.</p>
+          </div>
+        </div>
+        <sc-if value="{{ decision }}" hint-placeholder-val="{{ false }}">
+          <p style="margin:0;font-size:12.5px;font-weight:500;color:#0A8A0A">{{ decision }}</p>
+        </sc-if>
+      </section>
+
+      <section style="flex:1;display:flex;flex-direction:column;gap:10px">
+        <h2 style="margin:0;font-size:12.5px;letter-spacing:0.07em;text-transform:uppercase;color:#9A968C">Yours, on the map</h2>
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <div style="border:1px solid rgba(11,11,11,0.08);border-radius:10px;padding:12px 14px">
+            <p style="margin:0;font-size:13.5px;font-weight:500">Generator service</p>
+            <div style="margin-top:8px;display:flex;gap:3px">
+              <span style="flex:1;height:4px;border-radius:2px;background:#0CA30C"></span><span style="flex:1;height:4px;border-radius:2px;background:#D97757"></span><span style="flex:1;height:4px;border-radius:2px;background:rgba(11,11,11,0.10)"></span><span style="flex:1;height:4px;border-radius:2px;background:rgba(11,11,11,0.10)"></span><span style="flex:1;height:4px;border-radius:2px;background:rgba(11,11,11,0.10)"></span><span style="flex:1;height:4px;border-radius:2px;background:rgba(11,11,11,0.10)"></span><span style="flex:1;height:4px;border-radius:2px;background:rgba(11,11,11,0.10)"></span>
+            </div>
+            <p style="margin:6px 0 0;font-size:12.5px;color:#5B5952">Stage 2 · with Vikram Shah</p>
+          </div>
+          <div style="border:1px solid rgba(11,11,11,0.08);border-radius:10px;padding:12px 14px">
+            <p style="margin:0;font-size:13.5px;font-weight:500">Dell Latitude ×3</p>
+            <div style="margin-top:8px;display:flex;gap:3px">
+              <span style="flex:1;height:4px;border-radius:2px;background:#0CA30C"></span><span style="flex:1;height:4px;border-radius:2px;background:#0CA30C"></span><span style="flex:1;height:4px;border-radius:2px;background:#0CA30C"></span><span style="flex:1;height:4px;border-radius:2px;background:#0CA30C"></span><span style="flex:1;height:4px;border-radius:2px;background:#D97757"></span><span style="flex:1;height:4px;border-radius:2px;background:rgba(11,11,11,0.10)"></span><span style="flex:1;height:4px;border-radius:2px;background:rgba(11,11,11,0.10)"></span>
+            </div>
+            <p style="margin:6px 0 0;font-size:12.5px;color:#5B5952">Stage 5 · arriving 22 Aug</p>
+          </div>
+          <div style="border:1px solid rgba(11,11,11,0.08);border-radius:10px;padding:12px 14px;background:#F6F6F3">
+            <p style="margin:0;font-size:13px;line-height:1.5;color:#5B5952">Every request, order, bill and payment in AWA shows this same seven-part bar. Learn it once.</p>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <div style="display:flex;gap:12px">
+      <button style="flex:1;display:flex;flex-direction:column;gap:4px;text-align:left;border:1px solid rgba(11,11,11,0.10);border-radius:10px;background:#FCFCFB;padding:16px 18px;cursor:pointer">
+        <span style="font-size:15px;font-weight:500;color:#0B0B0B">Ask for something</span>
+        <span style="font-size:13px;color:#78766F">Two minutes. We'll tell you who has to agree before you send it.</span>
+      </button>
+      <button style="flex:1;display:flex;flex-direction:column;gap:4px;text-align:left;border:1px solid rgba(11,11,11,0.10);border-radius:10px;background:#FCFCFB;padding:16px 18px;cursor:pointer">
+        <span style="font-size:15px;font-weight:500;color:#0B0B0B">Find out what happened to something</span>
+        <span style="font-size:13px;color:#78766F">Search anyone's request — see who is holding it and since when.</span>
+      </button>
+    </div>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1180,&quot;height&quot;:840}}">
+const STAGES = [
+  { title: "Someone asks", formal: "Requisition", count: "3", mine: true, sub: "yours · 1 unsent", subColor: "#C6613F" },
+  { title: "Someone agrees", formal: "Approval", count: "5", mine: true, sub: "2 waiting on you", subColor: "#C6613F" },
+  { title: "A vendor is chosen", formal: "Sourcing / RFQ", count: "4", mine: false, sub: "procurement", subColor: "#9A968C" },
+  { title: "The order goes out", formal: "Purchase order", count: "2", mine: false, sub: "procurement", subColor: "#9A968C" },
+  { title: "It arrives", formal: "Goods receipt", count: "2", mine: false, sub: "whoever takes delivery", subColor: "#9A968C" },
+  { title: "The bill is checked", formal: "Three-way match", count: "3 · 1 stuck", mine: false, sub: "finance", subColor: "#9A968C" },
+  { title: "It gets paid", formal: "Payment", count: "3", mine: false, sub: "finance", subColor: "#9A968C" },
+];
+
+class Component extends DCLogic {
+  state = { decision: "", selected: null };
+
+  renderVals() {
+    return {
+      stages: STAGES.map((s, i) => ({
+        ...s,
+        notMine: !s.mine,
+        onClick: () => this.setState({ selected: i }),
+        style: {
+          flex: 1, textAlign: "left", padding: "16px 14px", border: "none", cursor: "pointer",
+          fontFamily: "inherit", borderRight: i < STAGES.length - 1 ? "1px solid rgba(11,11,11,0.08)" : "none",
+          background: this.state.selected === i ? "rgba(217,119,87,0.14)" : s.mine ? "rgba(217,119,87,0.07)" : "transparent",
+        },
+        countStyle: { margin: "10px 0 0", fontSize: "20px", fontWeight: 500, fontVariantNumeric: "tabular-nums", color: s.mine ? "#0B0B0B" : "#5B5952" },
+        subStyle: { margin: "2px 0 0", fontSize: "11.5px", fontWeight: s.mine ? 500 : 400, color: s.subColor },
+      })),
+      decision: this.state.decision,
+      decide: () => this.setState({ decision: "Recorded — Vikram's request now moves to Priya in finance." }),
+    };
+  }
+}
+</script>
+</body>
+</html>

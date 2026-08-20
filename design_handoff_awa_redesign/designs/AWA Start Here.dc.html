@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Source+Serif+4:opsz,wght@8..60,400;8..60,500&display=swap" rel="stylesheet">
+<style>body{margin:0;background:#E9E7E1;font-family:Geist,system-ui,sans-serif}a{color:#D97757}a:hover{color:#C6613F}</style>
+</helmet>
+
+<div style="display:flex;width:100%;min-width:1180px;min-height:880px;background:#FCFCFB">
+  <dc-import name="AwaSidebarNew" active="start" start-caption="{{ startCaption }}" hint-size="248px,880px"></dc-import>
+
+  <main style="flex:1;min-width:0;display:flex;flex-direction:column;gap:24px;padding:32px 36px">
+    <div>
+      <h1 style="margin:0;font-family:'Source Serif 4',Georgia,serif;font-size:26px;font-weight:400;color:#0B0B0B">Start here</h1>
+      <p style="margin:4px 0 0;font-size:14.5px;line-height:1.55;color:#5B5952;max-width:70ch">Four things, about twenty minutes, in this order — each one needs the one above it. Nothing is permanent; all of it stays editable.</p>
+    </div>
+
+    <div style="display:flex;align-items:center;gap:16px;border:1px solid rgba(11,11,11,0.08);border-radius:10px;background:#F6F6F3;padding:14px 16px">
+      <div style="flex:1;display:flex;flex-direction:column;gap:8px">
+        <div style="display:flex;gap:4px">
+          <sc-for list="{{ progressBars }}" as="bar" hint-placeholder-count="4">
+            <span style="{{ bar.style }}"></span>
+          </sc-for>
+        </div>
+        <p style="margin:0;font-size:13px;color:#5B5952"><strong style="font-weight:500">{{ doneCount }} of 4 done.</strong> {{ progressNote }}</p>
+      </div>
+      <span style="{{ liveBadgeStyle }}">{{ liveLabel }}</span>
+    </div>
+
+    <ol style="margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:10px">
+      <li style="display:flex;gap:14px;border:1px solid rgba(11,11,11,0.08);border-radius:10px;padding:14px 16px;background:#FCFCFB">
+        <span style="width:20px;height:20px;flex-shrink:0;display:grid;place-items:center;border-radius:999px;background:#0CA30C;color:#fff;font-size:11px;font-weight:600">✓</span>
+        <div style="flex:1"><p style="margin:0;font-size:14.5px;font-weight:500;color:#5B5952">Where the money comes from</p><p style="margin:2px 0 0;font-size:13px;color:#78766F">4 departments, 6 budget lines — all with an annual figure.</p></div>
+        <button style="height:30px;padding:0 12px;border:1px solid rgba(11,11,11,0.10);border-radius:8px;background:#FCFCFB;font-size:13px;cursor:pointer">Review</button>
+      </li>
+      <li style="display:flex;gap:14px;border:1px solid rgba(11,11,11,0.08);border-radius:10px;padding:14px 16px;background:#FCFCFB">
+        <span style="width:20px;height:20px;flex-shrink:0;display:grid;place-items:center;border-radius:999px;background:#0CA30C;color:#fff;font-size:11px;font-weight:600">✓</span>
+        <div style="flex:1"><p style="margin:0;font-size:14.5px;font-weight:500;color:#5B5952">Who's in, and what each of them does</p><p style="margin:2px 0 0;font-size:13px;color:#78766F">7 people invited, all with a role. <span style="color:#B07A05">3 hold no role beyond requesting.</span></p></div>
+        <button style="height:30px;padding:0 12px;border:1px solid rgba(11,11,11,0.10);border-radius:8px;background:#FCFCFB;font-size:13px;cursor:pointer">Review</button>
+      </li>
+
+      <li style="border:1px solid rgba(217,119,87,0.4);border-radius:10px;background:rgba(217,119,87,0.05);padding:18px 20px">
+        <div style="display:flex;gap:14px;align-items:flex-start">
+          <span style="width:20px;height:20px;flex-shrink:0;display:grid;place-items:center;border-radius:999px;border:1.5px solid #D97757;color:#D97757;font-size:11px;font-weight:600">3</span>
+          <div style="flex:1;min-width:0">
+            <div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px">
+              <p style="margin:0;font-size:15px;font-weight:500;color:#0B0B0B">Who has to sign off</p>
+              <span style="border-radius:999px;padding:2px 8px;font-size:11.5px;font-weight:500;background:rgba(217,119,87,0.16);color:#C6613F">you're here</span>
+            </div>
+            <p style="margin:6px 0 0;font-size:13.5px;line-height:1.55;color:#5B5952;max-width:74ch">An approval rule says who must agree before money is committed. <strong style="font-weight:500;color:#0B0B0B">Skip it and AWA has nobody to send requests to, so it approves them itself.</strong></p>
+
+            <div style="margin-top:14px;display:flex;gap:16px;flex-wrap:wrap">
+              <div style="flex:1 1 380px;border:1px solid rgba(11,11,11,0.10);border-radius:10px;background:#fff;padding:14px">
+                <p style="margin:0;font-size:11px;letter-spacing:0.08em;text-transform:uppercase;color:#9A968C">Start from a common one</p>
+                <div style="margin-top:10px;display:flex;flex-direction:column;gap:8px">
+                  <sc-for list="{{ ruleOptions }}" as="opt" hint-placeholder-count="3">
+                    <label onclick="{{ opt.select }}" style="{{ opt.style }}">
+                      <span style="{{ opt.dotStyle }}"></span>
+                      <span>
+                        <span style="display:block;font-size:13.5px;font-weight:500">{{ opt.title }}</span>
+                        <span style="display:block;margin-top:2px;font-size:12.5px;color:#78766F">{{ opt.desc }}</span>
+                      </span>
+                    </label>
+                  </sc-for>
+                </div>
+              </div>
+
+              <div style="flex:1 1 300px;border:1px solid rgba(11,11,11,0.10);border-radius:10px;background:#F6F6F3;padding:14px">
+                <p style="margin:0;font-size:11px;letter-spacing:0.08em;text-transform:uppercase;color:#9A968C">Rehearsal · a real request from last week</p>
+                <p style="margin:10px 0 0;font-size:13.5px;line-height:1.5;color:#0B0B0B">Anjali's <strong style="font-weight:500">₹86,000 generator service</strong> would go to:</p>
+                <div style="margin-top:10px;display:flex;flex-direction:column;gap:6px">
+                  <div style="display:flex;align-items:center;gap:8px;background:#fff;border:1px solid rgba(11,11,11,0.08);border-radius:8px;padding:8px 10px">
+                    <span style="width:22px;height:22px;border-radius:999px;background:#CBCADB;font-size:10px;font-weight:600;color:#3A3860;display:grid;place-items:center">VS</span>
+                    <span style="font-size:13px">Vikram Shah <span style="color:#78766F">· head of Facilities</span></span>
+                  </div>
+                  <p style="margin:0;padding-left:10px;font-size:12px;color:#78766F">then, if approved →</p>
+                  <sc-if value="{{ hasSecondStep }}" hint-placeholder-val="{{ false }}">
+                    <div style="display:flex;align-items:center;gap:8px;background:#fff;border:1px solid rgba(11,11,11,0.08);border-radius:8px;padding:8px 10px">
+                      <span style="width:22px;height:22px;border-radius:999px;background:#BCD1CA;font-size:10px;font-weight:600;color:#2E4A41;display:grid;place-items:center">PM</span>
+                      <span style="font-size:13px">Priya Menon <span style="color:#78766F">· finance approver</span></span>
+                    </div>
+                  </sc-if>
+                  <sc-if value="{{ noSecondStep }}" hint-placeholder-val="{{ true }}">
+                    <div style="display:flex;align-items:center;gap:8px;background:#fff;border:1px dashed rgba(11,11,11,0.14);border-radius:8px;padding:8px 10px;opacity:0.6">
+                      <span style="width:22px;height:22px;border-radius:999px;background:#F6F6F3;font-size:10px;color:#78766F;display:grid;place-items:center">—</span>
+                      <span style="font-size:13px;color:#78766F">nobody — this rule stops at one step</span>
+                    </div>
+                  </sc-if>
+                </div>
+                <p style="margin:12px 0 0;font-size:12.5px;line-height:1.5;color:#78766F">Change the choice on the left and this updates. Nothing is saved until you press below.</p>
+              </div>
+            </div>
+
+            <div style="margin-top:14px;display:flex;flex-wrap:wrap;gap:10px;align-items:center">
+              <button onclick="{{ activateRule }}" style="height:34px;padding:0 14px;border:none;border-radius:8px;background:#D97757;color:#fff;font-size:14px;font-weight:500;cursor:pointer">Turn this rule on</button>
+              <button style="height:34px;padding:0 14px;border:1px solid rgba(11,11,11,0.10);border-radius:8px;background:#FCFCFB;font-size:14px;cursor:pointer">Do this later</button>
+              <sc-if value="{{ ruleActivated }}" hint-placeholder-val="{{ false }}">
+                <span style="font-size:12.5px;font-weight:500;color:#0A8A0A">Rule turned on — requests now route for approval.</span>
+              </sc-if>
+            </div>
+          </div>
+        </div>
+      </li>
+
+      <li style="display:flex;gap:14px;border:1px solid rgba(11,11,11,0.08);border-radius:10px;padding:14px 16px;background:#FCFCFB">
+        <span style="width:20px;height:20px;flex-shrink:0;display:grid;place-items:center;border-radius:999px;border:1.5px solid rgba(11,11,11,0.18);color:#78766F;font-size:11px;font-weight:600">4</span>
+        <div style="flex:1"><p style="margin:0;font-size:14.5px;font-weight:500">Tell your team it exists</p><p style="margin:2px 0 0;font-size:13px;line-height:1.5;color:#78766F">We'll send each person a short note — what AWA is, which stage is theirs, one thing to try.</p></div>
+        <button style="height:30px;padding:0 12px;border:1px solid rgba(11,11,11,0.10);border-radius:8px;background:#FCFCFB;font-size:13px;cursor:pointer">Preview the note</button>
+      </li>
+    </ol>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1180,&quot;height&quot;:880}}">
+const RULES = [
+  { key: "single", title: "The manager of whoever asks", desc: "Anything over ₹0 goes to that person's department head. One step, nobody left out.", hasSecond: false },
+  { key: "two", title: "Manager, then finance over ₹50,000", desc: "Small things move fast; anything material gets a second pair of eyes.", hasSecond: true },
+  { key: "custom", title: "Write my own", desc: "The full rule matrix — amount, department, category, several signatories.", hasSecond: true },
+];
+
+class Component extends DCLogic {
+  state = { selected: "two", activated: false };
+
+  renderVals() {
+    const doneCount = this.state.activated ? 3 : 2;
+    const rule = RULES.find((r) => r.key === this.state.selected);
+    return {
+      startCaption: `${doneCount} of 4 done`,
+      progressBars: [0, 1, 2, 3].map((i) => ({
+        style: { flex: 1, height: "6px", borderRadius: "999px", background: i < doneCount ? "#0CA30C" : i === doneCount ? "#D97757" : "rgba(11,11,11,0.10)" },
+      })),
+      doneCount,
+      progressNote: this.state.activated
+        ? "Approval rules are live — requests now route for a decision."
+        : "Until step 3 is finished, every request anyone sends is approved automatically — the controls aren't running yet.",
+      liveBadgeStyle: { borderRadius: "999px", padding: "4px 10px", fontSize: "12px", fontWeight: 500,
+        background: this.state.activated ? "rgba(12,163,12,0.12)" : "rgba(249,178,26,0.12)",
+        color: this.state.activated ? "#0A8A0A" : "#B07A05" },
+      liveLabel: this.state.activated ? "Live" : "Not live yet",
+      ruleOptions: RULES.map((r) => ({
+        title: r.title, desc: r.desc,
+        select: () => this.setState({ selected: r.key }),
+        style: {
+          display: "flex", gap: "10px", alignItems: "flex-start", borderRadius: "8px", padding: "10px 12px", cursor: "pointer",
+          border: r.key === this.state.selected ? "1.5px solid #D97757" : "1px solid rgba(11,11,11,0.10)",
+          background: r.key === this.state.selected ? "rgba(217,119,87,0.05)" : "transparent",
+        },
+        dotStyle: { marginTop: "2px", width: "14px", height: "14px", borderRadius: "999px", flexShrink: 0,
+          border: r.key === this.state.selected ? "4px solid #D97757" : "1.5px solid rgba(11,11,11,0.25)" },
+      })),
+      hasSecondStep: rule.hasSecond,
+      noSecondStep: !rule.hasSecond,
+      activateRule: () => this.setState({ activated: true }),
+      ruleActivated: this.state.activated,
+    };
+  }
+}
+</script>
+</body>
+</html>

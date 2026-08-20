@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { LIFECYCLE_STEPS, railPosition } from "@/lib/lifecycle";
 import { Term } from "@/components/ui/help";
 import { cn } from "@/lib/utils";
@@ -23,6 +24,7 @@ export function LifecycleRail({
   captions,
   explain = false,
   compact = false,
+  href,
   className,
 }: {
   stage: string;
@@ -32,6 +34,13 @@ export function LifecycleRail({
   explain?: boolean;
   /** Dots and rules only, no labels — for a list row. */
   compact?: boolean;
+  /**
+   * Makes the whole rail one clickable link (typically to the record's
+   * own detail page) rather than a purely decorative status readout —
+   * every segment describes the same record, so there's one sensible
+   * destination regardless of which part of the bar is clicked.
+   */
+  href?: string;
   className?: string;
 }) {
   const { step: currentIndex, health } = railPosition(stage);
@@ -44,10 +53,10 @@ export function LifecycleRail({
   const currentTone =
     health === "attention" ? "bg-warning" : health === "stopped" ? "bg-destructive" : "bg-primary";
 
-  return (
+  const rail = (
     <ol
       aria-label={`Lifecycle — currently at ${LIFECYCLE_STEPS[currentIndex]?.label ?? "the start"}`}
-      className={cn("flex items-stretch overflow-x-auto", className)}
+      className={cn("flex items-stretch overflow-x-auto", !href && className)}
     >
       {LIFECYCLE_STEPS.map((step, index) => {
         const state = stateFor(index);
@@ -90,5 +99,19 @@ export function LifecycleRail({
         );
       })}
     </ol>
+  );
+
+  if (!href) return rail;
+
+  return (
+    <Link
+      href={href}
+      className={cn(
+        "block rounded-sm hover:opacity-80 focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none",
+        className,
+      )}
+    >
+      {rail}
+    </Link>
   );
 }

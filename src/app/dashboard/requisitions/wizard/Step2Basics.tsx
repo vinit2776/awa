@@ -1,6 +1,7 @@
 import { cn } from "@/lib/utils";
 import { Term } from "@/components/ui/help";
 import type { Department, CostCenter } from "./types";
+import { computeBudgetStatus } from "./budgetStatus";
 
 export function Step2Basics({
   departments,
@@ -22,9 +23,10 @@ export function Step2Basics({
   committedByCostCenter: Record<string, number>;
 }) {
   const selectedCostCenter = costCenters.find((c) => c.id === costCenterId);
-  const budget = selectedCostCenter?.annualBudget ? Number(selectedCostCenter.annualBudget) : null;
-  const committed = costCenterId ? (committedByCostCenter[costCenterId] ?? 0) : 0;
-  const remainingAfterThis = budget !== null ? budget - committed - total : null;
+  const budgetStatus = computeBudgetStatus(costCenterId, costCenters, committedByCostCenter, total);
+  const budget = budgetStatus?.budget ?? null;
+  const committed = budgetStatus?.committed ?? 0;
+  const remainingAfterThis = budgetStatus?.remainingAfterThis ?? null;
 
   return (
     <div className="flex flex-col gap-4">
