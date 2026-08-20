@@ -63,13 +63,21 @@ export function Step3LineItems({
       )}
 
       <div className="flex flex-col gap-3">
-        <LineItemsTable
-          lines={lines}
-          categories={categories}
-          catalogItems={catalogItems}
-          updateLine={updateLine}
-          removeLine={removeLine}
-        />
+        {/* Scrolls within itself at a viewport too narrow for the sidebar
+            plus every fixed-width input in a row — without this boundary
+            the overflow used to bubble up to DashboardShell's <main>
+            (fixed now too, but belt-and-suspenders) and drag the "Add
+            line" / total row, and the step nav above, out to the right
+            along with it. */}
+        <div className="overflow-x-auto">
+          <LineItemsTable
+            lines={lines}
+            categories={categories}
+            catalogItems={catalogItems}
+            updateLine={updateLine}
+            removeLine={removeLine}
+          />
+        </div>
 
         <div className="flex items-center justify-between">
           <button type="button" onClick={addLine} className={cn(buttonVariants({ variant: "outline", size: "sm" }))}>

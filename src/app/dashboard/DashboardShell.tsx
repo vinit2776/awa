@@ -63,7 +63,16 @@ export function DashboardShell({ sidebar, children }: { sidebar: ReactNode; chil
           {sidebar}
         </div>
 
-        <main className="flex min-w-0 flex-1 flex-col">{children}</main>
+        {/* overflow-x-auto is the actual fix, not min-w-0 alone: min-w-0
+            stops main from being forced wider than its flex-basis, but
+            without its own scroll boundary, content that's still too
+            wide for that width (a table with several fixed-width
+            inputs, at a viewport too narrow for the sidebar's 240px
+            plus that table but not narrow enough to trigger the
+            drawer below `md`) overflows past main and the whole
+            document scrolls horizontally instead — dragging the
+            sidebar, a normal flex sibling here, out of view with it. */}
+        <main className="flex min-w-0 flex-1 flex-col overflow-x-auto">{children}</main>
       </div>
     </div>
   );
