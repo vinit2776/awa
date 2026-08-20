@@ -6,6 +6,7 @@ import { SearchableSelect } from "@/components/ui/combobox";
 import { PriceHistoryHint } from "./PriceHistoryHint";
 import { CatalogMatchHint } from "./CatalogMatchHint";
 import { CommitmentHint } from "./CommitmentHint";
+import { AddToCatalogButton } from "./AddToCatalogButton";
 import type { Line, Category, CatalogItem } from "./types";
 
 export function LineItemsTable({
@@ -233,6 +234,14 @@ export function LineItemsTable({
                       onDismiss={() => updateLine(line.key, { catalogMatchDismissed: true })}
                       onAccept={acceptCatalogMatch}
                     />
+                    {!line.catalogItemId && (
+                      <AddToCatalogButton
+                        description={line.freeTextDescription}
+                        uom={line.uom}
+                        categoryId={line.categoryId}
+                        onCreated={acceptCatalogMatch}
+                      />
+                    )}
                     <CommitmentHint catalogItemId={line.catalogItemId} />
                     <PriceHistoryHint
                       catalogItemId={line.catalogItemId}

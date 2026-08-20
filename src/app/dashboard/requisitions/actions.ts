@@ -15,7 +15,7 @@ import { getOpenCommitmentsForItem, type OpenCommitments } from "@/db/itemCommit
 import { findSimilarCatalogItems, type SimilarCatalogItem } from "@/db/catalogMatch";
 import { judgeCatalogMatch } from "@/db/catalogMatchJudge";
 import { findPossibleDuplicates, recordDuplicateAcknowledgements, type PossibleDuplicate } from "@/db/duplicateDetection";
-import { purchaseRequisitions, purchaseRequisitionLines } from "@/db/schema";
+import { purchaseRequisitions, purchaseRequisitionLines, catalogItems } from "@/db/schema";
 
 export type LineInput = {
   catalogItemId: string | null;
@@ -467,6 +467,58 @@ export async function suggestCatalogItemForLine(description: string): Promise<Si
   if (candidates.length === 0) return null;
 
   return judgeCatalogMatch(trimmed, candidates);
+}
+
+/**
+ * Lets any requester add their free-text line straight to the catalogue,
+ * instead of only an admin being able to (admin/catalog/actions.ts's
+ * createItem, gated by requireTenantAdmin). Admin › Catalogue remains
+ * where that gets reviewed or enriched afterwards — it already lists
+ * every item's status, and this creates with the same "unverified"
+ * default admin-created items get (catalogItems.status has no other
+ * caller setting it either).
+ *
+ * Re-runs the same trigram-recall + LLM-judge check CatalogMatchHint
+ * uses (suggestCatalogItemForLine, above) at the moment of creation,
+ * rather than trusting that an earlier hint already ruled out a
+ * duplicate — the hint only fires on blur and can be dismissed or never
+ * triggered, so the action that actually writes a row is the one that
+ * has to get this right, not a UI state it can't see.
+ */
+export async function createCatalogItemFromLine(input: {
+  name: string;
+  uom: string;
+  categoryId: string | null;
+}): Promise<{ error?: string; item?: { id: string; name: string; uom: string; categoryId: string | null } }> {
+  const name = input.name.trim();
+  if (!name) return { error: "Give the item a name." };
+
+  const { user, tenant } = await getCurrentUserAndTenant();
+
+  const candidates = await withTenant(tenant.id, (tx) => findSimilarCatalogItems(tx, name, 5));
+  if (candidates.length > 0) {
+    const judged = await judgeCatalogMatch(name, candidates);
+    if (judged) return { error: `This looks like "${judged.name}", already in the catalogue — use that instead.` };
+  }
+
+  const created = await withTenant(tenant.id, async (tx) => {
+    const [item] = await tx
+      .insert(catalogItems)
+      .values({ tenantId: tenant.id, name, categoryId: input.categoryId, uom: input.uom.trim() || "each", createdBy: user.id })
+      .returning();
+    await logAction(tx, {
+      tenantId: tenant.id,
+      actorUserId: user.id,
+      action: "catalog_item.created",
+      entityType: "catalog_item",
+      entityId: item.id,
+      metadata: { name, source: "requisition_line" },
+    });
+    return item;
+  });
+
+  revalidatePath("/dashboard/admin/catalog");
+  return { item: { id: created.id, name: created.name, uom: created.uom, categoryId: created.categoryId } };
 }
 
 /**
