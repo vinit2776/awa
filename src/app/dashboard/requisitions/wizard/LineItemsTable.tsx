@@ -1,7 +1,7 @@
 "use client";
 
 import { Fragment, useMemo, useState } from "react";
-import { Term } from "@/components/ui/help";
+import { Term, Info } from "@/components/ui/help";
 import { SearchableSelect } from "@/components/ui/combobox";
 import { PriceHistoryHint } from "./PriceHistoryHint";
 import { CatalogMatchHint } from "./CatalogMatchHint";
@@ -198,6 +198,12 @@ export function LineItemsTable({
                       {categoryOpen.has(line.key) || line.categoryId ? (
                         <label className="flex items-center gap-1.5 text-muted-foreground">
                           Category
+                          <Info title="Category" next="Set it up under Admin › Approval rules.">
+                            What kind of purchase this is, not what it&apos;s called — only used so an approval
+                            rule can require a different approver for this kind of thing regardless of
+                            department. It doesn&apos;t add anything to the catalogue and nobody else sees it
+                            unless a rule is scoped to it.
+                          </Info>
                           <select
                             value={line.categoryId ?? ""}
                             onChange={(e) => updateLine(line.key, { categoryId: e.target.value || null })}
