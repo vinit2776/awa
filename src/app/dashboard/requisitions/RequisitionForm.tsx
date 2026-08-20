@@ -12,6 +12,7 @@ import {
   type LineInput,
 } from "./actions";
 import { cn } from "@/lib/utils";
+import { buttonVariants } from "@/components/ui/button";
 import type { ApprovalPreview } from "@/db/approvalPreview";
 import type { ExtractedDocumentMeta } from "@/db/documentExtraction";
 import type { PossibleDuplicate } from "@/db/duplicateDetection";
@@ -192,6 +193,10 @@ export function RequisitionForm({
     [lines],
   );
   const budgetStatus = computeBudgetStatus(costCenterId, costCenters, committedByCostCenter, total);
+  // Same test the server applies (requisitions/actions.ts's validLines
+  // filter) — the rail uses it to decide whether it has anything real to
+  // offer to send yet.
+  const hasContent = lines.some((l) => (l.catalogItemId || l.freeTextDescription?.trim()) && Number(l.quantity) > 0);
 
   // Refreshed whenever something that affects routing changes. Rules match
   // on value, department, cost centre and line category, so those are the
@@ -397,14 +402,12 @@ export function RequisitionForm({
           />
         )}
 
-        <div className="flex justify-between">
+        <div className="mt-2 flex items-center justify-center gap-4">
           <button
             type="button"
             disabled={stepIndex === 0}
             onClick={() => setStepIndex((i) => Math.max(0, i - 1))}
-            className={cn(
-              "text-sm text-muted-foreground hover:text-foreground disabled:pointer-events-none disabled:opacity-0",
-            )}
+            className="text-sm text-muted-foreground hover:text-foreground disabled:pointer-events-none disabled:opacity-0"
           >
             ← Back
           </button>
@@ -412,7 +415,7 @@ export function RequisitionForm({
             <button
               type="button"
               onClick={() => goToStep(steps[stepIndex + 1])}
-              className="text-sm text-muted-foreground hover:text-foreground"
+              className={cn(buttonVariants({ variant: step === "lines" && !hasContent ? "outline" : "default" }), "px-6")}
             >
               Next →
             </button>
@@ -425,6 +428,7 @@ export function RequisitionForm({
         duplicates={duplicates}
         budgetStatus={budgetStatus}
         revision={!!revision}
+        hasContent={hasContent}
         isPending={isPending}
         onSend={handleSend}
         onSaveDraft={() => submit(false)}

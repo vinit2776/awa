@@ -24,6 +24,15 @@ export function LineItemsTable({
   // Which extraction-sourced lines the user has asked to see the full
   // catalog picker for, despite the collapsed default — see Line.fromExtraction.
   const [pickerOpen, setPickerOpen] = useState<Set<string>>(new Set());
+  // Which lines have their category control expanded. Category is
+  // optional and only does anything once an admin sets up a rule scoped
+  // to it (db/approvals.ts's lineCategoryIds matching) — asking it as a
+  // full column on every line is friction with no payoff for a tenant
+  // that never configures one, so it starts collapsed behind a toggle
+  // in the hint row, same as "or pick from catalog" does for the item
+  // picker. A line that already has one (set by hand, or auto-filled
+  // from a catalog pick) shows the control expanded, not the toggle.
+  const [categoryOpen, setCategoryOpen] = useState<Set<string>>(new Set());
   // A dozen-plus catalog items is already too many to scan in a closed
   // dropdown — searchable beats a scrollable native <select> here.
   const catalogOptions = useMemo(() => catalogItems.map((i) => ({ value: i.id, label: i.name })), [catalogItems]);
@@ -40,7 +49,6 @@ export function LineItemsTable({
       <thead>
         <tr className="border-b text-left text-xs text-muted-foreground">
           <th className="py-2 font-normal">Item</th>
-          <th className="py-2 font-normal">Category</th>
           <th className="py-2 font-normal">Type</th>
           <th className="py-2 font-normal">Qty</th>
           <th className="py-2 font-normal">
@@ -117,18 +125,6 @@ export function LineItemsTable({
                 </td>
                 <td className="py-2 pr-2">
                   <select
-                    value={line.categoryId ?? ""}
-                    onChange={(e) => updateLine(line.key, { categoryId: e.target.value || null })}
-                    className="h-8 w-32 rounded-md border px-2 text-sm"
-                  >
-                    <option value="">—</option>
-                    {categories.map((c) => (
-                      <option key={c.id} value={c.id}>{c.name}</option>
-                    ))}
-                  </select>
-                </td>
-                <td className="py-2 pr-2">
-                  <select
                     value={line.fulfillmentType}
                     onChange={(e) => updateLine(line.key, { fulfillmentType: e.target.value as "goods" | "service" })}
                     className="h-8 w-24 rounded-md border px-2 text-sm"
@@ -189,16 +185,40 @@ export function LineItemsTable({
                   )}
                 </td>
               </tr>
-              {/* Hints live in a full-width sub-row rather than their cramped
-                  columns above, so a wide hint doesn't stretch the column it
-                  refers to. No vertical padding/border here, so a line with
-                  no active hints (the common case — every hint self-hides)
-                  collapses to zero height; the border that used to sit on
-                  the main row moves down here so the pair still reads as
-                  one bordered row when empty. */}
+              {/* Hints — and the collapsed category toggle — live in a
+                  full-width sub-row rather than their own cramped columns
+                  above, so a wide hint doesn't stretch the column it refers
+                  to. No vertical padding/border on the cell itself; the
+                  border that used to sit on the main row moves down here so
+                  the pair still reads as one bordered row. */}
               <tr className="border-b">
-                <td colSpan={8} className="py-0">
-                  <div className="flex flex-wrap items-start gap-x-4 gap-y-1 max-w-2xl">
+                <td colSpan={7} className="py-0">
+                  <div className="flex flex-wrap items-center gap-x-4 gap-y-1 max-w-2xl">
+                    <div className="text-xs">
+                      {categoryOpen.has(line.key) || line.categoryId ? (
+                        <label className="flex items-center gap-1.5 text-muted-foreground">
+                          Category
+                          <select
+                            value={line.categoryId ?? ""}
+                            onChange={(e) => updateLine(line.key, { categoryId: e.target.value || null })}
+                            className="h-6 rounded-md border px-1.5 text-xs"
+                          >
+                            <option value="">— none —</option>
+                            {categories.map((c) => (
+                              <option key={c.id} value={c.id}>{c.name}</option>
+                            ))}
+                          </select>
+                        </label>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => setCategoryOpen((prev) => new Set(prev).add(line.key))}
+                          className="text-muted-foreground underline underline-offset-2 hover:text-foreground"
+                        >
+                          + category
+                        </button>
+                      )}
+                    </div>
                     <CatalogMatchHint
                       description={line.freeTextDescription}
                       catalogItemId={line.catalogItemId}

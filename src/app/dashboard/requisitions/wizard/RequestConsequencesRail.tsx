@@ -22,6 +22,7 @@ export function RequestConsequencesRail({
   duplicates,
   budgetStatus,
   revision,
+  hasContent,
   isPending,
   onSend,
   onSaveDraft,
@@ -31,6 +32,16 @@ export function RequestConsequencesRail({
   duplicates: PossibleDuplicate[];
   budgetStatus: BudgetStatus;
   revision: boolean;
+  /**
+   * Same test createRequisition/reviseAndResubmitRequisition apply
+   * server-side — at least one line with a description and a quantity
+   * greater than zero. Before that's true, "Send to Krunal Dangi" is a
+   * real name on a live-looking button that can't actually go anywhere
+   * yet (the server rejects an empty submission either way), which reads
+   * as the rail offering to send nothing. Gate the actions on it instead
+   * of just letting the server catch it after a click.
+   */
+  hasContent: boolean;
   isPending: boolean;
   onSend: () => void;
   onSaveDraft: () => void;
@@ -47,7 +58,13 @@ export function RequestConsequencesRail({
     <aside className="flex w-full flex-col gap-3.5 border-t border-border pt-6 lg:w-[330px] lg:shrink-0 lg:border-t-0 lg:border-l lg:pt-0 lg:pl-6">
       <p className="text-xs font-medium tracking-[0.07em] text-muted-foreground uppercase">If you send this now</p>
 
-      <ApprovalChainSummary preview={preview} />
+      {hasContent ? (
+        <ApprovalChainSummary preview={preview} />
+      ) : (
+        <p className="rounded-lg border border-dashed border-input p-3 text-xs leading-relaxed text-muted-foreground">
+          Add at least one item to see who this goes to.
+        </p>
+      )}
 
       {(budgetStatus || duplicates.length > 0) && (
         <div className="flex flex-col gap-2 border-t border-border pt-3.5">
@@ -81,13 +98,18 @@ export function RequestConsequencesRail({
       )}
 
       <div className="flex flex-col gap-2 border-t border-border pt-3.5">
-        <button type="button" disabled={isPending} onClick={onSend} className={cn(buttonVariants(), "h-10")}>
+        <button
+          type="button"
+          disabled={isPending || !hasContent}
+          onClick={onSend}
+          className={cn(buttonVariants(), "h-10")}
+        >
           {sendLabel}
         </button>
         {!revision && (
           <button
             type="button"
-            disabled={isPending}
+            disabled={isPending || !hasContent}
             onClick={onSaveDraft}
             className={cn(buttonVariants({ variant: "outline" }), "h-9")}
           >
@@ -95,7 +117,9 @@ export function RequestConsequencesRail({
           </button>
         )}
         <p className="text-[11.5px] leading-relaxed text-muted-foreground/80">
-          A draft is private to you. Sending commits nothing — it asks a person.
+          {hasContent
+            ? "A draft is private to you. Sending commits nothing — it asks a person."
+            : "Both need at least one item on the request first."}
         </p>
       </div>
     </aside>
