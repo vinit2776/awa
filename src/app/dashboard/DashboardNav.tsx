@@ -52,7 +52,11 @@ const FOOTER: NavRow[] = [
 
 function useIsActive() {
   const pathname = usePathname();
-  return (href: string) => pathname === href || pathname.startsWith(`${href}/`);
+  // "/dashboard" is the one href here every other route is nested
+  // under — prefix-matching it the same way as the rest would mark
+  // "Today" active on literally every page in the app.
+  return (href: string) =>
+    href === "/dashboard" ? pathname === href : pathname === href || pathname.startsWith(`${href}/`);
 }
 
 function NavLink({ item, active, dim, count }: { item: NavRow; active: boolean; dim?: boolean; count?: number }) {

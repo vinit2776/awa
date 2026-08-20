@@ -69,16 +69,23 @@ export function HelpClient({
   };
 
   return (
-    <div className="flex flex-1">
-      <nav className="flex w-[210px] shrink-0 flex-col gap-0.5 border-r border-border px-4 py-7">
-        <p className="mb-2 px-2 text-[11px] tracking-[0.08em] text-muted-foreground uppercase">Contents</p>
+    <div className="flex flex-1 flex-col xl:flex-row">
+      {/* Three fixed-width columns (210 + 300, plus the app's own 240px
+          sidebar) need well over 1200px before the center content has
+          room to breathe — below `xl` this stacks instead: contents
+          becomes a horizontal-scrolling row up top, the glossary drops
+          below the main content rather than squeezing it to a sliver. */}
+      <nav className="flex w-full shrink-0 gap-0.5 overflow-x-auto border-b border-border px-4 py-3 xl:w-[210px] xl:flex-col xl:border-r xl:border-b-0 xl:px-4 xl:py-7">
+        <p className="hidden px-2 text-[11px] tracking-[0.08em] text-muted-foreground uppercase xl:mb-2 xl:block">
+          Contents
+        </p>
         {SECTIONS.map((s) => (
           <button
             key={s}
             type="button"
             onClick={() => setSection(s)}
             className={cn(
-              "rounded-lg px-2 py-1.5 text-left text-sm transition-colors",
+              "shrink-0 rounded-lg px-2 py-1.5 text-left text-sm whitespace-nowrap transition-colors",
               s === section ? "bg-primary/10 font-medium text-primary" : "text-foreground/75 hover:bg-muted",
             )}
           >
@@ -133,7 +140,7 @@ export function HelpClient({
         )}
       </div>
 
-      <aside className="flex w-[300px] shrink-0 flex-col gap-3.5 border-l border-border bg-muted/40 px-5 py-6">
+      <aside className="flex w-full shrink-0 flex-col gap-3.5 border-t border-border bg-muted/40 px-5 py-6 xl:w-[300px] xl:border-t-0 xl:border-l">
         <p className="text-[11px] tracking-[0.08em] text-muted-foreground uppercase">Words we use</p>
         <input
           value={query}
